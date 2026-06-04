@@ -1,0 +1,33 @@
+import { createContext } from 'react'
+
+import type { LoginApiResult } from '@/api/auth'
+import type { AuthSession } from '@/lib/auth-session'
+import type { AccessProfile } from '@/types/access-profile'
+
+export type LoginOutcome =
+  | { status: 'ok' }
+  | { status: 'error'; message: string }
+  | { status: 'verify'; challengeId: string; userEmail: string }
+  | { status: 'enroll'; enrollmentToken: string; userEmail: string }
+
+export type AuthContextValue = {
+  session: AuthSession | null
+  /** Perfil de acceso del usuario conectado (API). */
+  profile: AccessProfile | null
+  isAuthenticated: boolean
+  isReady: boolean
+  login: (email: string, password: string) => Promise<LoginOutcome>
+  completeTwoFactorLogin: (challengeId: string, code: string) => Promise<LoginOutcome>
+  completeEnrollmentLogin: (
+    enrollmentToken: string,
+    code: string,
+    setupId?: string,
+  ) => Promise<LoginOutcome & { backupCodes?: string[] }>
+  logout: () => Promise<void>
+  /** Recarga permisos desde la API (p. ej. tras editar el perfil de acceso). */
+  refreshProfile: () => Promise<void>
+}
+
+export type { LoginApiResult }
+
+export const AuthContext = createContext<AuthContextValue | null>(null)

@@ -1,0 +1,43 @@
+{
+  "name": "kora-crm-backend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test src/**/*.test.ts",
+    "db:migrate-warehouses-geo": "tsx scripts/migrate-warehouses-geo.ts",
+    "db:migrate-purchase-oc-workflow": "tsx scripts/migrate-purchase-oc-workflow.ts",
+    "db:migrate-purchase-detail-fields": "tsx scripts/migrate-purchase-detail-fields.ts",
+    "db:migrate-exchange-rates": "tsx scripts/migrate-exchange-rates.ts",
+    "db:migrate-user-totp-2fa": "tsx scripts/migrate-user-totp-2fa.ts",
+    "db:migrate-purchase-line-discount": "tsx scripts/migrate-purchase-line-discount.ts"
+  },
+  "dependencies": {
+    "chilean-territorial-divisions": "^1.0.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "mailtrap": "^4.6.0",
+    "nodemailer": "^8.0.10",
+    "otplib": "^13.4.1",
+    "pg": "^8.13.3",
+    "qrcode": "^1.5.4",
+    "ws": "^8.21.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.13.10",
+    "@types/nodemailer": "^6.4.23",
+    "@types/pg": "^8.11.11",
+    "@types/qrcode": "^1.5.6",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}
