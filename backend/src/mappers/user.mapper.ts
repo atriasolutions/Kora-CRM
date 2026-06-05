@@ -8,6 +8,7 @@ export type UserRow = {
   name: string
   role: string | null
   profile_id: string
+  profile_name?: string | null
   status: UserListItem['status']
   avatar_url: string | null
   phone: string | null
@@ -48,6 +49,8 @@ export function mapUserRow(row: UserRow): UserListItem {
     name: row.name,
     email: row.email,
     role: row.role ?? '—',
+    profileId: row.profile_id,
+    profileName: row.profile_name?.trim() || '—',
     lastLogin: formatActivityLabel(row.last_login_at),
     status: row.status,
     avatarUrl: imageUrlForList(row.avatar_url),

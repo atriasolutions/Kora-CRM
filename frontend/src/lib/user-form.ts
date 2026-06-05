@@ -1,4 +1,4 @@
-import { profileIdForUserRole } from '@/data/profiles.mock'
+import { profileIdForUserRole, profileNameForId } from '@/data/profiles.mock'
 import type { UserDetail } from '@/data/user-detail.mock'
 import type { UserListItem, UserRole, UserStatus } from '@/data/users.mock'
 
@@ -176,11 +176,14 @@ export function applyFormValuesToUser(
 }
 
 export function listItemFromUserDetail(user: UserDetail): UserListItem {
+  const profileId = user.profileId
   return {
     id: user.id,
     name: user.name,
     email: user.email,
     role: user.role,
+    profileId,
+    profileName: profileNameForId(profileId),
     lastLogin: user.lastLogin,
     status: user.status,
     avatarUrl: user.avatarUrl,

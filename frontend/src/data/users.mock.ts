@@ -1,3 +1,5 @@
+import { profileIdForUserRole, profileNameForId } from '@/data/profiles.mock'
+
 export type UserStatus = 'Activo' | 'Invitado' | 'Inactivo' | 'Por verificar'
 
 export type UserRole =
@@ -15,12 +17,16 @@ export type UserListItem = {
   name: string
   email: string
   role: UserRole | string
+  profileId: string
+  profileName: string
   lastLogin: string
   status: UserStatus
   avatarUrl?: string
 }
 
-export const userListSeed: UserListItem[] = [
+type UserListSeedRow = Omit<UserListItem, 'profileId' | 'profileName'>
+
+const userListSeedBase: UserListSeedRow[] = [
   {
     id: 'u1',
     name: 'María López',
@@ -86,3 +92,12 @@ export const userListSeed: UserListItem[] = [
     status: 'Invitado',
   },
 ]
+
+export const userListSeed: UserListItem[] = userListSeedBase.map((row) => {
+  const profileId = profileIdForUserRole(row.role)
+  return {
+    ...row,
+    profileId,
+    profileName: profileNameForId(profileId),
+  }
+})

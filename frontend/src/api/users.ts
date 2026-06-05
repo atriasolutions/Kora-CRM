@@ -3,6 +3,7 @@ import { fetchJSON } from '@/api/client'
 import { fetchAllPages } from '@/api/list-all'
 import type { ApiItemResponse } from '@/api/types'
 import type { UserDetail } from '@/data/user-detail.mock'
+import { profileIdForUserRole, profileNameForId } from '@/data/profiles.mock'
 import type { UserListItem } from '@/data/users.mock'
 import type { UserFormValues } from '@/lib/user-form'
 import { resolveEntityImageSrc } from '@/lib/image-upload'
@@ -10,8 +11,11 @@ import { resolveEntityImageSrc } from '@/lib/image-upload'
 const BASE = `${API_V1}/users`
 
 function normalizeUserListItem(user: UserListItem): UserListItem {
+  const profileId = user.profileId ?? profileIdForUserRole(user.role)
   return {
     ...user,
+    profileId,
+    profileName: user.profileName?.trim() || profileNameForId(profileId),
     avatarUrl: resolveEntityImageSrc(user.avatarUrl),
   }
 }

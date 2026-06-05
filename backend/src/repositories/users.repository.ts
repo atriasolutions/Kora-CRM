@@ -20,6 +20,14 @@ const SELECT_COLUMNS = `
   bio, last_login_at, created_at
 `
 
+const SELECT_LIST_COLUMNS = `
+  u.id, u.email, u.name, u.role, u.profile_id, u.status, u.avatar_url,
+  u.phone, u.department, u.job_title, u.timezone, u.language,
+  u.two_factor_enabled, u.totp_secret_encrypted, u.totp_verified_at,
+  u.bio, u.last_login_at, u.created_at,
+  p.name AS profile_name
+`
+
 export type ListUsersParams = {
   page: number
   pageSize: number
@@ -30,16 +38,18 @@ export type ListUsersParams = {
 export async function listUsers(
   params: ListUsersParams,
 ): Promise<{ items: UserListItem[]; total: number }> {
-  const conditions: string[] = ['deleted_at IS NULL']
+  const conditions: string[] = ['u.deleted_at IS NULL']
   const values: unknown[] = []
   let idx = 1
 
   if (params.status) {
-    conditions.push(`status = $${idx++}`)
+    conditions.push(`u.status = $${idx++}`)
     values.push(params.status)
   }
   if (params.q) {
-    conditions.push(`(name ILIKE $${idx} OR email ILIKE $${idx} OR role ILIKE $${idx})`)
+    conditions.push(
+      `(u.name ILIKE $${idx} OR u.email ILIKE $${idx} OR u.role ILIKE $${idx} OR p.name ILIKE $${idx})`,
+    )
     values.push(`%${params.q}%`)
     idx++
   }
@@ -47,7 +57,10 @@ export async function listUsers(
   const where = `WHERE ${conditions.join(' AND ')}`
 
   const countResult = await pool.query<{ count: string }>(
-    `SELECT count(*)::text AS count FROM crm_users ${where}`,
+    `SELECT count(*)::text AS count
+     FROM crm_users u
+     LEFT JOIN crm_access_profiles p ON p.id = u.profile_id
+     ${where}`,
     values,
   )
   const total = Number.parseInt(countResult.rows[0]?.count ?? '0', 10)
@@ -56,10 +69,11 @@ export async function listUsers(
   values.push(params.pageSize, offset)
 
   const result = await pool.query<UserRow>(
-    `SELECT ${SELECT_COLUMNS}
-     FROM crm_users
+    `SELECT ${SELECT_LIST_COLUMNS}
+     FROM crm_users u
+     LEFT JOIN crm_access_profiles p ON p.id = u.profile_id
      ${where}
-     ORDER BY name ASC
+     ORDER BY u.name ASC
      LIMIT $${idx++} OFFSET $${idx}`,
     values,
   )
@@ -70,10 +84,11 @@ export async function listUsers(
 /** Directorio mínimo para asignar responsables (sin permiso al módulo Usuarios). */
 export async function listUsersForAssignee(): Promise<UserListItem[]> {
   const result = await pool.query<UserRow>(
-    `SELECT ${SELECT_COLUMNS}
-     FROM crm_users
-     WHERE deleted_at IS NULL AND status = 'Activo'
-     ORDER BY name ASC`,
+    `SELECT ${SELECT_LIST_COLUMNS}
+     FROM crm_users u
+     LEFT JOIN crm_access_profiles p ON p.id = u.profile_id
+     WHERE u.deleted_at IS NULL AND u.status = 'Activo'
+     ORDER BY u.name ASC`,
   )
   return result.rows.map(mapUserRow)
 }

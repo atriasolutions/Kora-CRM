@@ -11,6 +11,8 @@ export type UserListItem = {
   name: string
   email: string
   role: string
+  profileId: string
+  profileName: string
   lastLogin: string
   status: UserStatus
   avatarUrl?: string

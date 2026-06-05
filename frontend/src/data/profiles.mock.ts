@@ -166,3 +166,7 @@ export function profileIdForUserRole(role: string): string {
   if (role === 'Soporte') return 'p-lectura'
   return 'p-lectura'
 }
+
+export function profileNameForId(profileId: string): string {
+  return profileListSeed.find((p) => p.id === profileId)?.name ?? '—'
+}

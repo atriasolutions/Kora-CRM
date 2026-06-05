@@ -20,7 +20,8 @@ export const usersListConfig: ModuleListConfig<UserListItem> = {
   searchFilter: (row, q) =>
     row.name.toLowerCase().includes(q) ||
     row.email.toLowerCase().includes(q) ||
-    row.role.toLowerCase().includes(q),
+    row.role.toLowerCase().includes(q) ||
+    row.profileName.toLowerCase().includes(q),
   columns: [
     {
       kind: 'primary',
@@ -37,6 +38,14 @@ export const usersListConfig: ModuleListConfig<UserListItem> = {
       header: 'Rol',
       className: 'w-[120px]',
       cell: (r) => r.role,
+    },
+    {
+      kind: 'text',
+      header: 'Perfil',
+      sortable: true,
+      sortValue: (r) => r.profileName,
+      className: 'w-[150px]',
+      cell: (r) => r.profileName,
     },
     {
       kind: 'text',
