@@ -20,9 +20,8 @@ import type {
 } from '../types/contact.js'
 import { paginationOffset } from '../utils/pagination.js'
 import { purgeEntityNotesAndFiles } from '../services/entity-purge.service.js'
-import {
-  assertUniqueContactRut,
-} from '../lib/tax-id-uniqueness.js'
+import { assertUniqueContactEmail } from '../lib/contact-uniqueness.js'
+import { assertUniqueContactRut } from '../lib/tax-id-uniqueness.js'
 import { maybeNotifyRecordOwnerChange } from '../lib/owner-assignment.js'
 
 const SELECT_COLUMNS = `
@@ -149,6 +148,7 @@ export async function createContact(
   await assertValidRegionCommune(input.region, input.commune)
 
   await assertUniqueContactRut(input.rut)
+  await assertUniqueContactEmail(input.email)
 
   const { companyId, companyName } = await resolveCompanySnapshot(
     input.companyId,
@@ -225,7 +225,9 @@ export async function updateContact(
   }
 
   const nextRut = input.rut !== undefined ? input.rut : existing.rut
+  const nextEmail = input.email !== undefined ? input.email : existing.email
   await assertUniqueContactRut(nextRut, id)
+  await assertUniqueContactEmail(nextEmail, id)
 
   const result = await pool.query<ContactRow>(
     `UPDATE crm_contacts SET

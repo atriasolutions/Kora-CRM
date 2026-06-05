@@ -303,7 +303,7 @@ INSERT INTO crm_invoices (
   issue_date, due_date, status, owner_name, payment_method, sii_number,
   created_by_name, updated_by_name
 ) VALUES (
-  'h1000001-0001-4001-8001-000000000001',
+  '81000001-0001-4001-8001-000000000001',
   'FAC-2024-0842',
   'Tech Solutions',
   'empresa',
@@ -326,8 +326,8 @@ INSERT INTO crm_invoices (
 INSERT INTO crm_invoice_line_items (
   id, invoice_id, product_name, sku, quantity, unit_price_cents, discount_pct, total_cents, sort_order
 ) VALUES (
-  'h1100001-0001-4001-8001-000000000001',
-  'h1000001-0001-4001-8001-000000000001',
+  '81100001-0001-4001-8001-000000000001',
+  '81000001-0001-4001-8001-000000000001',
   'Licencias cloud — plan anual',
   'CLOUD-ANUAL',
   1,
@@ -340,8 +340,8 @@ INSERT INTO crm_invoice_line_items (
 INSERT INTO crm_invoice_payments (
   id, invoice_id, amount_cents, paid_at, method, status, reference
 ) VALUES (
-  'h1200001-0001-4001-8001-000000000001',
-  'h1000001-0001-4001-8001-000000000001',
+  '81200001-0001-4001-8001-000000000001',
+  '81000001-0001-4001-8001-000000000001',
   5540000,
   '2024-05-15 12:00:00+00',
   'Transferencia',
@@ -355,7 +355,7 @@ INSERT INTO crm_invoices (
   issue_date, due_date, status, owner_name, payment_method,
   created_by_name, updated_by_name
 ) VALUES (
-  'h1000001-0001-4001-8001-000000000002',
+  '81000001-0001-4001-8001-000000000002',
   'FAC-2024-0901',
   'Nova Retail',
   'empresa',
@@ -373,8 +373,8 @@ INSERT INTO crm_invoices (
 INSERT INTO crm_invoice_line_items (
   id, invoice_id, product_name, sku, quantity, unit_price_cents, discount_pct, total_cents, sort_order
 ) VALUES (
-  'h1100001-0001-4001-8001-000000000002',
-  'h1000001-0001-4001-8001-000000000002',
+  '81100001-0001-4001-8001-000000000002',
+  '81000001-0001-4001-8001-000000000002',
   'Implementación CRM',
   'SRV-CRM-IMP',
   1,
@@ -391,7 +391,7 @@ INSERT INTO crm_projects (
   journey_stage, status, priority, health, budget_cents, start_date,
   created_by_name, updated_by_name
 ) VALUES (
-  'i1000001-0001-4001-8001-000000000001',
+  '91000001-0001-4001-8001-000000000001',
   'Implementación SaaS Core',
   'Tech Solutions',
   'c1000001-0001-4001-8001-000000000001',
@@ -412,8 +412,8 @@ INSERT INTO crm_projects (
 ) ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO crm_project_team_members (id, project_id, user_name, role_label) VALUES
-  ('i1100001-0001-4001-8001-000000000001', 'i1000001-0001-4001-8001-000000000001', 'María López', 'Gerente de proyecto'),
-  ('i1100001-0001-4001-8001-000000000002', 'i1000001-0001-4001-8001-000000000001', 'Equipo implementación', 'Consultor')
+  ('91100001-0001-4001-8001-000000000001', '91000001-0001-4001-8001-000000000001', 'María López', 'Gerente de proyecto'),
+  ('91100001-0001-4001-8001-000000000002', '91000001-0001-4001-8001-000000000001', 'Equipo implementación', 'Consultor')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO crm_projects (
@@ -421,7 +421,7 @@ INSERT INTO crm_projects (
   journey_stage, status, priority, health, budget_cents, start_date,
   created_by_name, updated_by_name
 ) VALUES (
-  'i1000001-0001-4001-8001-000000000002',
+  '91000001-0001-4001-8001-000000000002',
   'Capacitación ventas LATAM',
   'Nova Retail',
   'c1000001-0001-4001-8001-000000000002',
@@ -438,7 +438,7 @@ INSERT INTO crm_projects (
 ) ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO crm_project_team_members (id, project_id, user_name, role_label) VALUES
-  ('i1100001-0001-4001-8001-000000000003', 'i1000001-0001-4001-8001-000000000002', 'Ana Ruiz', 'Gerente de proyecto')
+  ('91100001-0001-4001-8001-000000000003', '91000001-0001-4001-8001-000000000002', 'Ana Ruiz', 'Gerente de proyecto')
 ON CONFLICT (id) DO NOTHING;
 
 -- Actividades demo
@@ -447,7 +447,7 @@ INSERT INTO crm_activities (
   company_name, due_at, assignee_name, status, priority, scheduled_at,
   created_by_name, updated_by_name
 ) VALUES (
-  'j1000001-0001-4001-8001-000000000001',
+  '01000001-0001-4001-8001-000000000001',
   'Llamar a Juan Pérez',
   'llamada',
   'Llamada',
@@ -468,7 +468,7 @@ INSERT INTO crm_activities (
   company_name, due_at, assignee_name, status, priority, scheduled_at,
   created_by_name, updated_by_name
 ) VALUES (
-  'j1000001-0001-4001-8001-000000000002',
+  '01000001-0001-4001-8001-000000000002',
   'Seguimiento cotización cloud',
   'email',
   'Email',
@@ -489,12 +489,12 @@ INSERT INTO crm_activities (
   company_name, due_at, assignee_name, status, priority, scheduled_at,
   created_by_name, updated_by_name
 ) VALUES (
-  'j1000001-0001-4001-8001-000000000003',
+  '01000001-0001-4001-8001-000000000003',
   'Kick-off proyecto SaaS',
   'reunion',
   'Reunión',
   'proyecto',
-  'i1000001-0001-4001-8001-000000000001',
+  '91000001-0001-4001-8001-000000000001',
   'Implementación SaaS Core',
   'Tech Solutions',
   '2024-05-20 10:00:00+00',
@@ -509,15 +509,15 @@ INSERT INTO crm_activities (
 -- Reportes (árbol demo — espejo de reports-tree.mock.ts)
 -- ---------------------------------------------------------------------------
 INSERT INTO crm_report_folders (id, name, parent_id, sort_order) VALUES
-  ('k1000001-0001-4001-8001-000000000001', 'Ventas', NULL, 0),
-  ('k1000001-0001-4001-8001-000000000002', 'Finanzas', NULL, 1),
-  ('k1000001-0001-4001-8001-000000000003', 'Operaciones', NULL, 2),
-  ('k1000001-0001-4001-8001-000000000004', 'Marketing', NULL, 3),
-  ('k1000001-0001-4001-8001-000000000005', 'Proyectos', NULL, 4),
-  ('k1000001-0001-4001-8001-000000000006', 'Experiencia cliente', NULL, 5),
-  ('k1000001-0001-4001-8001-000000000007', 'Producto', NULL, 6),
-  ('k1000001-0001-4001-8001-000000000008', 'Favoritos', NULL, 7),
-  ('k1000001-0001-4001-8001-000000000009', 'Pipeline', 'k1000001-0001-4001-8001-000000000001', 0)
+  ('11000001-0001-4001-8001-000000000001', 'Ventas', NULL, 0),
+  ('11000001-0001-4001-8001-000000000002', 'Finanzas', NULL, 1),
+  ('11000001-0001-4001-8001-000000000003', 'Operaciones', NULL, 2),
+  ('11000001-0001-4001-8001-000000000004', 'Marketing', NULL, 3),
+  ('11000001-0001-4001-8001-000000000005', 'Proyectos', NULL, 4),
+  ('11000001-0001-4001-8001-000000000006', 'Experiencia cliente', NULL, 5),
+  ('11000001-0001-4001-8001-000000000007', 'Producto', NULL, 6),
+  ('11000001-0001-4001-8001-000000000008', 'Favoritos', NULL, 7),
+  ('11000001-0001-4001-8001-000000000009', 'Pipeline', '11000001-0001-4001-8001-000000000001', 0)
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO crm_reports (
@@ -525,8 +525,8 @@ INSERT INTO crm_reports (
   template_id, table_config, last_run_at, updated_at
 ) VALUES
   (
-    'k2000001-0001-4001-8001-000000000001',
-    'k1000001-0001-4001-8001-000000000009',
+    '12000001-0001-4001-8001-000000000001',
+    '11000001-0001-4001-8001-000000000009',
     'Pipeline por etapa',
     'table',
     'María López',
@@ -538,8 +538,8 @@ INSERT INTO crm_reports (
     '2024-05-18 12:00:00+00'
   ),
   (
-    'k2000001-0001-4001-8001-000000000002',
-    'k1000001-0001-4001-8001-000000000004',
+    '12000001-0001-4001-8001-000000000002',
+    '11000001-0001-4001-8001-000000000004',
     'Conversión leads',
     'dashboard',
     'Laura Fernández',
@@ -551,8 +551,8 @@ INSERT INTO crm_reports (
     '2024-05-12 11:00:00+00'
   ),
   (
-    'k2000001-0001-4001-8001-000000000003',
-    'k1000001-0001-4001-8001-000000000002',
+    '12000001-0001-4001-8001-000000000003',
+    '11000001-0001-4001-8001-000000000002',
     'Ingresos vs. meta',
     'dashboard',
     'Carlos Vega',
@@ -564,8 +564,8 @@ INSERT INTO crm_reports (
     '2024-05-17 18:30:00+00'
   ),
   (
-    'k2000001-0001-4001-8001-000000000004',
-    'k1000001-0001-4001-8001-000000000002',
+    '12000001-0001-4001-8001-000000000004',
+    '11000001-0001-4001-8001-000000000002',
     'Facturas pendientes',
     'dashboard',
     'Roberto Sánchez',
@@ -577,8 +577,8 @@ INSERT INTO crm_reports (
     '2024-05-16 07:45:00+00'
   ),
   (
-    'k2000001-0001-4001-8001-000000000005',
-    'k1000001-0001-4001-8001-000000000003',
+    '12000001-0001-4001-8001-000000000005',
+    '11000001-0001-4001-8001-000000000003',
     'Actividades del equipo',
     'dashboard',
     'Ana Ruiz',
@@ -590,8 +590,8 @@ INSERT INTO crm_reports (
     '2024-05-14 09:15:00+00'
   ),
   (
-    'k2000001-0001-4001-8001-000000000006',
-    'k1000001-0001-4001-8001-000000000005',
+    '12000001-0001-4001-8001-000000000006',
+    '11000001-0001-4001-8001-000000000005',
     'Proyectos en riesgo',
     'dashboard',
     'Diego Méndez',
@@ -603,8 +603,8 @@ INSERT INTO crm_reports (
     '2024-05-10 16:20:00+00'
   ),
   (
-    'k2000001-0001-4001-8001-000000000007',
-    'k1000001-0001-4001-8001-000000000006',
+    '12000001-0001-4001-8001-000000000007',
+    '11000001-0001-4001-8001-000000000006',
     'NPS clientes',
     'dashboard',
     'Valentina Torres',
@@ -616,8 +616,8 @@ INSERT INTO crm_reports (
     '2024-05-01 12:00:00+00'
   ),
   (
-    'k2000001-0001-4001-8001-000000000008',
-    'k1000001-0001-4001-8001-000000000007',
+    '12000001-0001-4001-8001-000000000008',
+    '11000001-0001-4001-8001-000000000007',
     'Uso por módulo',
     'dashboard',
     'María López',
@@ -629,8 +629,8 @@ INSERT INTO crm_reports (
     '2024-05-15 10:30:00+00'
   ),
   (
-    'k2000001-0001-4001-8001-000000000009',
-    'k1000001-0001-4001-8001-000000000001',
+    '12000001-0001-4001-8001-000000000009',
+    '11000001-0001-4001-8001-000000000001',
     'Oportunidades ganadas',
     'table',
     'María López',
@@ -642,8 +642,8 @@ INSERT INTO crm_reports (
     '2024-05-17 14:00:00+00'
   ),
   (
-    'k2000001-0001-4001-8001-000000000010',
-    'k1000001-0001-4001-8001-000000000008',
+    '12000001-0001-4001-8001-000000000010',
+    '11000001-0001-4001-8001-000000000008',
     'Resumen ejecutivo',
     'dashboard',
     'Carlos Vega',
@@ -682,33 +682,33 @@ INSERT INTO crm_legacy_id_map (legacy_id, entity_type, uuid) VALUES
   ('prod1', 'product', 'e2000001-0001-4001-8001-000000000001'),
   ('prod2', 'product', 'e2000001-0001-4001-8001-000000000002'),
   ('prod3', 'product', 'e2000001-0001-4001-8001-000000000003'),
-  ('pur1', 'purchase', 'g1000001-0001-4001-8001-000000000001'),
-  ('sr1', 'stock_receipt', 'g2000001-0001-4001-8001-000000000001'),
-  ('inv1', 'inventory', 'g3000001-0001-4001-8001-000000000001'),
-  ('inv2', 'inventory', 'g3000001-0001-4001-8001-000000000002'),
-  ('pr1', 'project', 'i1000001-0001-4001-8001-000000000001'),
-  ('pr3', 'project', 'i1000001-0001-4001-8001-000000000002'),
-  ('a1', 'activity', 'j1000001-0001-4001-8001-000000000001'),
-  ('a2', 'activity', 'j1000001-0001-4001-8001-000000000002'),
-  ('fld-ventas', 'report_folder', 'k1000001-0001-4001-8001-000000000001'),
-  ('fld-finanzas', 'report_folder', 'k1000001-0001-4001-8001-000000000002'),
-  ('fld-operaciones', 'report_folder', 'k1000001-0001-4001-8001-000000000003'),
-  ('fld-marketing', 'report_folder', 'k1000001-0001-4001-8001-000000000004'),
-  ('fld-proyectos', 'report_folder', 'k1000001-0001-4001-8001-000000000005'),
-  ('fld-cx', 'report_folder', 'k1000001-0001-4001-8001-000000000006'),
-  ('fld-producto', 'report_folder', 'k1000001-0001-4001-8001-000000000007'),
-  ('fld-favoritos', 'report_folder', 'k1000001-0001-4001-8001-000000000008'),
-  ('fld-ventas-pipeline', 'report_folder', 'k1000001-0001-4001-8001-000000000009'),
-  ('rpt-1', 'report', 'k2000001-0001-4001-8001-000000000001'),
-  ('rpt-2', 'report', 'k2000001-0001-4001-8001-000000000002'),
-  ('rpt-3', 'report', 'k2000001-0001-4001-8001-000000000003'),
-  ('rpt-4', 'report', 'k2000001-0001-4001-8001-000000000004'),
-  ('rpt-5', 'report', 'k2000001-0001-4001-8001-000000000005'),
-  ('rpt-6', 'report', 'k2000001-0001-4001-8001-000000000006'),
-  ('rpt-7', 'report', 'k2000001-0001-4001-8001-000000000007'),
-  ('rpt-8', 'report', 'k2000001-0001-4001-8001-000000000008'),
-  ('rpt-9', 'report', 'k2000001-0001-4001-8001-000000000009'),
-  ('rpt-10', 'report', 'k2000001-0001-4001-8001-000000000010')
+  ('pur1', 'purchase', '71000001-0001-4001-8001-000000000001'),
+  ('sr1', 'stock_receipt', '72000001-0001-4001-8001-000000000001'),
+  ('inv1', 'inventory', '73000001-0001-4001-8001-000000000001'),
+  ('inv2', 'inventory', '73000001-0001-4001-8001-000000000002'),
+  ('pr1', 'project', '91000001-0001-4001-8001-000000000001'),
+  ('pr3', 'project', '91000001-0001-4001-8001-000000000002'),
+  ('a1', 'activity', '01000001-0001-4001-8001-000000000001'),
+  ('a2', 'activity', '01000001-0001-4001-8001-000000000002'),
+  ('fld-ventas', 'report_folder', '11000001-0001-4001-8001-000000000001'),
+  ('fld-finanzas', 'report_folder', '11000001-0001-4001-8001-000000000002'),
+  ('fld-operaciones', 'report_folder', '11000001-0001-4001-8001-000000000003'),
+  ('fld-marketing', 'report_folder', '11000001-0001-4001-8001-000000000004'),
+  ('fld-proyectos', 'report_folder', '11000001-0001-4001-8001-000000000005'),
+  ('fld-cx', 'report_folder', '11000001-0001-4001-8001-000000000006'),
+  ('fld-producto', 'report_folder', '11000001-0001-4001-8001-000000000007'),
+  ('fld-favoritos', 'report_folder', '11000001-0001-4001-8001-000000000008'),
+  ('fld-ventas-pipeline', 'report_folder', '11000001-0001-4001-8001-000000000009'),
+  ('rpt-1', 'report', '12000001-0001-4001-8001-000000000001'),
+  ('rpt-2', 'report', '12000001-0001-4001-8001-000000000002'),
+  ('rpt-3', 'report', '12000001-0001-4001-8001-000000000003'),
+  ('rpt-4', 'report', '12000001-0001-4001-8001-000000000004'),
+  ('rpt-5', 'report', '12000001-0001-4001-8001-000000000005'),
+  ('rpt-6', 'report', '12000001-0001-4001-8001-000000000006'),
+  ('rpt-7', 'report', '12000001-0001-4001-8001-000000000007'),
+  ('rpt-8', 'report', '12000001-0001-4001-8001-000000000008'),
+  ('rpt-9', 'report', '12000001-0001-4001-8001-000000000009'),
+  ('rpt-10', 'report', '12000001-0001-4001-8001-000000000010')
 ON CONFLICT (legacy_id) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
@@ -719,14 +719,14 @@ INSERT INTO crm_purchases (
   order_date, amount_cents, status, owner_name,
   created_by_name, updated_by_name
 ) VALUES (
-  'g1000001-0001-4001-8001-000000000001',
+  '71000001-0001-4001-8001-000000000001',
   'OC-2026-0001',
   'c1000001-0001-4001-8001-000000000004',
   'BlueWave',
   'PLN-BUS-01 · SRV-IMP-01',
   CURRENT_DATE,
   238000,
-  'Pendiente',
+  'Emitida',
   'María López',
   'María López',
   'María López'
@@ -736,8 +736,8 @@ INSERT INTO crm_purchase_line_items (
   id, purchase_id, product_id, product_name, sku, quantity, unit_price_cents, total_cents, sort_order
 ) VALUES
   (
-    'g1100001-0001-4001-8001-000000000001',
-    'g1000001-0001-4001-8001-000000000001',
+    '71100001-0001-4001-8001-000000000001',
+    '71000001-0001-4001-8001-000000000001',
     'e2000001-0001-4001-8001-000000000002',
     'Plan Business',
     'PLN-BUS-01',
@@ -747,8 +747,8 @@ INSERT INTO crm_purchase_line_items (
     0
   ),
   (
-    'g1100001-0001-4001-8001-000000000002',
-    'g1000001-0001-4001-8001-000000000001',
+    '71100001-0001-4001-8001-000000000002',
+    '71000001-0001-4001-8001-000000000001',
     'e2000001-0001-4001-8001-000000000003',
     'Implementación CRM',
     'SRV-IMP-01',
@@ -764,11 +764,11 @@ INSERT INTO crm_stock_receipts (
   supplier_name, warehouse_id, warehouse_name, product_summary, line_count,
   owner_name, created_by_name, updated_by_name
 ) VALUES (
-  'g2000001-0001-4001-8001-000000000001',
+  '72000001-0001-4001-8001-000000000001',
   'ING-2026-0001',
   'Borrador',
   'Recepción pendiente OC-2026-0001',
-  'g1000001-0001-4001-8001-000000000001',
+  '71000001-0001-4001-8001-000000000001',
   'OC-2026-0001',
   'BlueWave',
   'e1000001-0001-4001-8001-000000000001',
@@ -783,8 +783,8 @@ INSERT INTO crm_stock_receipts (
 INSERT INTO crm_stock_receipt_lines (
   id, receipt_id, product_id, product_name, sku, quantity, sort_order
 ) VALUES (
-  'g2100001-0001-4001-8001-000000000001',
-  'g2000001-0001-4001-8001-000000000001',
+  '72100001-0001-4001-8001-000000000001',
+  '72000001-0001-4001-8001-000000000001',
   'e2000001-0001-4001-8001-000000000002',
   'Plan Business',
   'PLN-BUS-01',
@@ -798,7 +798,7 @@ INSERT INTO crm_inventory_positions (
   last_movement_at
 ) VALUES
   (
-    'g3000001-0001-4001-8001-000000000001',
+    '73000001-0001-4001-8001-000000000001',
     'e2000001-0001-4001-8001-000000000002',
     'Plan Business',
     'PLN-BUS-01',
@@ -812,7 +812,7 @@ INSERT INTO crm_inventory_positions (
     now()
   ),
   (
-    'g3000001-0001-4001-8001-000000000002',
+    '73000001-0001-4001-8001-000000000002',
     'e2000001-0001-4001-8001-000000000003',
     'Implementación CRM',
     'SRV-IMP-01',

@@ -2,6 +2,14 @@ export type ProjectTeamMemberDto = {
   id: string
   name: string
   role: string
+  userId?: string
+}
+
+export type ProjectListTeamMember = {
+  id: string
+  name: string
+  userId?: string
+  role?: string
 }
 
 export type ProjectListItem = {
@@ -30,6 +38,7 @@ export type ProjectListItem = {
   updatedAt: string
   updatedById: string
   updatedByName: string
+  teamMembers?: ProjectListTeamMember[]
 }
 
 export type ProjectDetail = ProjectListItem & {

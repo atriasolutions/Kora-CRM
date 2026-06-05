@@ -38,7 +38,7 @@ import {
   purgeExpiredFromStore,
 } from '@/lib/product-archive'
 import { purgeProductLocalData } from '@/lib/product-permanent-delete'
-import { enrichProductListStock } from '@/lib/product-stock-inventory'
+import { assertProductSkuAvailable } from '@/lib/product-sku-uniqueness'
 import { archivedStoreFromList } from '@/lib/registry-archive-from-api'
 import { useRegistryApiBootstrap } from '@/hooks/use-registry-api-bootstrap'
 const useApi = isApiEnabled()
@@ -116,6 +116,7 @@ export function ProductsRegistryProvider({ children }: { children: ReactNode }) 
 
   const addProduct = useCallback(
     async (values: ProductFormValues) => {
+      assertProductSkuAvailable(values.sku, userProducts)
       if (useApi) {
         const item = await createProductApi(productFormToApiBody(values))
         save([item, ...userProducts])
@@ -131,6 +132,15 @@ export function ProductsRegistryProvider({ children }: { children: ReactNode }) 
 
   const addProducts = useCallback(
     async (valuesList: CreateProductFormValues[]): Promise<ProductListItem[]> => {
+      const seen = new Set<string>()
+      for (const values of valuesList) {
+        const key = values.sku.trim().toLowerCase()
+        if (seen.has(key)) {
+          throw new Error(`El SKU «${values.sku.trim()}» está repetido en la importación.`)
+        }
+        seen.add(key)
+        assertProductSkuAvailable(values.sku, userProducts)
+      }
       if (useApi) {
         const items = await Promise.all(
           valuesList.map((v) => createProductApi(productFormToApiBody(v))),
@@ -139,7 +149,11 @@ export function ProductsRegistryProvider({ children }: { children: ReactNode }) 
         notifyInventoryRegistry()
         return items
       }
-      const items = valuesList.map((v) => formValuesToListItem(v))
+      const items: ProductListItem[] = []
+      for (const v of valuesList) {
+        assertProductSkuAvailable(v.sku, [...userProducts, ...items])
+        items.push(formValuesToListItem(v))
+      }
       save([...items, ...userProducts])
       return items
     },
@@ -154,6 +168,11 @@ export function ProductsRegistryProvider({ children }: { children: ReactNode }) 
   const updateProductFromDetail = useCallback(
     async (detail: ProductDetail, options?: { previousSku?: string }) => {
       const list = listItemFromProductDetail(detail)
+      const existing = userProducts.find((p) => p.id === detail.id)
+      const prevSku = options?.previousSku ?? existing?.sku ?? detail.sku
+      if (detail.sku.trim().toLowerCase() !== prevSku.trim().toLowerCase()) {
+        assertProductSkuAvailable(detail.sku, userProducts, detail.id)
+      }
       if (useApi) {
         await updateProductApi(detail.id, productDetailToApiBody(detail))
         save(userProducts.map((p) => (p.id === detail.id ? list : p)))

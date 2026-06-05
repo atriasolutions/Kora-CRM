@@ -24,14 +24,12 @@ function NavButton({
   return (
     <button
       type="button"
-      disabled={section.comingSoon}
       onClick={onSelect}
       className={cn(
         'flex w-full items-start gap-3 rounded-lg border px-3 py-3 text-left transition-colors',
         active
           ? 'border-primary/40 bg-primary/5 shadow-sm'
           : 'border-transparent hover:border-border hover:bg-muted/50',
-        section.comingSoon && 'cursor-not-allowed opacity-60',
       )}
     >
       <span
@@ -45,21 +43,7 @@ function NavButton({
         <Icon aria-hidden className="size-4" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="flex flex-wrap items-center gap-2">
-          <span
-            className={cn(
-              'text-sm font-medium',
-              active ? 'text-foreground' : 'text-foreground/90',
-            )}
-          >
-            {section.label}
-          </span>
-          {section.comingSoon ? (
-            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-              Próximamente
-            </span>
-          ) : null}
-        </span>
+        <span className="text-sm font-medium text-foreground/90">{section.label}</span>
         <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
           {section.description}
         </span>
@@ -76,9 +60,7 @@ export function SettingsNav({ activeId, onSelect }: SettingsNavProps) {
           key={section.id}
           section={section}
           active={activeId === section.id}
-          onSelect={() => {
-            if (!section.comingSoon) onSelect(section.id)
-          }}
+          onSelect={() => onSelect(section.id)}
         />
       ))}
     </nav>

@@ -18,6 +18,7 @@ export type ActivitiesRegistryContextValue = {
   findById: (id: string) => ActivityListItem | undefined
   addActivity: (values: CreateActivityFormValues) => Promise<ActivityListItem>
   addActivities: (values: CreateActivityFormValues[]) => Promise<ActivityListItem[]>
+  upsertActivityFromDetail: (detail: ActivityDetail) => ActivityDetail
   updateActivityFromDetail: (detail: ActivityDetail) => Promise<void>
   updateActivityStatus: (detail: ActivityDetail, status: ActivityDetail['status']) => Promise<void>
   archiveActivity: (id: string) => Promise<void>

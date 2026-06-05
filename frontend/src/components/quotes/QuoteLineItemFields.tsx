@@ -153,8 +153,8 @@ export function QuoteLineItemFields({
           <ContactFormInput
             id={`${idPrefix}-desc-${line.id}`}
             label="Descripción"
-            inputVariant="alphanumeric"
-            value={quoteLineDescription(line)}
+            inputVariant="text"
+            value={line.description}
             placeholder="Ej. Instalación, capacitación, flete…"
             onChange={(description) =>
               patchRecalc({ lineKind: 'manual', description, productId: undefined, sku: '' })

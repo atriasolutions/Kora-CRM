@@ -29,7 +29,7 @@ export const env = {
   mailSmtpPass: (process.env.MAIL_SMTP_PASS ?? '').trim(),
   /** Alternativa: API con token (Sending). */
   mailtrapToken: process.env.MAILTRAP_TOKEN ?? '',
-  mailFromAddress: process.env.MAIL_FROM_ADDRESS ?? 'noreply@kora.io',
+  mailFromAddress: process.env.MAIL_FROM_ADDRESS ?? 'noreply@atriasolutions.cl',
   mailFromName: process.env.MAIL_FROM_NAME ?? 'Kora CRM',
   mailEnabled: process.env.MAIL_ENABLED !== 'false',
   /** Opcional: fuerza destinatario (solo si usas API con dominio demo). */

@@ -30,6 +30,7 @@ import {
   reorderGroups,
 } from '@/lib/project-work-plan'
 import type { WorkPlanPersistOptions } from '@/lib/project-work-plan'
+import { useAssigneeDirectory } from '@/hooks/use-assignee-directory'
 import type { ProjectWorkPlan } from '@/types/project-work-plan'
 import type { ProjectWorkMetrics } from '@/types/project-work-plan'
 
@@ -39,6 +40,8 @@ type ProjectWorkBoardProps = {
   onChange: (plan: ProjectWorkPlan, options?: WorkPlanPersistOptions) => void
   readOnly?: boolean
   projectTitle?: string
+  /** Miembros de la pestaña Equipo (opciones del selector de responsables). */
+  teamMemberNames?: string[]
 }
 
 function parseDragId(id: string) {
@@ -52,7 +55,10 @@ export function ProjectWorkBoard({
   onChange,
   readOnly = false,
   projectTitle,
+  teamMemberNames,
 }: ProjectWorkBoardProps) {
+  useAssigneeDirectory(!readOnly)
+
   const [planView, setPlanView] = useState<WorkboardPlanView>('table')
   const [expandedParents, setExpandedParents] = useState<Set<string>>(() => new Set())
   const [newGroupName, setNewGroupName] = useState('')
@@ -157,6 +163,7 @@ export function ProjectWorkBoard({
       onChange={onChange}
       expandedParents={expandedParents}
       onToggleParent={toggleParent}
+      teamMemberNames={teamMemberNames}
     />
   ))
 

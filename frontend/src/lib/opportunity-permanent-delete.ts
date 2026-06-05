@@ -5,6 +5,6 @@ import { removeEntityFromRecentlyViewed } from '@/lib/entity-recently-viewed'
 export function purgeOpportunityLocalData(opportunityId: string) {
   const id = opportunityId.trim()
   if (!id) return
-  purgeEntityAttachments('oportunidad', id)
+  purgeEntityAttachments('oportunidad', id, 'oportunidad')
   removeEntityFromRecentlyViewed('oportunidades', id)
 }

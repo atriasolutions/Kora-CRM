@@ -11,8 +11,16 @@ import {
   type ProjectRow,
   type ProjectTeamRow,
 } from '../mappers/project.mapper.js'
-import { badRequest, notFound } from '../middleware/errors.js'
+import { badRequest, forbidden, notFound } from '../middleware/errors.js'
+import type { ProjectTeamMemberDto } from '../types/project.js'
+import {
+  collectNewTeamMembers,
+  dedupeTeamMemberInputs,
+  teamMembersFromDto,
+  teamMembersFromInput,
+} from '../lib/project-team-member-sync.js'
 import { notifyProjectAssignment } from '../services/notifications.service.js'
+import { notifyAndEmailNewProjectTeamMembers } from '../services/project-team-member.service.js'
 import type { AuditActor } from '../types/audit.js'
 import type {
   CreateProjectInput,
@@ -45,6 +53,35 @@ export type ListProjectsParams = {
   opportunityId?: string
   companyId?: string
   archivedOnly?: boolean
+  /** Si se define, solo proyectos donde el usuario es gerente o miembro del equipo. */
+  memberAccess?: { userId: string; userName: string }
+}
+
+export function userHasProjectTeamAccess(
+  managerName: string,
+  team: ProjectTeamMemberDto[],
+  actor: AuditActor,
+): boolean {
+  const actorName = actor.userName.trim().toLowerCase()
+  const manager = managerName.trim().toLowerCase()
+  if (manager && manager === actorName) return true
+  const actorId = actor.userId.trim().toLowerCase()
+  return team.some((member) => {
+    const memberId = member.userId?.trim().toLowerCase()
+    const memberName = member.name?.trim().toLowerCase()
+    if (memberId && memberId === actorId) return true
+    return Boolean(memberName && memberName === actorName)
+  })
+}
+
+export function assertProjectTeamAccess(
+  managerName: string,
+  team: ProjectTeamMemberDto[],
+  actor: AuditActor,
+): void {
+  if (!userHasProjectTeamAccess(managerName, team, actor)) {
+    throw forbidden('No tienes acceso a este proyecto.')
+  }
 }
 
 async function loadProjectTeam(projectId: string): Promise<ProjectTeamRow[]> {
@@ -56,6 +93,38 @@ async function loadProjectTeam(projectId: string): Promise<ProjectTeamRow[]> {
     [projectId],
   )
   return result.rows
+}
+
+async function loadTeamsByProjectIds(
+  projectIds: string[],
+): Promise<Map<string, ProjectTeamRow[]>> {
+  const map = new Map<string, ProjectTeamRow[]>()
+  if (projectIds.length === 0) return map
+  const result = await pool.query<ProjectTeamRow>(
+    `SELECT ${TEAM_COLUMNS}
+     FROM crm_project_team_members
+     WHERE project_id = ANY($1::uuid[])
+     ORDER BY project_id, user_name ASC, id ASC`,
+    [projectIds],
+  )
+  for (const row of result.rows) {
+    const list = map.get(row.project_id) ?? []
+    list.push(row)
+    map.set(row.project_id, list)
+  }
+  return map
+}
+
+function mapTeamRowsToListMembers(
+  rows: ProjectTeamRow[] | undefined,
+): ProjectListItem['teamMembers'] {
+  if (!rows?.length) return []
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.user_name,
+    userId: row.user_id ?? undefined,
+    role: row.role_label ?? undefined,
+  }))
 }
 
 function resolveProgressPct(input: CreateProjectInput | UpdateProjectInput): number | null {
@@ -225,9 +294,10 @@ async function insertProjectTeam(
   team: ProjectTeamMemberInput[] | undefined,
   managerName: string,
 ): Promise<void> {
+  const deduped = dedupeTeamMemberInputs(team, managerName)
   const members =
-    team && team.length > 0
-      ? team
+    deduped.length > 0
+      ? deduped
       : [{ userName: managerName, roleLabel: 'Gerente de proyecto' }]
 
   for (const member of members) {
@@ -283,6 +353,26 @@ export async function listProjects(
     values.push(`%${params.q}%`)
     idx++
   }
+  if (params.memberAccess) {
+    const userName = params.memberAccess.userName.trim()
+    const userId = params.memberAccess.userId
+    const nameIdx = idx++
+    const idIdx = idx++
+    conditions.push(
+      `(
+        lower(trim(manager_name)) = lower($${nameIdx})
+        OR EXISTS (
+          SELECT 1 FROM crm_project_team_members tm
+          WHERE tm.project_id = crm_projects.id
+          AND (
+            tm.user_id = $${idIdx}::uuid
+            OR lower(trim(tm.user_name)) = lower($${nameIdx})
+          )
+        )
+      )`,
+    )
+    values.push(userName, userId)
+  }
 
   const where = `WHERE ${conditions.join(' AND ')}`
   const countResult = await pool.query<{ count: string }>(
@@ -302,7 +392,16 @@ export async function listProjects(
     values,
   )
 
-  return { items: result.rows.map(mapProjectRow), total }
+  const projectIds = result.rows.map((row) => row.id)
+  const teamsByProject = await loadTeamsByProjectIds(projectIds)
+
+  return {
+    items: result.rows.map((row) => ({
+      ...mapProjectRow(row),
+      teamMembers: mapTeamRowsToListMembers(teamsByProject.get(row.id)),
+    })),
+    total,
+  }
 }
 
 export async function getProjectById(id: string): Promise<ProjectDetail> {
@@ -538,16 +637,21 @@ export async function updateProject(
     const row = result.rows[0]
     if (!row) throw notFound('Proyecto no encontrado')
 
+    const nextManagerName = input.managerName?.trim() || existing.manager
+    const newTeamMembers =
+      input.team !== undefined
+        ? collectNewTeamMembers(
+            teamMembersFromDto(existing.team),
+            teamMembersFromInput(input.team),
+            nextManagerName,
+          )
+        : []
+
     if (input.team) {
       await client.query(`DELETE FROM crm_project_team_members WHERE project_id = $1`, [
         id,
       ])
-      await insertProjectTeam(
-        client,
-        id,
-        input.team,
-        input.managerName?.trim() || existing.manager,
-      )
+      await insertProjectTeam(client, id, input.team, nextManagerName)
     }
 
     await client.query('COMMIT')
@@ -564,6 +668,18 @@ export async function updateProject(
         /* ignore realtime errors */
       })
     }
+
+    if (newTeamMembers.length > 0) {
+      void notifyAndEmailNewProjectTeamMembers({
+        actor,
+        projectId: detail.id,
+        projectName: detail.name,
+        members: newTeamMembers,
+      }).catch(() => {
+        /* ignore notification errors */
+      })
+    }
+
     return detail
   } catch (e) {
     await client.query('ROLLBACK')

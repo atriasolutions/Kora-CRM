@@ -56,7 +56,7 @@ const activityMeta: Record<
 
 type ContactActivitiesPanelProps = {
   activities: ContactActivity[]
-  onRegister: () => void
+  onRegister?: () => void
   disabled?: boolean
   /** Registro asociado para textos vacíos (por defecto: contacto). */
   entityKind?:
@@ -225,9 +225,11 @@ export function ContactActivitiesPanel({
           Registra llamadas, reuniones o seguimientos para llevar el historial de la{' '}
           {entityLabel}.
         </p>
-        <Button className="mt-4" disabled={disabled} onClick={onRegister}>
-          Registrar actividad
-        </Button>
+        {onRegister ? (
+          <Button className="mt-4" disabled={disabled} onClick={onRegister}>
+            Registrar actividad
+          </Button>
+        ) : null}
       </div>
     )
   }

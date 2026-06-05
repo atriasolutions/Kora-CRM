@@ -398,8 +398,10 @@ export function QuoteDetailPage() {
       <QuoteSuccessPath
         currentStage={quote.status}
         history={quote.statusHistory}
-        readOnly={false}
-        onStageChange={(stage: QuoteJourneyStage) => {
+        readOnly={!canEdit}
+        onStageChange={
+          canEdit
+            ? (stage: QuoteJourneyStage) => {
           if (
             !canTransition(quote.status, stage, {
               history: quote.statusHistory,
@@ -466,7 +468,9 @@ export function QuoteDetailPage() {
               toast.error(message)
             }
           })()
-        }}
+            }
+            : undefined
+        }
       />
 
       <div className="min-w-0 space-y-4">

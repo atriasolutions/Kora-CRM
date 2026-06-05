@@ -315,36 +315,41 @@ export function PurchaseDetailPage() {
       <PurchaseSuccessPath
         currentStage={purchase.stage}
         history={purchase.stageHistory}
-        onStageChange={(stage: PurchaseJourneyStage) => {
-          if (
-            !canTransition(purchase.stage, stage, {
-              history: purchase.stageHistory,
-            })
-          ) {
-            return
-          }
-          if (!isApiEnabled()) {
-            savePurchaseJourneyOverride(purchase.id, stage)
-          }
-          const listStatus = journeyStageToListStatus(stage)
-          setPurchase((prev) => {
-            if (!prev) return prev
-            const updated = {
-              ...prev,
-              stage,
-              status: listStatus,
-              stageHistory: buildPurchaseStageHistoryOnTransition(
-                prev.stage,
-                stage,
-                prev.stageHistory,
-              ),
-            }
-            void updatePurchaseFromDetail(updated).then((saved) => {
-              setPurchase(saved)
-            })
-            return updated
-          })
-        }}
+        readOnly={!canEdit}
+        onStageChange={
+          canEdit
+            ? (stage: PurchaseJourneyStage) => {
+                if (
+                  !canTransition(purchase.stage, stage, {
+                    history: purchase.stageHistory,
+                  })
+                ) {
+                  return
+                }
+                if (!isApiEnabled()) {
+                  savePurchaseJourneyOverride(purchase.id, stage)
+                }
+                const listStatus = journeyStageToListStatus(stage)
+                setPurchase((prev) => {
+                  if (!prev) return prev
+                  const updated = {
+                    ...prev,
+                    stage,
+                    status: listStatus,
+                    stageHistory: buildPurchaseStageHistoryOnTransition(
+                      prev.stage,
+                      stage,
+                      prev.stageHistory,
+                    ),
+                  }
+                  void updatePurchaseFromDetail(updated).then((saved) => {
+                    setPurchase(saved)
+                  })
+                  return updated
+                })
+              }
+            : undefined
+        }
       />
 
       <PurchaseInboundPendingBanner purchase={purchase} />

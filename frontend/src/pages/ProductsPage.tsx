@@ -8,7 +8,6 @@ import { ModuleListPage, type ListSelectionAction } from '@/components/list/Modu
 import { useEmbeddedListToolbarSlot } from '@/hooks/use-embedded-list-toolbar-slot'
 import { CreateProductDialog } from '@/components/products/CreateProductDialog'
 import { DuplicateProductDialog } from '@/components/products/DuplicateProductDialog'
-import { ImportProductsDialog } from '@/components/products/ImportProductsDialog'
 import { EditProductDialog } from '@/components/products/EditProductDialog'
 import { ProductsArchivedView } from '@/components/products/ProductsArchivedView'
 import { ProductsKanbanView } from '@/components/products/ProductsKanbanView'
@@ -60,7 +59,6 @@ export function ProductsPage() {
   const {
     allProducts,
     addProduct,
-    addProducts,
     updateProductFromDetail,
     archiveProduct,
     archiveProducts,
@@ -110,7 +108,6 @@ export function ProductsPage() {
   }, [view, listScope, reloadFromApi])
 
   const [createOpen, setCreateOpen] = useState(false)
-  const [importOpen, setImportOpen] = useState(false)
   const [duplicateOpen, setDuplicateOpen] = useState(false)
   const [createInitial, setCreateInitial] = useState<Partial<CreateProductFormValues>>()
   const [createTitle, setCreateTitle] = useState('Nuevo producto')
@@ -221,7 +218,6 @@ export function ProductsPage() {
           setCreateOpen(true)
         }}
         onDuplicate={() => setDuplicateOpen(true)}
-        onImportCsv={() => setImportOpen(true)}
         filters={filters}
         onFiltersChange={setFilters}
         listScope={listScope}
@@ -299,18 +295,6 @@ export function ProductsPage() {
         onOpenChange={setDuplicateOpen}
         products={allProducts}
         onSelectDuplicate={handleDuplicateSelect}
-      />
-
-      <ImportProductsDialog
-        open={importOpen}
-        onOpenChange={setImportOpen}
-        onImport={async (rows) => {
-          const items = await addProducts(rows)
-          setListRefreshKey((k) => k + 1)
-          toast.success(
-            `${items.length} producto${items.length === 1 ? '' : 's'} importado${items.length === 1 ? '' : 's'}.`,
-          )
-        }}
       />
 
       {canEdit && editingProduct ? (

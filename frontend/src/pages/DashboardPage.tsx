@@ -1,4 +1,4 @@
-import { Loader2, Plus, Sparkles } from 'lucide-react'
+import { Loader2, Sparkles } from 'lucide-react'
 import { useState } from 'react'
 
 import { PageScrollArea } from '@/components/layout/PageScrollArea'
@@ -10,13 +10,6 @@ import { RevenueBySourceCard } from '@/components/dashboard/RevenueBySourceCard'
 import { RevenueExpenseChartCard } from '@/components/dashboard/RevenueExpenseChartCard'
 import { SalesFunnelCard } from '@/components/dashboard/SalesFunnelCard'
 import { TasksByProjectCard } from '@/components/dashboard/TasksByProjectCard'
-import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { defaultDashboardPeriod, useDashboardData } from '@/hooks/use-dashboard-data'
 import { cn } from '@/lib/utils'
 
@@ -59,36 +52,17 @@ export function DashboardPage() {
       >
         <div className="pointer-events-none absolute -end-6 -top-6 size-28 rounded-full bg-primary/20 blur-2xl" />
         <div className="pointer-events-none absolute -bottom-4 start-8 size-20 rounded-full bg-chart-5/25 blur-xl" />
-        <div className="relative flex items-start justify-between gap-3">
-          <div className="min-w-0 space-y-1">
-            <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-primary">
-              <Sparkles aria-hidden className="size-3.5" />
-              Resumen del día
-            </p>
-            <h1 className="text-lg font-bold tracking-tight text-foreground">
-              Tu pipeline en tiempo real
-            </h1>
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              {heroChange} y {heroRevenue} en ingresos facturados.
-            </p>
-          </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                type="button"
-                size="icon"
-                className="size-9 shrink-0 rounded-full shadow-md"
-              >
-                <Plus aria-hidden className="size-4" />
-                <span className="sr-only">Nuevo</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52">
-              <DropdownMenuItem>Oportunidad</DropdownMenuItem>
-              <DropdownMenuItem>Cliente</DropdownMenuItem>
-              <DropdownMenuItem>Actividad</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+        <div className="relative min-w-0 space-y-1">
+          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-primary">
+            <Sparkles aria-hidden className="size-3.5" />
+            Resumen del día
+          </p>
+          <h1 className="text-lg font-bold tracking-tight text-foreground">
+            Tu pipeline en tiempo real
+          </h1>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            {heroChange} y {heroRevenue} en ingresos facturados.
+          </p>
         </div>
         <DashboardPeriodSelector
           value={period}
@@ -109,26 +83,11 @@ export function DashboardPage() {
               : 'Resumen comercial — datos de demostración.'}
           </p>
         </div>
-        <div className="flex w-full flex-col gap-3 sm:w-auto sm:max-w-md sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-          <DashboardPeriodSelector
-            value={period}
-            onChange={setPeriod}
-            disabled={loading}
-          />
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button type="button" className="h-10 w-full shadow-sm sm:h-10 sm:w-auto">
-                <Plus aria-hidden className="size-4" />
-                Nuevo
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52">
-              <DropdownMenuItem>Oportunidad</DropdownMenuItem>
-              <DropdownMenuItem>Cliente</DropdownMenuItem>
-              <DropdownMenuItem>Actividad</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+        <DashboardPeriodSelector
+          value={period}
+          onChange={setPeriod}
+          disabled={loading}
+        />
       </div>
 
       <KpiGrid items={data.kpis} />

@@ -176,18 +176,19 @@ export function ProjectsRegistryProvider({ children }: { children: ReactNode }) 
   )
 
   const updateProjectFromDetail = useCallback(
-    async (detail: ProjectDetail) => {
+    async (detail: ProjectDetail): Promise<ProjectDetail> => {
       const list = listItemFromProjectDetail(detail)
       if (useApi) {
-        await updateProjectApi(detail.id, projectDetailToApiBody(detail))
+        const saved = await updateProjectApi(detail.id, projectDetailToApiBody(detail))
         if (userProjects.some((p) => p.id === detail.id)) {
           save(userProjects.map((p) => (p.id === detail.id ? list : p)))
         }
-        return
+        return saved as ProjectDetail
       }
       if (userProjects.some((p) => p.id === detail.id)) {
         save(userProjects.map((p) => (p.id === detail.id ? list : p)))
       }
+      return detail
     },
     [save, userProjects],
   )

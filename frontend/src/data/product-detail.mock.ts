@@ -3,7 +3,11 @@ import { mergeEntityNotesForMock } from '@/lib/entity-notes-storage'
 import { buildProductActivitiesForDetail } from '@/lib/product-activities'
 import { getRegistryProductById } from '@/data/products-registry-store'
 import type { ProductListItem } from '@/data/products.mock'
-import type { BillingPeriod, ProductType } from '@/lib/product-catalog'
+import {
+  BILLING_PERIOD_OPTIONS,
+  type BillingPeriod,
+  type ProductType,
+} from '@/lib/product-catalog'
 import { loadProductDetailOverride, persistProductDetailOverride } from '@/lib/product-detail-storage'
 import {
   computeMarginPercent,
@@ -72,6 +76,11 @@ export function buildDetailFromList(base: ProductListItem, id: string): ProductD
     base.productType === 'Suscripción' ||
     base.category.includes('Software')
 
+  const savedBillingPeriod = base.billingPeriod
+  const hasSavedBillingPeriod =
+    !!savedBillingPeriod &&
+    BILLING_PERIOD_OPTIONS.includes(savedBillingPeriod as BillingPeriod)
+
   return {
     ...base,
     owner: base.owner ?? '—',
@@ -79,15 +88,17 @@ export function buildDetailFromList(base: ProductListItem, id: string): ProductD
     shortDescription: `SKU ${base.sku} · ${base.productType} · ${base.category}`,
     brand: '',
     internalCode: base.sku.replace(/-/g, ''),
-    billingPeriod: base.unitOfMeasure === 'mes'
-      ? 'Mensual'
-      : base.unitOfMeasure === 'hora'
-        ? 'Por hora'
-        : base.unitOfMeasure === 'kg' || base.unitOfMeasure === 'unidad'
-          ? 'Por unidad'
-          : base.priceNum === 0
-            ? 'A medida'
-            : 'Único',
+    billingPeriod: hasSavedBillingPeriod
+      ? (savedBillingPeriod as BillingPeriod)
+      : base.unitOfMeasure === 'mes'
+        ? 'Mensual'
+        : base.unitOfMeasure === 'hora'
+          ? 'Por hora'
+          : base.unitOfMeasure === 'kg' || base.unitOfMeasure === 'unidad'
+            ? 'Por unidad'
+            : base.priceNum === 0
+              ? 'A medida'
+              : 'Único',
     taxRate: '19',
     taxIncluded: true,
     trackInventory: isPhysical && base.stockNum >= 0,

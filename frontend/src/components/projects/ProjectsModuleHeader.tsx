@@ -18,10 +18,11 @@ import {
   type ProjectFilters,
 } from '@/lib/project-filters'
 import {
-  PROJECT_LIST_SCOPE_OPTIONS,
   PROJECT_SCOPE_SHORT_LABELS,
+  projectListScopeOptionsForProfile,
   type ProjectListScope,
 } from '@/lib/project-list-scope'
+import { useAuth } from '@/hooks/use-auth'
 import { useModulePermissions } from '@/hooks/use-module-permissions'
 import type { StandardModuleViewId } from '@/lib/module-list-views'
 import { STANDARD_MODULE_VIEW_OPTIONS } from '@/lib/module-list-views'
@@ -57,7 +58,9 @@ export function ProjectsModuleHeader({
   archivedCount = 0,
   toolbarEnd,
 }: ProjectsModuleHeaderProps) {
+  const { profile } = useAuth()
   const { canCreate } = useModulePermissions('proyectos')
+  const scopeOptions = projectListScopeOptionsForProfile(profile)
   const activeFilters = countActiveProjectFilters(filters)
   const showListScope = view !== 'archivados' && onListScopeChange != null
 
@@ -124,7 +127,7 @@ export function ProjectsModuleHeader({
             <ModuleListScopeSwitcher
               value={listScope}
               onChange={onListScopeChange}
-              options={PROJECT_LIST_SCOPE_OPTIONS}
+              options={scopeOptions}
               shortLabels={PROJECT_SCOPE_SHORT_LABELS}
               showLabel
             />

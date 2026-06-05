@@ -16,9 +16,9 @@ const journeyStageSchema = z.enum([
 ])
 
 const teamMemberSchema = z.object({
-  userId: z.string().uuid().optional(),
-  userName: z.string().optional(),
-  roleLabel: z.string().optional(),
+  userId: z.string().uuid().nullish(),
+  userName: z.string().min(1).optional(),
+  roleLabel: z.string().max(255).nullish(),
 })
 
 export const listProjectsQuerySchema = z.object({

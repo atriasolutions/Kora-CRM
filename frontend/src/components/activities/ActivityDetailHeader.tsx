@@ -38,6 +38,7 @@ import {
 } from '@/lib/activity-form'
 import { normalizeDurationMinutes } from '@/lib/activity-detail-normalize'
 import { resolveActivityReminderLabel } from '@/lib/activity-reminder'
+import { formatChileDateTimeLabel, parseChileDatetimeInput } from '@/lib/chile-timezone'
 import { useDetailHeaderPermissions } from '@/hooks/use-detail-header-permissions'
 import { cn } from '@/lib/utils'
 
@@ -242,7 +243,12 @@ export function ActivityDetailHeader({
           <div className="mt-4 flex flex-wrap gap-4 text-sm text-muted-foreground">
             <span className="inline-flex items-center gap-1.5">
               <Calendar aria-hidden className="size-4" />
-              Programada: {activity.scheduledAt}
+              Programada:{' '}
+              {formatChileDateTimeLabel(
+                parseChileDatetimeInput(activity.scheduledAt) ??
+                  activity.scheduledAt ??
+                  activity.due,
+              )}
             </span>
             {activity.completedAt ? (
               <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">

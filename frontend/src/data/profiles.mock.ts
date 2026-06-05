@@ -75,6 +75,20 @@ export const profileListSeed: AccessProfileListItem[] = [
     userCount: 2,
     updatedAt: '10 may 2026',
   },
+  {
+    id: 'p-operaciones',
+    name: 'Operaciones',
+    description: 'Proyectos, compras, ingresos e inventario.',
+    userCount: 0,
+    updatedAt: '20 may 2026',
+  },
+  {
+    id: 'p-invitado',
+    name: 'Cliente Invitado',
+    description: 'Acceso limitado a proyectos donde figura en el equipo.',
+    userCount: 1,
+    updatedAt: '20 may 2026',
+  },
 ]
 
 export const profileDetailSeed: Record<string, AccessProfile> = {
@@ -96,6 +110,49 @@ export const profileDetailSeed: Record<string, AccessProfile> = {
       'reportes',
     ]),
   },
+  'p-operaciones': {
+    ...profileListSeed[3]!,
+    permissions: createFullModulePermissions().map((p) => {
+      const ops = new Set<MenuModuleId>([
+        'dashboard',
+        'proyectos',
+        'compras',
+        'ingresos',
+        'inventario',
+        'productos',
+        'actividades',
+      ])
+      if (!ops.has(p.moduleId)) {
+        return {
+          ...p,
+          flags: {
+            menu: false,
+            view: false,
+            create: false,
+            edit: false,
+            delete: false,
+          },
+        }
+      }
+      const full = ['proyectos', 'compras', 'ingresos', 'actividades'].includes(
+        p.moduleId,
+      )
+      return {
+        ...p,
+        flags: {
+          menu: true,
+          view: true,
+          create: full,
+          edit: full,
+          delete: p.moduleId === 'actividades' ? false : full,
+        },
+      }
+    }),
+  },
+  'p-invitado': {
+    ...profileListSeed[4]!,
+    permissions: createViewOnlyModulePermissions(['proyectos']),
+  },
 }
 
 export const DEFAULT_PROFILE_ID = 'p-admin'
@@ -104,5 +161,8 @@ export function profileIdForUserRole(role: string): string {
   if (role === 'Admin') return 'p-admin'
   if (role === 'Manager') return 'p-ventas'
   if (role === 'Ventas' || role === 'Marketing' || role === 'CS') return 'p-ventas'
+  if (role === 'Operaciones') return 'p-operaciones'
+  if (role === 'Invitado') return 'p-invitado'
+  if (role === 'Soporte') return 'p-lectura'
   return 'p-lectura'
 }

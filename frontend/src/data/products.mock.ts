@@ -2,6 +2,7 @@ import type { RecordAuditFields } from '@/lib/record-audit'
 import { ensureRecordAuditList } from '@/lib/seed-audit'
 
 import type { ProductType } from '@/lib/product-catalog'
+import type { BillingPeriod } from '@/lib/product-catalog'
 
 export type ProductStatus = 'Activo' | 'Agotado' | 'Borrador'
 
@@ -12,6 +13,7 @@ export type ProductListItem = {
   category: string
   productType: ProductType
   unitOfMeasure: string
+  billingPeriod?: BillingPeriod
   customUnit?: string
   price: string
   priceNum: number

@@ -14,7 +14,10 @@ import {
   inferContactIdentifierType,
   normalizeTaxIdValue,
 } from '@/lib/tax-identifier'
-import { getDuplicateContactTaxIdMessage } from '@/lib/tax-id-uniqueness'
+import {
+  getDuplicateContactEmailMessage,
+  getDuplicateContactTaxIdMessage,
+} from '@/lib/tax-id-uniqueness'
 import { stampRecordAuditOnCreate } from '@/lib/record-audit'
 
 export type CreateContactFormValues = {
@@ -142,19 +145,26 @@ export function validateCreateContactForm(
   const taxIdError = getContactTaxIdValidationMessage(
     identifierType,
     values.rut,
-    { required: true },
+    { required: false },
   )
   if (taxIdError) return taxIdError
-  const duplicateError = getDuplicateContactTaxIdMessage(
-    identifierType,
-    values.rut,
-    options?.excludeId,
-  )
-  if (duplicateError) return duplicateError
+  if (values.rut.trim()) {
+    const duplicateTaxIdError = getDuplicateContactTaxIdMessage(
+      identifierType,
+      values.rut,
+      options?.excludeId,
+    )
+    if (duplicateTaxIdError) return duplicateTaxIdError
+  }
   if (!values.email.trim()) return 'El email es obligatorio.'
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email.trim())) {
     return 'Introduce un email válido.'
   }
+  const duplicateEmailError = getDuplicateContactEmailMessage(
+    values.email,
+    options?.excludeId,
+  )
+  if (duplicateEmailError) return duplicateEmailError
   if (!values.mobilePhone.trim()) return 'El móvil / WhatsApp es obligatorio.'
   return null
 }

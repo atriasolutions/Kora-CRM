@@ -1,4 +1,4 @@
-import { emailButton, emailLayout } from './layout.js'
+import { emailButton, emailLayout, emailNotice, emailParagraph, emailStepsList } from './layout.js'
 
 export function accountSetupEmail(params: {
   userName: string
@@ -19,19 +19,22 @@ Si no solicitaste este acceso, ignora este mensaje.
 
   const html = emailLayout({
     title: 'Bienvenido/a a Kora',
+    subtitle: 'Activa tu cuenta y empieza a trabajar con tu equipo.',
     preheader: 'Activa tu cuenta y configura tu acceso seguro.',
     bodyHtml: `
-      <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#334155;">Hola <strong>${params.userName}</strong>,</p>
-      <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#334155;">
-        Tu cuenta en <strong>Kora CRM</strong> está lista. Solo falta un paso para empezar a trabajar con tu equipo.
-      </p>
-      <ul style="margin:0 0 20px;padding-left:20px;font-size:14px;line-height:1.7;color:#475569;">
-        <li>Define tu contraseña personal</li>
-        <li>Elige una pregunta de seguridad (recuperación de acceso)</li>
-        <li>Activa tu perfil — estado <strong>Por verificar</strong> → <strong>Activo</strong></li>
-      </ul>
+      ${emailParagraph(`Hola <strong>${params.userName}</strong>,`)}
+      ${emailParagraph(
+        'Tu cuenta en <strong>Kora CRM</strong> está lista. Solo falta un paso para empezar a gestionar contactos, oportunidades y actividades con tu equipo.',
+      )}
+      ${emailStepsList([
+        'Define tu contraseña personal',
+        'Elige una pregunta de seguridad (recuperación de acceso)',
+        'Activa tu perfil — de <strong>Por verificar</strong> a <strong>Activo</strong>',
+      ])}
       ${emailButton(params.activateUrl, 'Activar mi cuenta')}
-      <p style="margin:0;font-size:13px;color:#64748b;">El enlace caduca en <strong>${params.expiresHours} horas</strong>.</p>
+      ${emailNotice(
+        `El enlace caduca en <strong>${params.expiresHours} horas</strong>. Si expira, pide a un administrador que reenvíe la invitación.`,
+      )}
     `,
   })
 

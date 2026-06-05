@@ -2,6 +2,7 @@ import { getRegistryOpportunityById } from '@/data/opportunities-registry-store'
 import type { OpportunityListItem } from '@/data/opportunities.mock'
 import { opportunityListSeed } from '@/data/opportunities.mock'
 import type { ContactActivity, ContactNote } from '@/data/contact-detail.mock'
+import type { OpportunityFile } from '@/lib/opportunity-files'
 import { buildOpportunityActivitiesForDetail } from '@/lib/opportunity-activities'
 import type { OpportunityQuoteSummary } from '@/lib/quote-relations'
 import { quoteSummariesForOpportunity } from '@/lib/quote-relations'
@@ -44,6 +45,7 @@ export type OpportunityDetail = OpportunityListItem & {
   lineItems: OpportunityLineItem[]
   activities: ContactActivity[]
   notes: ContactNote[]
+  files: OpportunityFile[]
   quotes: OpportunityQuoteSummary[]
   pendingActivities: number
   quoteCount: number
@@ -174,6 +176,7 @@ export function getOpportunityDetail(id: string): OpportunityDetail {
         when: '13 may, 09:30',
       },
     ],
+    files: [],
     quotes,
     pendingActivities: (idx % 3) + 1,
     quoteCount: quotes.length,

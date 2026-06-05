@@ -1,5 +1,5 @@
 import { Bell, HelpCircle, LogOut, Menu, UserRound } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { getUserApi } from '@/api/users'
@@ -36,11 +36,13 @@ import { getUserDetail } from '@/data/user-detail.mock'
 import { useAuth } from '@/hooks/use-auth'
 import { useUsersRegistry } from '@/hooks/use-users-registry'
 import { useShellLayout } from '@/contexts/shell-layout'
+import { formatChileDateTimeLabel } from '@/lib/chile-timezone'
 import { getLoginPath } from '@/lib/auth-routes'
 import { getCurrentUser } from '@/lib/current-user'
 import { getUserDetailPath } from '@/lib/user-routes'
 import { cn } from '@/lib/utils'
 import { useNotifications } from '@/contexts/notifications-context'
+import type { NotificationItem } from '@/types/notification'
 
 function initialsFromName(name: string): string {
   return name
@@ -52,14 +54,8 @@ function initialsFromName(name: string): string {
 }
 
 function formatNotificationTime(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  return date.toLocaleString('es-CL', {
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  const formatted = formatChileDateTimeLabel(value)
+  return formatted === '—' ? '' : formatted
 }
 
 export function TopBar() {
@@ -114,10 +110,92 @@ export function TopBar() {
     }
   }
 
+  const visibleNotifications = useMemo(() => items.slice(0, 10), [items])
+  const unreadNotifications = useMemo(
+    () => visibleNotifications.filter((n) => !n.readAt),
+    [visibleNotifications],
+  )
+  const readNotifications = useMemo(
+    () => visibleNotifications.filter((n) => n.readAt),
+    [visibleNotifications],
+  )
+
+  const renderNotificationItem = (n: NotificationItem) => {
+    const isUnread = !n.readAt
+    return (
+      <DropdownMenuItem
+        key={n.id}
+        className={cn(
+          'relative flex flex-col items-start gap-1 rounded-lg px-3 py-2.5',
+          isUnread
+            ? 'bg-primary/10 shadow-[inset_3px_0_0_0_hsl(var(--primary))] focus:bg-primary/15'
+            : 'bg-muted/25 opacity-80 focus:bg-muted/40',
+        )}
+        onSelect={(e) => {
+          e.preventDefault()
+          void markRead(n.id)
+          if (n.href) navigate(n.href)
+        }}
+      >
+        {isUnread ? (
+          <span
+            className="absolute start-2 top-3 size-2 rounded-full bg-primary ring-2 ring-popover"
+            aria-hidden
+          />
+        ) : null}
+        <span
+          className={cn(
+            'flex w-full items-start justify-between gap-2',
+            isUnread && 'ps-3',
+          )}
+        >
+          <span
+            className={cn(
+              'min-w-0 flex-1 text-sm leading-tight',
+              isUnread
+                ? 'font-semibold text-foreground'
+                : 'font-medium text-muted-foreground',
+            )}
+          >
+            {n.title}
+          </span>
+          {isUnread ? (
+            <span className="shrink-0 rounded-md bg-primary px-1.5 py-0.5 text-[10px] font-bold leading-none text-primary-foreground">
+              Nuevo
+            </span>
+          ) : (
+            <span className="shrink-0 text-[10px] font-medium text-muted-foreground/70">
+              Leída
+            </span>
+          )}
+        </span>
+        <span
+          className={cn(
+            'w-full text-xs leading-snug',
+            isUnread ? 'text-foreground/80' : 'text-muted-foreground',
+          )}
+        >
+          {n.message}
+        </span>
+        <span
+          className={cn(
+            'w-full text-[10px]',
+            isUnread ? 'font-medium text-primary/80' : 'text-muted-foreground/70',
+          )}
+        >
+          {formatNotificationTime(n.createdAt)}
+        </span>
+      </DropdownMenuItem>
+    )
+  }
+
   return (
     <header
       className={cn(
-        'flex shrink-0 items-center gap-2 border-b border-border/70 bg-background/90 backdrop-blur-md',
+        'relative z-20 flex shrink-0 items-center gap-2',
+        'border-b border-border/60 bg-gradient-to-r from-background via-background to-primary/[0.04]',
+        'shadow-[0_1px_0_0_hsl(var(--border)/0.9),0_8px_32px_-12px_rgba(15,23,42,0.1)]',
+        'backdrop-blur-xl supports-[backdrop-filter]:bg-background/85',
         'pt-[env(safe-area-inset-top)] pb-2.5',
         'ps-[max(0.75rem,env(safe-area-inset-left))] pe-[max(0.75rem,env(safe-area-inset-right))]',
         'sm:gap-3 sm:pb-3',
@@ -140,14 +218,19 @@ export function TopBar() {
 
       <GlobalSearch />
 
-      <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
+      <div
+        className={cn(
+          'flex shrink-0 items-center gap-0.5 rounded-full border border-border/50',
+          'bg-muted/35 p-0.5 shadow-sm sm:gap-1 sm:p-1',
+        )}
+      >
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              className="relative size-9 rounded-full text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+              className="relative size-9 rounded-full text-muted-foreground hover:bg-background/90 hover:text-foreground hover:shadow-sm"
               aria-label="Notificaciones"
             >
               <Bell aria-hidden className="size-[18px]" />
@@ -161,9 +244,12 @@ export function TopBar() {
               ) : null}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-80">
-            <DropdownMenuLabel className="flex items-center justify-between gap-2">
-              <span className="font-normal">Notificaciones</span>
+          <DropdownMenuContent
+            align="end"
+            className="w-80 border-border/80 shadow-lg"
+          >
+            <DropdownMenuLabel className="flex items-center justify-between gap-2 bg-muted/30 py-2.5">
+              <span className="text-sm font-semibold text-foreground">Notificaciones</span>
               {items.length > 0 ? (
                 <span className="flex items-center gap-2">
                   {unreadCount > 0 ? (
@@ -199,28 +285,26 @@ export function TopBar() {
                 Sin notificaciones
               </div>
             ) : (
-              <div className="max-h-[320px] overflow-auto">
-                {items.slice(0, 10).map((n) => (
-                  <DropdownMenuItem
-                    key={n.id}
-                    className="flex flex-col items-start gap-1 px-3 py-2.5"
-                    onSelect={(e) => {
-                      e.preventDefault()
-                      void markRead(n.id)
-                      if (n.href) navigate(n.href)
-                    }}
-                  >
-                    <span className="text-sm font-medium leading-tight">
-                      {n.title}
-                    </span>
-                    <span className="text-xs text-muted-foreground leading-snug">
-                      {n.message}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">
-                      {n.readAt ? 'Leída' : 'Nuevo'} · {formatNotificationTime(n.createdAt)}
-                    </span>
-                  </DropdownMenuItem>
-                ))}
+              <div className="max-h-[320px] overflow-auto p-1">
+                {unreadNotifications.length > 0 ? (
+                  <>
+                    <p className="px-2 pb-1 pt-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
+                      Sin leer ({unreadNotifications.length})
+                    </p>
+                    {unreadNotifications.map(renderNotificationItem)}
+                  </>
+                ) : null}
+                {unreadNotifications.length > 0 && readNotifications.length > 0 ? (
+                  <DropdownMenuSeparator className="my-1" />
+                ) : null}
+                {readNotifications.length > 0 ? (
+                  <>
+                    <p className="px-2 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Leídas
+                    </p>
+                    {readNotifications.map(renderNotificationItem)}
+                  </>
+                ) : null}
               </div>
             )}
           </DropdownMenuContent>
@@ -262,7 +346,7 @@ export function TopBar() {
               type="button"
               variant="ghost"
               size="icon"
-              className="size-9 rounded-full text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+              className="size-9 rounded-full text-muted-foreground hover:bg-background/90 hover:text-foreground hover:shadow-sm"
               aria-label="Ayuda"
               onClick={openHelp}
             >
@@ -276,7 +360,7 @@ export function TopBar() {
 
         <Separator
           orientation="vertical"
-          className="mx-1 hidden h-6 sm:mx-1.5 sm:block"
+          className="mx-0.5 hidden h-7 bg-border/70 sm:mx-1"
         />
 
         <DropdownMenu>
@@ -284,9 +368,9 @@ export function TopBar() {
             <button
               type="button"
               className={cn(
-                'flex max-w-[11rem] items-center gap-2 rounded-full py-1 ps-1 pe-2.5 transition-colors',
-                'hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30',
-                'data-[state=open]:bg-muted/80',
+                'flex max-w-[11rem] items-center gap-2 rounded-full py-1 ps-1 pe-2.5 transition-all',
+                'hover:bg-background/90 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30',
+                'data-[state=open]:bg-background/90 data-[state=open]:shadow-sm',
                 'sm:pe-3',
               )}
               aria-label="Menú de cuenta"

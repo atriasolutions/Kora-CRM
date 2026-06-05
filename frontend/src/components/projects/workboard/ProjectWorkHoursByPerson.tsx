@@ -1,22 +1,22 @@
 import { Clock, Users } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { UserAssigneeAvatar } from '@/components/shared/UserAssigneeAvatar'
-import { Input } from '@/components/ui/input'
+import { WorkHoursMonthField } from '@/components/projects/workboard/WorkHoursPeriodFields'
 import {
   computeHoursByAssignee,
-  defaultWorkHoursDayKey,
-  defaultWorkHoursMonthKey,
-  type WorkHoursPeriodScope,
+  getWorkHoursPeriodAvailability,
+  pickDefaultWorkHoursMonth,
 } from '@/lib/project-work-hours-by-assignee'
 import { formatWorkboardHoursDisplay } from '@/lib/project-work-plan'
 import type { ProjectWorkPlan } from '@/types/project-work-plan'
 import { cn } from '@/lib/utils'
 
-const SCOPE_OPTIONS: { value: WorkHoursPeriodScope; label: string }[] = [
+type HoursByPersonScope = 'project' | 'month'
+
+const SCOPE_OPTIONS: { value: HoursByPersonScope; label: string }[] = [
   { value: 'project', label: 'Proyecto completo' },
   { value: 'month', label: 'Por mes' },
-  { value: 'day', label: 'Por día' },
 ]
 
 type ProjectWorkHoursByPersonProps = {
@@ -24,26 +24,38 @@ type ProjectWorkHoursByPersonProps = {
 }
 
 export function ProjectWorkHoursByPerson({ plan }: ProjectWorkHoursByPersonProps) {
-  const [scope, setScope] = useState<WorkHoursPeriodScope>('project')
-  const [month, setMonth] = useState(defaultWorkHoursMonthKey)
-  const [day, setDay] = useState(defaultWorkHoursDayKey)
+  const [scope, setScope] = useState<HoursByPersonScope>('project')
+  const availability = useMemo(() => getWorkHoursPeriodAvailability(plan), [plan])
+  const [month, setMonth] = useState(() =>
+    pickDefaultWorkHoursMonth(availability.monthKeys),
+  )
+
+  useEffect(() => {
+    if (!availability.monthKeys.includes(month)) {
+      setMonth(pickDefaultWorkHoursMonth(availability.monthKeys))
+    }
+  }, [availability.monthKeys, month])
+
+  const selectScope = (next: HoursByPersonScope) => {
+    setScope(next)
+    if (next === 'month' && !availability.monthKeys.includes(month)) {
+      setMonth(pickDefaultWorkHoursMonth(availability.monthKeys))
+    }
+  }
 
   const result = useMemo(
     () =>
       computeHoursByAssignee(plan, {
         scope,
         month: scope === 'month' ? month : undefined,
-        day: scope === 'day' ? day : undefined,
       }),
-    [plan, scope, month, day],
+    [plan, scope, month],
   )
 
   const scopeHint =
-    scope === 'project'
-      ? 'Suma todas las horas de actividades hoja (excluye canceladas). Con varios responsables, se reparten en partes iguales.'
-      : scope === 'month'
-        ? 'Prorratea las horas según los días planificados de cada actividad que caen en el mes elegido.'
-        : 'Prorratea las horas del día elegido según el rango planificado de cada actividad.'
+    scope === 'month'
+      ? 'Prorratea las horas según los días planificados de cada actividad que caen en el mes elegido.'
+      : 'Suma todas las horas de actividades hoja (excluye canceladas). Con varios responsables, se reparten en partes iguales.'
 
   return (
     <div className="space-y-4 p-4 sm:p-5">
@@ -51,9 +63,9 @@ export function ProjectWorkHoursByPerson({ plan }: ProjectWorkHoursByPersonProps
         <p className="text-sm font-medium text-foreground">Filtro de periodo</p>
         <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{scopeHint}</p>
 
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-center">
           <div
-            className="inline-flex w-full shrink-0 rounded-lg border border-border bg-background p-0.5 shadow-sm sm:w-auto"
+            className="inline-flex w-full shrink-0 rounded-lg border border-border bg-background p-0.5 shadow-sm lg:w-auto"
             role="tablist"
             aria-label="Periodo de horas"
           >
@@ -69,7 +81,7 @@ export function ProjectWorkHoursByPerson({ plan }: ProjectWorkHoursByPersonProps
                     ? 'bg-primary text-primary-foreground shadow-sm'
                     : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
                 )}
-                onClick={() => setScope(opt.value)}
+                onClick={() => selectScope(opt.value)}
               >
                 {opt.label}
               </button>
@@ -77,39 +89,11 @@ export function ProjectWorkHoursByPerson({ plan }: ProjectWorkHoursByPersonProps
           </div>
 
           {scope === 'month' ? (
-            <div className="flex w-full items-center gap-2 sm:w-auto">
-              <label
-                htmlFor="work-hours-month"
-                className="shrink-0 text-xs font-medium text-muted-foreground"
-              >
-                Mes
-              </label>
-              <Input
-                id="work-hours-month"
-                type="month"
-                className="h-9 min-w-0 flex-1 bg-background sm:w-44 sm:flex-none"
-                value={month}
-                onChange={(e) => setMonth(e.target.value)}
-              />
-            </div>
-          ) : null}
-
-          {scope === 'day' ? (
-            <div className="flex w-full items-center gap-2 sm:w-auto">
-              <label
-                htmlFor="work-hours-day"
-                className="shrink-0 text-xs font-medium text-muted-foreground"
-              >
-                Día
-              </label>
-              <Input
-                id="work-hours-day"
-                type="date"
-                className="h-9 min-w-0 flex-1 bg-background sm:w-44 sm:flex-none"
-                value={day}
-                onChange={(e) => setDay(e.target.value)}
-              />
-            </div>
+            <WorkHoursMonthField
+              value={month}
+              availableMonthKeys={availability.monthKeys}
+              onChange={setMonth}
+            />
           ) : null}
         </div>
       </div>

@@ -437,6 +437,7 @@ CREATE TABLE IF NOT EXISTS crm_products (
   category_id         UUID REFERENCES crm_product_categories(id) ON DELETE SET NULL,
   product_type        VARCHAR(64),
   unit_of_measure     VARCHAR(32),
+  billing_period      VARCHAR(32),
   price_cents         BIGINT NOT NULL DEFAULT 0,
   cost_price_cents    BIGINT,
   stock_qty           INT,

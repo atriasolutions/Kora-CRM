@@ -15,8 +15,11 @@ import type { ProductDetail } from '@/data/product-detail.mock'
 import {
   applyFormValuesToProduct,
   productDetailToFormValues,
+  productFormValuesToCreateSlice,
   type ProductFormValues,
 } from '@/lib/product-form'
+import { validateCreateProductForm } from '@/lib/product-create'
+import { useProductsRegistry } from '@/hooks/use-products-registry'
 
 type EditProductDialogProps = {
   open: boolean
@@ -31,6 +34,7 @@ export function EditProductDialog({
   product,
   onSave,
 }: EditProductDialogProps) {
+  const { allProducts } = useProductsRegistry()
   const [form, setForm] = useState<ProductFormValues>(() =>
     productDetailToFormValues(product),
   )
@@ -50,6 +54,18 @@ export function EditProductDialog({
     e.preventDefault()
     if (!form.name.trim()) {
       toast.warning('El nombre del producto es obligatorio.')
+      return
+    }
+    if (!form.sku.trim()) {
+      toast.warning('El SKU es obligatorio.')
+      return
+    }
+    const skuValidation = validateCreateProductForm(
+      productFormValuesToCreateSlice(form),
+      { existingProducts: allProducts, excludeProductId: product.id },
+    )
+    if (skuValidation) {
+      toast.warning(skuValidation)
       return
     }
     setSaving(true)

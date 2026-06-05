@@ -13,7 +13,6 @@ import { CompaniesSegmentsView } from '@/components/companies/CompaniesSegmentsV
 import { CreateCompanyDialog } from '@/components/companies/CreateCompanyDialog'
 import { DuplicateCompanyDialog } from '@/components/companies/DuplicateCompanyDialog'
 import { EditCompanyDialog } from '@/components/companies/EditCompanyDialog'
-import { ImportCompaniesDialog } from '@/components/companies/ImportCompaniesDialog'
 import { ListPageLayout } from '@/components/list/ListPageLayout'
 import { ModuleListPage, type ListSelectionAction } from '@/components/list/ModuleListPage'
 import { Button } from '@/components/ui/button'
@@ -62,7 +61,6 @@ export function CompaniesPage() {
   const {
     allCompanies,
     addCompany,
-    addCompanies,
     updateCompanyFromDetail,
     archiveCompany,
     archiveCompanies,
@@ -113,7 +111,6 @@ export function CompaniesPage() {
 
   const [createOpen, setCreateOpen] = useState(false)
   const [duplicateOpen, setDuplicateOpen] = useState(false)
-  const [importOpen, setImportOpen] = useState(false)
   const [createInitial, setCreateInitial] = useState<Partial<CreateCompanyFormValues>>()
   const [createTitle, setCreateTitle] = useState('Nueva empresa')
   const [editOpen, setEditOpen] = useState(false)
@@ -135,19 +132,6 @@ export function CompaniesPage() {
     setCreateTitle('Duplicar empresa')
     setCreateOpen(true)
   }, [])
-
-  const handleImport = useCallback(
-    async (rows: CreateCompanyFormValues[]) => {
-      const items = await addCompanies(rows)
-      toast.success(
-        `${items.length} empresa${items.length === 1 ? '' : 's'} importada${items.length === 1 ? '' : 's'}.`,
-      )
-      if (items.length === 1) {
-        navigate(`/empresas/${items[0]!.id}`)
-      }
-    },
-    [addCompanies, navigate],
-  )
 
   const resolveListRow = useCallback(
     (row: CompanyListItem) => {
@@ -239,7 +223,6 @@ export function CompaniesPage() {
           setCreateOpen(true)
         }}
         onDuplicate={() => setDuplicateOpen(true)}
-        onImportFile={() => setImportOpen(true)}
         filters={filters}
         onFiltersChange={setFilters}
         listScope={listScope}
@@ -319,12 +302,6 @@ export function CompaniesPage() {
         onOpenChange={setDuplicateOpen}
         companies={allCompanies}
         onSelectDuplicate={handleDuplicateSelect}
-      />
-
-      <ImportCompaniesDialog
-        open={importOpen}
-        onOpenChange={setImportOpen}
-        onImport={handleImport}
       />
 
       {canEdit && editingCompany ? (

@@ -3,7 +3,6 @@ import {
   Layers,
   Receipt,
   SlidersHorizontal,
-  Users,
   Warehouse,
   type LucideIcon,
 } from 'lucide-react'
@@ -13,15 +12,12 @@ export type SettingsSectionId =
   | 'bodegas'
   | 'categorias'
   | 'impuestos'
-  | 'usuarios'
 
 export type SettingsSection = {
   id: SettingsSectionId
   label: string
   description: string
   Icon: LucideIcon
-  /** Sección visible pero sin panel implementado aún */
-  comingSoon?: boolean
 }
 
 export const SETTINGS_SECTIONS: SettingsSection[] = [
@@ -48,13 +44,6 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     label: 'Impuestos y moneda',
     description: 'Indicadores UF, USD y EUR, e IVA por defecto del sistema.',
     Icon: Receipt,
-  },
-  {
-    id: 'usuarios',
-    label: 'Usuarios y permisos',
-    description: 'Equipos, roles y acceso a módulos.',
-    Icon: Users,
-    comingSoon: true,
   },
 ]
 

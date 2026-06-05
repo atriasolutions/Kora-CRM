@@ -119,11 +119,11 @@ export function RightPanel() {
         }
         className={cn(
           'absolute top-[42%] z-30 flex -translate-y-1/2 items-center justify-center',
-          'rounded-full border shadow-md transition-all duration-300',
+          'border shadow-md transition-all duration-300',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
           featuredContactOpen
-            ? '-left-4 size-8 border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground'
-            : 'relative left-0 flex h-14 w-9 -translate-x-full flex-col gap-0.5 rounded-l-lg rounded-r-none border-primary/50 bg-primary text-primary-foreground shadow-lg ring-2 ring-primary/35 hover:bg-primary/90',
+            ? '-left-4 size-8 rounded-full border-border/80 bg-card text-muted-foreground shadow-sm hover:border-primary/30 hover:bg-muted hover:text-foreground'
+            : 'relative left-0 flex h-[4.25rem] w-10 -translate-x-full flex-col gap-0.5 rounded-l-xl rounded-r-none border-primary/40 bg-gradient-to-b from-primary to-primary/90 text-primary-foreground shadow-[0_8px_24px_-6px_hsl(var(--primary)/0.55)] ring-2 ring-primary/25 hover:from-primary/95 hover:to-primary/80',
         )}
       >
         {featuredContactOpen ? (
@@ -148,9 +148,10 @@ export function RightPanel() {
         id="pending-activities-panel"
         aria-hidden={!featuredContactOpen}
         className={cn(
-          'flex h-full flex-col overflow-hidden border-l bg-card',
-          'transition-[width,border-color] duration-300 ease-in-out',
-          featuredContactOpen ? 'border-border' : 'border-transparent',
+          'flex h-full flex-col overflow-hidden border-l bg-gradient-to-b from-card via-card to-muted/20',
+          'shadow-[-8px_0_32px_-20px_rgba(15,23,42,0.12)]',
+          'transition-[width,border-color,box-shadow] duration-300 ease-in-out',
+          featuredContactOpen ? 'border-border/80' : 'border-transparent',
         )}
         style={{ width: featuredContactOpen ? PANEL_WIDTH_PX : 0 }}
       >
@@ -158,28 +159,44 @@ export function RightPanel() {
           className="flex h-full min-h-0 flex-col"
           style={{ width: PANEL_WIDTH_PX }}
         >
-          <div className="border-b border-border px-5 py-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Actividades pendientes
-            </p>
+          <div className="border-b border-border/70 bg-gradient-to-br from-primary/[0.09] via-card to-card px-5 py-4">
+            <div className="flex items-center gap-2">
+              <span className="grid size-8 place-items-center rounded-lg bg-primary/15 text-primary shadow-sm ring-1 ring-primary/20">
+                <ClipboardList aria-hidden className="size-4" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-primary/80">
+                  Actividades pendientes
+                </p>
+                {pendingActivities.length > 0 ? (
+                  <p className="mt-0.5 text-sm font-medium text-foreground">
+                    {pendingActivities.length}{' '}
+                    {pendingActivities.length === 1 ? 'asignada' : 'asignadas'}
+                  </p>
+                ) : null}
+              </div>
+            </div>
             {pendingActivities.length > 0 ? (
-              <p className="mt-1 text-sm text-muted-foreground">
-                {pendingActivities.length}{' '}
-                {pendingActivities.length === 1
-                  ? 'actividad asignada'
-                  : 'actividades asignadas'}{' '}
-                · orden por prioridad y fecha
+              <p className="mt-2 text-xs text-muted-foreground">
+                Aparecen cuando llega el recordatorio o la fecha programada
               </p>
             ) : (
-              <p className="mt-1 text-sm text-muted-foreground">
-                Tus actividades pendientes o en curso aparecerán aquí.
+              <p className="mt-2 text-sm text-muted-foreground">
+                Tus actividades aparecerán aquí cuando llegue su recordatorio o fecha
+                programada.
               </p>
             )}
           </div>
 
           <div className="flex-1 overflow-y-auto px-5 py-5">
-            {pendingActivities.length === 0 ? (
-              <Card className="border-border shadow-sm">
+            {!registryHydrated ? (
+              <Card className="border-dashed border-border/80 bg-muted/20 shadow-none">
+                <CardContent className="p-4 text-sm text-muted-foreground">
+                  Cargando tus actividades…
+                </CardContent>
+              </Card>
+            ) : pendingActivities.length === 0 ? (
+              <Card className="border-dashed border-border/80 bg-muted/20 shadow-none">
                 <CardContent className="p-4 text-sm text-muted-foreground">
                   No tienes actividades pendientes asignadas. Crea una actividad o pide
                   que te asignen una desde el módulo Actividades.
@@ -187,7 +204,7 @@ export function RightPanel() {
               </Card>
             ) : (
               <div className="space-y-3">
-                <h3 className="text-base font-semibold text-foreground">
+                <h3 className="text-sm font-semibold tracking-tight text-foreground">
                   Mis actividades
                 </h3>
                 <ul className="space-y-3">
@@ -210,9 +227,9 @@ export function RightPanel() {
                             }
                           }}
                           className={cn(
-                            'group flex w-full cursor-pointer gap-3 rounded-lg border border-border',
-                            'bg-background p-3 text-left shadow-sm transition-colors',
-                            'hover:border-primary/40 hover:bg-muted/40',
+                            'group flex w-full cursor-pointer gap-3 rounded-xl border border-border/80',
+                            'bg-background/90 p-3 text-left shadow-sm transition-all',
+                            'hover:border-primary/35 hover:bg-primary/[0.03] hover:shadow-md',
                             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                           )}
                           aria-label={`Ver actividad: ${activity.title}`}
@@ -280,7 +297,7 @@ export function RightPanel() {
             <p className="mt-4 text-center">
               <Link
                 to="/actividades"
-                className="text-xs font-semibold text-primary hover:underline"
+                className="inline-flex items-center justify-center rounded-full border border-primary/25 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 hover:underline"
               >
                 Ver todas las actividades
               </Link>

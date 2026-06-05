@@ -1,6 +1,14 @@
 export type UserStatus = 'Activo' | 'Invitado' | 'Inactivo' | 'Por verificar'
 
-export type UserRole = 'Admin' | 'Manager' | 'Ventas' | 'Marketing' | 'Soporte' | 'CS'
+export type UserRole =
+  | 'Admin'
+  | 'Manager'
+  | 'Ventas'
+  | 'Marketing'
+  | 'Operaciones'
+  | 'Invitado'
+  | 'Soporte'
+  | 'CS'
 
 export type UserListItem = {
   id: string

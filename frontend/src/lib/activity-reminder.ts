@@ -1,4 +1,9 @@
 import { toDatetimeLocalValue } from '@/lib/datetime-local'
+import {
+  formatChileDateTimeLabel,
+  parseChileDatetimeInput,
+  parseChileDatetimeLocal,
+} from '@/lib/chile-timezone'
 
 export type ActivityReminderPreset =
   | 'none'
@@ -49,15 +54,9 @@ export function formatReminderLabel(
       return '1 día antes'
     case 'custom': {
       if (!customAt?.trim()) return 'Fecha personalizada'
-      const date = new Date(customAt)
-      if (Number.isNaN(date.getTime())) return 'Fecha personalizada'
-      const when = date.toLocaleString('es', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
+      const date = parseChileDatetimeLocal(customAt) ?? parseChileDatetimeInput(customAt)
+      if (!date) return 'Fecha personalizada'
+      const when = formatChileDateTimeLabel(date)
       return `Personalizado · ${when}`
     }
   }
@@ -80,11 +79,14 @@ export function computeReminderAtMs(
 ): number | null {
   if (fields.reminderPreset === 'none') return null
   if (fields.reminderPreset === 'custom') {
-    const date = new Date(fields.reminderCustomAt)
-    return Number.isNaN(date.getTime()) ? null : date.getTime()
+    const date =
+      parseChileDatetimeLocal(fields.reminderCustomAt) ??
+      parseChileDatetimeInput(fields.reminderCustomAt)
+    return date ? date.getTime() : null
   }
-  const scheduled = new Date(scheduledAt)
-  if (Number.isNaN(scheduled.getTime())) return null
+  const scheduled =
+    parseChileDatetimeLocal(scheduledAt) ?? parseChileDatetimeInput(scheduledAt)
+  if (!scheduled) return null
   return scheduled.getTime() - REMINDER_OFFSET_MS[fields.reminderPreset]
 }
 
@@ -103,8 +105,10 @@ export function validateActivityReminder(
   if (!fields.reminderCustomAt.trim()) {
     return 'Indica la fecha y hora del recordatorio personalizado.'
   }
-  const date = new Date(fields.reminderCustomAt)
-  if (Number.isNaN(date.getTime())) {
+  const date =
+    parseChileDatetimeLocal(fields.reminderCustomAt) ??
+    parseChileDatetimeInput(fields.reminderCustomAt)
+  if (!date) {
     return 'La fecha del recordatorio no es válida.'
   }
   return null
@@ -128,26 +132,12 @@ export function formatReminderLabelFromAt(
 
   const scheduled = parseActivityDate(scheduledAt)
   if (!scheduled) {
-    const when = reminder.toLocaleString('es', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-    return `Personalizado · ${when}`
+    return `Personalizado · ${formatChileDateTimeLabel(reminder)}`
   }
 
   const diffMs = scheduled.getTime() - reminder.getTime()
   if (diffMs <= 60_000) {
-    const when = reminder.toLocaleString('es', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-    return `Personalizado · ${when}`
+    return `Personalizado · ${formatChileDateTimeLabel(reminder)}`
   }
 
   const diffMin = Math.round(diffMs / 60_000)
@@ -162,14 +152,7 @@ export function formatReminderLabelFromAt(
     return hours === 1 ? '1 hora antes' : `${hours} horas antes`
   }
 
-  const when = reminder.toLocaleString('es', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-  return `Personalizado · ${when}`
+  return `Personalizado · ${formatChileDateTimeLabel(reminder)}`
 }
 
 export function resolveActivityReminderLabel(activity: {

@@ -8,6 +8,11 @@ import {
   type ActivityReminderFormFields,
   type ActivityReminderPreset,
 } from '@/lib/activity-reminder'
+import {
+  CHILE_TIMEZONE,
+  isSameChileCalendarDay,
+  parseChileDatetimeInput,
+} from '@/lib/chile-timezone'
 import { getCurrentUser } from '@/lib/current-user'
 
 const PRIORITY_RANK: Record<ActivityPriority, number> = {
@@ -62,8 +67,11 @@ export function parseActivityDueLabel(due: string, now = new Date()): number | n
     const monthKey = datedMatch[2]!.toLowerCase().replace('.', '').slice(0, 3)
     const month = SPANISH_MONTHS[monthKey]
     if (month === undefined) return null
+    const year = now.getFullYear()
+    const chileNow = parseChileDatetimeInput(`${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T${datedMatch[3]}:${datedMatch[4]}`)
+    if (chileNow) return chileNow.getTime()
     const d = new Date(
-      now.getFullYear(),
+      year,
       month,
       day,
       Number(datedMatch[3]),
@@ -87,7 +95,7 @@ function reminderOffsetFromLabel(reminder?: string): number | null {
   if (text.includes('personalizado')) {
     const afterDot = reminder.split('·')[1]?.trim()
     if (afterDot) {
-      const parsed = new Date(afterDot)
+      const parsed = parseChileDatetimeInput(afterDot) ?? new Date(afterDot)
       if (!Number.isNaN(parsed.getTime())) return null
     }
   }
@@ -101,10 +109,21 @@ export function getActivityScheduledTimestamp(activity: ActivityListItem): numbe
 
 function scheduledTimestamp(activity: ActivityListItem): number | null {
   if (activity.scheduledAt) {
-    const t = new Date(activity.scheduledAt).getTime()
+    const parsed =
+      parseChileDatetimeInput(activity.scheduledAt) ?? new Date(activity.scheduledAt)
+    const t = parsed.getTime()
     if (!Number.isNaN(t)) return t
   }
   return parseActivityDueLabel(activity.due)
+}
+
+function activityHasReminder(activity: ActivityListItem): boolean {
+  if (activity.reminderPreset === 'none') return false
+  if (activity.reminderPreset && activity.reminderPreset !== 'none') return true
+  if (activity.reminderAt?.trim()) return true
+  const reminder = activity.reminder?.trim().toLowerCase() ?? ''
+  if (!reminder || reminder.includes('sin recordatorio')) return false
+  return true
 }
 
 function reminderFieldsFromActivity(
@@ -136,6 +155,15 @@ export function resolveActivityReminderAt(activity: ActivityListItem): number {
     return Number.MAX_SAFE_INTEGER
   }
 
+  const reminderText = activity.reminder?.trim().toLowerCase() ?? ''
+  if (reminderText.includes('personalizado')) {
+    const afterDot = activity.reminder?.split('·')[1]?.trim()
+    if (afterDot) {
+      const parsed = parseChileDatetimeInput(afterDot) ?? new Date(afterDot)
+      if (!Number.isNaN(parsed.getTime())) return parsed.getTime()
+    }
+  }
+
   const scheduled = scheduledTimestamp(activity)
   if (scheduled == null) return Number.MAX_SAFE_INTEGER
 
@@ -145,24 +173,25 @@ export function resolveActivityReminderAt(activity: ActivityListItem): number {
 
 export function formatReminderWhenLabel(timestampMs: number, now = new Date()): string {
   const date = new Date(timestampMs)
-  const time = date.toLocaleTimeString('es', {
+  const time = date.toLocaleTimeString('es-CL', {
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: CHILE_TIMEZONE,
   })
 
-  if (date.toDateString() === now.toDateString()) {
+  if (isSameChileCalendarDay(date, now)) {
     return `Hoy, ${time}`
   }
 
-  const tomorrow = new Date(now)
-  tomorrow.setDate(tomorrow.getDate() + 1)
-  if (date.toDateString() === tomorrow.toDateString()) {
+  const tomorrow = new Date(now.getTime() + 86_400_000)
+  if (isSameChileCalendarDay(date, tomorrow)) {
     return `Mañana, ${time}`
   }
 
-  const datePart = date.toLocaleDateString('es', {
+  const datePart = date.toLocaleDateString('es-CL', {
     day: 'numeric',
     month: 'short',
+    timeZone: CHILE_TIMEZONE,
   })
   return `${datePart}, ${time}`
 }
@@ -170,10 +199,21 @@ export function formatReminderWhenLabel(timestampMs: number, now = new Date()): 
 export function activityAssignedToUser(
   activity: ActivityListItem,
   userName = getCurrentUser().name,
+  userId = getCurrentUser().id,
 ): boolean {
+  const mineName = userName.trim().toLowerCase()
+  const mineId = userId.trim().toLowerCase()
   const assignee = activity.assignee?.trim().toLowerCase() ?? ''
-  const mine = userName.trim().toLowerCase()
-  return Boolean(assignee && mine && assignee === mine)
+
+  if (assignee && mineName && assignee === mineName) return true
+  if (
+    !assignee &&
+    activity.createdById?.trim().toLowerCase() === mineId &&
+    isPendingActivityStatus(activity.status)
+  ) {
+    return true
+  }
+  return false
 }
 
 export function sortPendingActivitiesByDue(
@@ -209,15 +249,29 @@ export function isActivityReminderDue(
   return reminderAt <= now.getTime()
 }
 
+/** True cuando la actividad debe mostrarse en el panel lateral. */
+export function isActivityVisibleInPendingPanel(
+  activity: ActivityListItem,
+  now: Date = new Date(),
+): boolean {
+  if (!isPendingActivityStatus(activity.status)) return false
+  if (!activityAssignedToUser(activity)) return false
+
+  if (activityHasReminder(activity)) {
+    return isActivityReminderDue(activity, now)
+  }
+
+  const scheduled = scheduledTimestamp(activity)
+  if (scheduled == null) return true
+  return scheduled <= now.getTime()
+}
+
 export function selectPendingActivitiesForPanel(
   activities: ActivityListItem[],
-  _now: Date = new Date(),
+  now: Date = new Date(),
 ): ActivityListItem[] {
   return sortPendingActivitiesByDue(
-    activities.filter((activity) => {
-      if (!isPendingActivityStatus(activity.status)) return false
-      return activityAssignedToUser(activity)
-    }),
+    activities.filter((activity) => isActivityVisibleInPendingPanel(activity, now)),
   )
 }
 

@@ -15,6 +15,7 @@ type WorkboardItemTreeProps = {
   onChange: (plan: ProjectWorkPlan, options?: WorkPlanPersistOptions) => void
   expandedParents: Set<string>
   onToggleParent: (id: string) => void
+  teamMemberNames?: string[]
 }
 
 export function WorkboardItemTree({
@@ -25,6 +26,7 @@ export function WorkboardItemTree({
   onChange,
   expandedParents,
   onToggleParent,
+  teamMemberNames,
 }: WorkboardItemTreeProps) {
   const kids = childrenOf(plan, item.id)
   const hasKids = kids.length > 0
@@ -41,6 +43,7 @@ export function WorkboardItemTree({
         expanded={expanded}
         onToggleExpand={() => onToggleParent(item.id)}
         onChange={onChange}
+        teamMemberNames={teamMemberNames}
       />
       {hasKids && expanded ? (
         <SortableContext items={childIds} strategy={verticalListSortingStrategy}>
@@ -54,6 +57,7 @@ export function WorkboardItemTree({
               onChange={onChange}
               expandedParents={expandedParents}
               onToggleParent={onToggleParent}
+              teamMemberNames={teamMemberNames}
             />
           ))}
         </SortableContext>

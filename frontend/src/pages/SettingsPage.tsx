@@ -13,7 +13,7 @@ import {
   type SettingsSectionId,
 } from '@/components/settings/settings-sections'
 import { WarehousesSettingsPanel } from '@/components/settings/WarehousesSettingsPanel'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 function SettingsSectionPanel({ sectionId }: { sectionId: SettingsSectionId }) {
   switch (sectionId) {
@@ -30,37 +30,13 @@ function SettingsSectionPanel({ sectionId }: { sectionId: SettingsSectionId }) {
   }
 }
 
-function ComingSoonPanel({ sectionId }: { sectionId: SettingsSectionId }) {
-  const section = settingsSectionById(sectionId)
-  if (!section) return null
-  const Icon = section.Icon
-
-  return (
-    <Card className="border-dashed shadow-sm">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base font-semibold">
-          <Icon aria-hidden className="size-5 text-muted-foreground" />
-          {section.label}
-        </CardTitle>
-        <CardDescription>{section.description}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <p className="text-sm text-muted-foreground">
-          Esta sección estará disponible en una próxima versión de Kora.
-        </p>
-      </CardContent>
-    </Card>
-  )
-}
-
 export function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const paramSection = searchParams.get('seccion') as SettingsSectionId | null
 
   const initialSection = useMemo(() => {
     const section = paramSection ? settingsSectionById(paramSection) : undefined
-    if (section && !section.comingSoon) return section.id
-    return DEFAULT_SETTINGS_SECTION
+    return section?.id ?? DEFAULT_SETTINGS_SECTION
   }, [paramSection])
 
   const [activeSection, setActiveSection] = useState<SettingsSectionId>(initialSection)
@@ -107,11 +83,7 @@ export function SettingsPage() {
             <p className="mt-0.5 text-xs text-muted-foreground">{activeMeta.description}</p>
           </div>
 
-          {activeMeta.comingSoon ? (
-            <ComingSoonPanel sectionId={activeSection} />
-          ) : (
-            <SettingsSectionPanel sectionId={activeSection} />
-          )}
+          <SettingsSectionPanel sectionId={activeSection} />
         </div>
       </div>
     </PageScrollArea>

@@ -54,6 +54,8 @@ export function EditUserDialog({
     try {
       await onSave(applyFormValuesToUser(user, form))
       onOpenChange(false)
+    } catch {
+      /* El detalle muestra el error vía toast */
     } finally {
       setSaving(false)
     }

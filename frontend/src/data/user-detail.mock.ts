@@ -112,6 +112,20 @@ function detailExtrasForSeed(
   }
 }
 
+const OPERATIONS_PERMISSIONS: UserPermissionModule[] = DEFAULT_PERMISSIONS.map((m) => {
+  if (['proyectos', 'compras', 'ingresos', 'actividades'].includes(m.id)) {
+    return { ...m, access: 'Completo' as const }
+  }
+  if (['inventario', 'productos'].includes(m.id)) {
+    return { ...m, access: 'Lectura' as const }
+  }
+  return { ...m, access: 'Sin acceso' as const }
+})
+
+const INVITED_PERMISSIONS: UserPermissionModule[] = DEFAULT_PERMISSIONS.map((m) =>
+  m.id === 'proyectos' ? { ...m, access: 'Lectura' as const } : { ...m, access: 'Sin acceso' as const },
+)
+
 export function permissionsForRole(role: string): UserPermissionModule[] {
   if (role === 'Admin') return ADMIN_PERMISSIONS
   if (role === 'Manager') {
@@ -121,6 +135,8 @@ export function permissionsForRole(role: string): UserPermissionModule[] {
         : { ...m, access: 'Completo' as const },
     )
   }
+  if (role === 'Operaciones') return OPERATIONS_PERMISSIONS
+  if (role === 'Invitado') return INVITED_PERMISSIONS
   return SALES_PERMISSIONS
 }
 

@@ -22,6 +22,7 @@ export type ProjectTeamMember = {
   id: string
   name: string
   role: string
+  userId?: string
 }
 
 export type ProjectDetail = ProjectListItem & {

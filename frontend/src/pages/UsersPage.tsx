@@ -6,6 +6,7 @@ import { InviteUserDialog } from '@/components/users/InviteUserDialog'
 import { ListPageLayout } from '@/components/list/ListPageLayout'
 import { ModuleListPage } from '@/components/list/ModuleListPage'
 import { UsersModuleHeader } from '@/components/users/UsersModuleHeader'
+import { apiActionErrorMessage } from '@/api/errors'
 import { isApiEnabled } from '@/api/config'
 import { usersListConfig } from '@/config/list-modules/users'
 import type { UserListItem } from '@/data/users.mock'
@@ -65,9 +66,16 @@ export function UsersPage() {
 
   const handleInvite = useCallback(
     async (values: UserFormValues) => {
-      const item = await addUser(values)
-      toast.success(`Usuario «${item.name}» invitado correctamente.`)
-      navigate(getUserDetailPath(item.id))
+      try {
+        const item = await addUser(values)
+        toast.success(`Usuario «${item.name}» invitado correctamente.`)
+        navigate(getUserDetailPath(item.id))
+      } catch (error) {
+        toast.error(
+          apiActionErrorMessage(error, 'No se pudo crear el usuario.'),
+        )
+        throw error
+      }
     },
     [addUser, navigate],
   )

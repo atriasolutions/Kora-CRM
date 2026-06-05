@@ -70,12 +70,18 @@ export async function fetchProjectWorkPlan(
   return loadProjectWorkPlan(projectId)
 }
 
-export type WorkPlanPersistOptions = { immediate?: boolean }
+export type WorkPlanPersistOptions = {
+  immediate?: boolean
+  onAfterSave?: () => void | Promise<void>
+}
 
 const saveTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const pendingPlans = new Map<string, ProjectWorkPlan>()
 
-export async function flushProjectWorkPlan(projectId: string): Promise<void> {
+export async function flushProjectWorkPlan(
+  projectId: string,
+  onAfterSave?: () => void | Promise<void>,
+): Promise<void> {
   const timer = saveTimers.get(projectId)
   if (timer) {
     clearTimeout(timer)
@@ -85,6 +91,7 @@ export async function flushProjectWorkPlan(projectId: string): Promise<void> {
   if (!plan || !isApiEnabled()) return
   pendingPlans.delete(projectId)
   await saveProjectWorkPlanApi(projectId, plan)
+  await onAfterSave?.()
 }
 
 export function persistProjectWorkPlan(
@@ -98,11 +105,12 @@ export function persistProjectWorkPlan(
     pendingPlans.delete(projectId)
     return
   }
+  const afterSave = options?.onAfterSave
   if (options?.immediate) {
     const prev = saveTimers.get(projectId)
     if (prev) clearTimeout(prev)
     saveTimers.delete(projectId)
-    void flushProjectWorkPlan(projectId).catch((error) => {
+    void flushProjectWorkPlan(projectId, afterSave).catch((error) => {
       toast.error(
         apiActionErrorMessage(error, 'No se pudo guardar el plan de trabajo.'),
       )
@@ -114,7 +122,7 @@ export function persistProjectWorkPlan(
   saveTimers.set(
     projectId,
     setTimeout(() => {
-      void flushProjectWorkPlan(projectId).catch((error) => {
+      void flushProjectWorkPlan(projectId, afterSave).catch((error) => {
         toast.error(
           apiActionErrorMessage(error, 'No se pudo guardar el plan de trabajo.'),
         )

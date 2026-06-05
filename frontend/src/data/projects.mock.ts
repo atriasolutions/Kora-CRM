@@ -34,6 +34,8 @@ export type ProjectListItem = {
   health: ProjectHealth
   budget: string
   startDate: string
+  /** Miembros con acceso al proyecto (pestaña Equipo). */
+  teamMembers?: { id: string; name: string; userId?: string; role?: string }[]
 } & RecordAuditFields
 
 export const PROJECT_LIST_TOTAL_DEMO = 42

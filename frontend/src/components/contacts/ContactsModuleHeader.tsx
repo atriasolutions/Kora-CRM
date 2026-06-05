@@ -29,7 +29,8 @@ type ContactsModuleHeaderProps = {
   onQueryChange: (query: string) => void
   onCreateNew: () => void
   onDuplicate: () => void
-  onImportFile: () => void
+  /** Importación CSV (deshabilitada de momento si se omite). */
+  onImportFile?: () => void
   filters: ContactFilters
   onFiltersChange: (filters: ContactFilters) => void
   listScope?: ContactListScope
@@ -97,8 +98,14 @@ export function ContactsModuleHeader({
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuItem onSelect={onCreateNew}>Crear nuevo</DropdownMenuItem>
                 <DropdownMenuItem onSelect={onDuplicate}>Duplicar existente</DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={onImportFile}>Importar archivo</DropdownMenuItem>
+                {onImportFile ? (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onSelect={onImportFile}>
+                      Importar archivo
+                    </DropdownMenuItem>
+                  </>
+                ) : null}
               </DropdownMenuContent>
             </DropdownMenu>
           ) : null}

@@ -18,7 +18,7 @@ export type EntityActivityKind =
 type EntityActivitiesSectionProps = {
   activities: ContactActivity[]
   entityKind: EntityActivityKind
-  onRegister: () => void
+  onRegister?: () => void
 }
 
 export function EntityActivitiesSection({
@@ -30,14 +30,16 @@ export function EntityActivitiesSection({
     <Card className="shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle className="text-base font-semibold">Actividades</CardTitle>
-        <Button
-          variant="outline"
-          size="sm"
-          className="border-border"
-          onClick={onRegister}
-        >
-          Registrar actividad
-        </Button>
+        {onRegister ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-border"
+            onClick={onRegister}
+          >
+            Registrar actividad
+          </Button>
+        ) : null}
       </CardHeader>
       <CardContent>
         <ContactActivitiesPanel

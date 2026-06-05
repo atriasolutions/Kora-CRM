@@ -47,6 +47,7 @@ export function mapProjectTeamRow(row: ProjectTeamRow): ProjectTeamMemberDto {
     id: row.id,
     name: row.user_name,
     role: row.role_label ?? '',
+    userId: row.user_id ?? undefined,
   }
 }
 

@@ -1,8 +1,12 @@
 import { Router } from 'express'
 
-import { getAuditActor } from '../middleware/audit-actor.js'
+import { isSystemAccessProfile } from '../lib/access-profile-admin.js'
+import { getAuditActor, getAuthProfile } from '../middleware/audit-actor.js'
 import { requirePermission } from '../middleware/require-permission.js'
 import { routeParam } from '../lib/route-params.js'
+import {
+  assertProjectTeamAccess,
+} from '../repositories/projects.repository.js'
 import * as projectsRepo from '../repositories/projects.repository.js'
 import * as projectWorkPlanRepo from '../repositories/project-work-plan.repository.js'
 import type {
@@ -24,6 +28,8 @@ projectsRouter.get(
   async (req, res, next) => {
     try {
       const query = listProjectsQuerySchema.parse(req.query)
+      const profile = getAuthProfile(req)
+      const actor = getAuditActor(req)
       const result = await projectsRepo.listProjects({
         page: query.page,
         pageSize: query.pageSize,
@@ -32,6 +38,9 @@ projectsRouter.get(
         opportunityId: query.opportunityId,
         companyId: query.companyId,
         archivedOnly: query.archived === true,
+        memberAccess: isSystemAccessProfile(profile)
+          ? undefined
+          : { userId: actor.userId, userName: actor.userName },
       })
       res.json({
         data: result.items,
@@ -53,7 +62,11 @@ projectsRouter.get(
   requirePermission('proyectos', 'view'),
   async (req, res, next) => {
     try {
+      const profile = getAuthProfile(req)
       const item = await projectsRepo.getProjectById(routeParam(req))
+      if (!isSystemAccessProfile(profile)) {
+        assertProjectTeamAccess(item.manager, item.team, getAuditActor(req))
+      }
       res.json({ data: item })
     } catch (e) {
       next(e)
@@ -80,7 +93,13 @@ projectsRouter.get(
   requirePermission('proyectos', 'view'),
   async (req, res, next) => {
     try {
-      const plan = await projectWorkPlanRepo.getProjectWorkPlan(routeParam(req))
+      const profile = getAuthProfile(req)
+      const id = routeParam(req)
+      if (!isSystemAccessProfile(profile)) {
+        const project = await projectsRepo.getProjectById(id)
+        assertProjectTeamAccess(project.manager, project.team, getAuditActor(req))
+      }
+      const plan = await projectWorkPlanRepo.getProjectWorkPlan(id)
       res.json({ data: plan })
     } catch (e) {
       next(e)

@@ -186,7 +186,7 @@ export function InvoiceDetailPage() {
 
   const handleStageChange = useCallback(
     (stage: InvoiceJourneyStage) => {
-      if (!invoice) return
+      if (!invoice || !canEdit) return
       if (
         !canTransition(invoice.status, stage, {
           history: invoice.statusHistory,
@@ -206,7 +206,7 @@ export function InvoiceDetailPage() {
 
       applyStageChange(stage)
     },
-    [applyStageChange, invoice],
+    [applyStageChange, canEdit, invoice],
   )
 
   const handleInvoiceSaved = useCallback(
@@ -382,8 +382,8 @@ export function InvoiceDetailPage() {
         invoiceId={invoice.id}
         currentStage={invoice.status}
         history={invoice.statusHistory}
-        readOnly={false}
-        onStageChange={handleStageChange}
+        readOnly={!canEdit}
+        onStageChange={canEdit ? handleStageChange : undefined}
       />
 
       <div className="min-w-0 space-y-4">

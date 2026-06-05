@@ -127,6 +127,7 @@ export function ContactFormFields({
           rutRange="person"
           typeOptions={CONTACT_TAX_IDENTIFIER_TYPE_OPTIONS}
           entityName="contact"
+          identifierRequired={false}
         />
         <ContactFormSelect
           id={`${idPrefix}-status`}

@@ -36,6 +36,7 @@ type WorkboardGroupSectionProps = {
   onChange: (plan: ProjectWorkPlan, options?: WorkPlanPersistOptions) => void
   expandedParents: Set<string>
   onToggleParent: (id: string) => void
+  teamMemberNames?: string[]
 }
 
 export function WorkboardGroupSection({
@@ -45,6 +46,7 @@ export function WorkboardGroupSection({
   onChange,
   expandedParents,
   onToggleParent,
+  teamMemberNames,
 }: WorkboardGroupSectionProps) {
   const totals = groupTotals(plan, group.id)
 
@@ -168,6 +170,7 @@ export function WorkboardGroupSection({
               onChange={onChange}
               expandedParents={expandedParents}
               onToggleParent={onToggleParent}
+              teamMemberNames={teamMemberNames}
             />
           ))}
           {!readOnly ? (

@@ -5,7 +5,7 @@ import {
   ContactFormTextarea,
 } from '@/components/contacts/ContactFormField'
 import { AvatarImageUpload } from '@/components/shared/AvatarImageUpload'
-import { profileIdForUserRole } from '@/data/profiles.mock'
+import { resolveProfileIdForRole } from '@/lib/user-form'
 import { useProfilesRegistry } from '@/hooks/use-profiles-registry'
 import {
   USER_LANGUAGE_OPTIONS,
@@ -128,7 +128,10 @@ export function UserFormFields({
             label="Rol"
             value={form.role}
             onChange={(role) =>
-              patch({ role, profileId: profileIdForUserRole(role) })
+              patch({
+                role,
+                profileId: resolveProfileIdForRole(role, profileOptions),
+              })
             }
             options={USER_ROLE_OPTIONS}
           />

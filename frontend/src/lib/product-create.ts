@@ -5,6 +5,11 @@ import type { ProductType } from '@/lib/product-catalog'
 import { parseStockNum } from '@/lib/product-display'
 import { parseProductPrice } from '@/lib/product-currency-input'
 import { parseMoneyNum } from '@/lib/product-pricing'
+import {
+  findDuplicateProductBySku,
+  productSkuDuplicateMessage,
+  type ProductSkuRecord,
+} from '@/lib/product-sku-uniqueness'
 import { normalizeProductCurrency } from '@/lib/currency'
 
 export type CreateProductFormValues = {
@@ -64,7 +69,17 @@ export function duplicateProductFormValues(
   }
 }
 
-export function validateCreateProductForm(values: CreateProductFormValues): string | null {
+export type ValidateCreateProductFormOptions = {
+  existingProducts?: ProductSkuRecord[]
+  excludeProductId?: string
+  /** SKUs ya presentes en el mismo archivo CSV (importación). */
+  skusInImportBatch?: Set<string>
+}
+
+export function validateCreateProductForm(
+  values: CreateProductFormValues,
+  options?: ValidateCreateProductFormOptions,
+): string | null {
   if (!values.name.trim()) return 'El nombre del producto es obligatorio.'
   if (!values.sku.trim()) return 'El SKU es obligatorio.'
   if (!values.price.trim()) return 'El precio de venta es obligatorio.'
@@ -72,6 +87,21 @@ export function validateCreateProductForm(values: CreateProductFormValues): stri
   if (values.unitOfMeasure === 'otra' && !values.customUnit.trim()) {
     return 'Indica la unidad de medida personalizada.'
   }
+
+  const skuKey = values.sku.trim().toLowerCase()
+  if (options?.skusInImportBatch?.has(skuKey)) {
+    return `El SKU «${values.sku.trim()}» está repetido en el archivo.`
+  }
+
+  if (options?.existingProducts?.length) {
+    const duplicate = findDuplicateProductBySku(
+      values.sku,
+      options.existingProducts,
+      options.excludeProductId,
+    )
+    if (duplicate) return productSkuDuplicateMessage(values.sku, duplicate)
+  }
+
   return null
 }
 
@@ -134,7 +164,10 @@ export type ProductCsvParseResult = {
   skipped: number
 }
 
-export function parseProductsCsv(text: string): ProductCsvParseResult {
+export function parseProductsCsv(
+  text: string,
+  existingProducts: ProductSkuRecord[] = [],
+): ProductCsvParseResult {
   const lines = text
     .split(/\r?\n/)
     .map((l) => l.trim())
@@ -156,6 +189,7 @@ export function parseProductsCsv(text: string): ProductCsvParseResult {
   const rows: CreateProductFormValues[] = []
   const errors: string[] = []
   let skipped = 0
+  const skusInImportBatch = new Set<string>()
 
   for (let i = 0; i < dataLines.length; i++) {
     const line = dataLines[i]!
@@ -192,12 +226,16 @@ export function parseProductsCsv(text: string): ProductCsvParseResult {
       ownerName: partial.ownerName ?? getDefaultOwnerName(),
     })
 
-    const err = validateCreateProductForm(values)
+    const err = validateCreateProductForm(values, {
+      existingProducts,
+      skusInImportBatch,
+    })
     if (err) {
       errors.push(`Fila ${hasKnownHeader ? i + 2 : i + 1}: ${err}`)
       skipped += 1
       continue
     }
+    skusInImportBatch.add(values.sku.trim().toLowerCase())
     rows.push(values)
   }
 

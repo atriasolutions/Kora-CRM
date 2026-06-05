@@ -11,6 +11,7 @@ import { Separator } from '@/components/ui/separator'
 import type { QuoteDetail } from '@/data/quote-detail.mock'
 import { UserLookupField } from '@/components/shared/UserLookupField'
 import { QuoteCommercialTermsFields } from '@/components/quotes/QuoteCommercialTermsFields'
+import { QuoteInternalInventorySection } from '@/components/quotes/QuoteInternalInventorySection'
 import type { QuoteFormValues } from '@/lib/quote-form'
 
 type QuoteDetailSidebarProps = {
@@ -97,12 +98,20 @@ export function QuoteDetailSidebar({
               value={form.billingAddress}
               onChange={(billingAddress) => patch({ billingAddress })}
             />
-            <p className="text-xs font-medium text-muted-foreground sm:col-span-2">
-              Bodega destino: {form.destinationWarehouse || '—'}
-            </p>
-            <p className="text-xs text-muted-foreground sm:col-span-2">
-              Dirección de entrega: {form.deliveryAddress || '—'}
-            </p>
+            <QuoteInternalInventorySection
+              warehouseFieldId="edit-qt-warehouse"
+              addressFieldId="edit-qt-warehouse-address"
+              warehouseId={form.destinationWarehouseId}
+              warehouseName={form.destinationWarehouse}
+              deliveryAddress={form.deliveryAddress}
+              onChange={(whPatch) =>
+                patch({
+                  destinationWarehouseId: whPatch.warehouseId,
+                  destinationWarehouse: whPatch.warehouse,
+                  deliveryAddress: whPatch.deliveryAddress,
+                })
+              }
+            />
             <ContactFormField id="edit-qt-internal" label="Notas internas">
               <textarea
                 id="edit-qt-internal"
@@ -173,22 +182,17 @@ export function QuoteDetailSidebar({
               {quote.billingAddress}
             </span>
           </p>
-          <p className="flex gap-2">
-            <Truck aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-            <span>
-              <span className="text-muted-foreground">Bodega destino: </span>
-              {quote.destinationWarehouse || '—'}
-            </span>
-          </p>
-          <p className="flex gap-2">
-            <MapPin aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-            <span>
-              <span className="text-muted-foreground">Dirección de entrega: </span>
-              {quote.deliveryAddress || '—'}
-            </span>
-          </p>
         </CardContent>
       </Card>
+
+      <QuoteInternalInventorySection
+        readOnly
+        warehouseFieldId="view-qt-warehouse"
+        addressFieldId="view-qt-warehouse-address"
+        warehouseId={quote.destinationWarehouseId}
+        warehouseName={quote.destinationWarehouse}
+        deliveryAddress={quote.deliveryAddress}
+      />
 
       <Card className="shadow-sm">
         <CardHeader className="pb-2">

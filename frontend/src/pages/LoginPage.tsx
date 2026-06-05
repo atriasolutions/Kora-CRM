@@ -11,6 +11,7 @@ import {
 import { useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 
+import { LoginAtriaCredit } from '@/components/auth/LoginAtriaCredit'
 import { LoginBackground } from '@/components/auth/LoginBackground'
 import { ContactFormInput } from '@/components/contacts/ContactFormField'
 import { Button } from '@/components/ui/button'
@@ -25,7 +26,7 @@ const HIGHLIGHTS = [
   {
     icon: Target,
     title: 'Pipeline comercial',
-    description: 'Oportunidades, cotizaciones y seguimiento en un solo lugar.',
+    description: 'Oportunidades, cotizaciones y seguimiento unificado.',
   },
   {
     icon: Users,
@@ -47,7 +48,7 @@ function LoginFormAlert({ message }: { message: string }) {
       role="alert"
       aria-live="polite"
       className={cn(
-        'rounded-lg border px-3.5 py-3 text-sm',
+        'rounded-xl border px-3.5 py-3 text-sm',
         isConnection
           ? 'border-border bg-muted/60 text-foreground'
           : 'border-destructive/30 bg-destructive/10 text-destructive',
@@ -71,6 +72,151 @@ function LoginFormAlert({ message }: { message: string }) {
           >
             {message}
           </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function LoginFormCard({
+  twoFactorStep,
+  backupCodesNotice,
+  loading,
+  error,
+  email,
+  password,
+  setEmail,
+  setPassword,
+  setError,
+  setTwoFactorStep,
+  handleSubmit,
+  handleTwoFactorSuccess,
+  navigate,
+  locationState,
+}: {
+  twoFactorStep:
+    | { mode: 'verify'; challengeId: string; userEmail: string }
+    | { mode: 'enroll'; enrollmentToken: string; userEmail: string }
+    | null
+  backupCodesNotice: string[] | null
+  loading: boolean
+  error: string | null
+  email: string
+  password: string
+  setEmail: (v: string) => void
+  setPassword: (v: string) => void
+  setError: (v: string | null) => void
+  setTwoFactorStep: React.Dispatch<
+    React.SetStateAction<
+      | { mode: 'verify'; challengeId: string; userEmail: string }
+      | { mode: 'enroll'; enrollmentToken: string; userEmail: string }
+      | null
+    >
+  >
+  handleSubmit: (event: React.FormEvent) => void
+  handleTwoFactorSuccess: (backupCodes?: string[]) => void
+  navigate: ReturnType<typeof useNavigate>
+  locationState: unknown
+}) {
+  const title = twoFactorStep
+    ? twoFactorStep.mode === 'enroll'
+      ? 'Configurar 2FA'
+      : 'Verificación en dos pasos'
+    : backupCodesNotice
+      ? 'Códigos de respaldo'
+      : 'Iniciar sesión'
+
+  const subtitle = backupCodesNotice
+    ? 'Guárdalos en un lugar seguro; cada uno solo sirve una vez.'
+    : twoFactorStep
+      ? 'Google Authenticator, Microsoft Authenticator u otra app TOTP'
+      : 'Accede con tus credenciales corporativas'
+
+  return (
+    <div className="w-full max-w-[420px] overflow-hidden rounded-2xl border border-border/80 bg-card/95 shadow-[0_24px_64px_-28px_rgba(15,23,42,0.22)] backdrop-blur-sm">
+      <div className="h-1 bg-gradient-to-r from-violet-600 via-primary to-cyan-500" aria-hidden />
+      <div className="px-7 py-6 sm:px-8 sm:py-7">
+        <h2 className="text-2xl font-semibold tracking-tight text-foreground">{title}</h2>
+        <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{subtitle}</p>
+
+        <div className="mt-6">
+          {backupCodesNotice ? (
+            <div className="space-y-4">
+              <ul className="grid gap-2 rounded-xl border border-border bg-muted/40 p-4 font-mono text-sm">
+                {backupCodesNotice.map((c) => (
+                  <li key={c}>{c}</li>
+                ))}
+              </ul>
+              <Button
+                type="button"
+                className="h-11 w-full text-base font-semibold"
+                onClick={() =>
+                  navigate(getPostLoginRedirect(locationState), { replace: true })
+                }
+              >
+                Continuar al CRM
+              </Button>
+            </div>
+          ) : twoFactorStep ? (
+            <LoginTwoFactorFlow
+              mode={twoFactorStep.mode}
+              challengeId={
+                twoFactorStep.mode === 'verify' ? twoFactorStep.challengeId : undefined
+              }
+              enrollmentToken={
+                twoFactorStep.mode === 'enroll'
+                  ? twoFactorStep.enrollmentToken
+                  : undefined
+              }
+              userEmail={twoFactorStep.userEmail}
+              onSuccess={handleTwoFactorSuccess}
+              onBack={() => {
+                setTwoFactorStep(null)
+                setError(null)
+              }}
+            />
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+              <ContactFormInput
+                id="login-email"
+                label="Email"
+                type="email"
+                value={email}
+                onChange={setEmail}
+                required
+              />
+              <ContactFormInput
+                id="login-password"
+                label="Contraseña"
+                type="password"
+                value={password}
+                onChange={setPassword}
+                required
+              />
+
+              {error ? <LoginFormAlert message={error} /> : null}
+
+              <div className="flex justify-end pt-0.5">
+                <Link
+                  to="/olvide-contraseña"
+                  className="text-sm font-medium text-primary underline-offset-2 hover:underline"
+                >
+                  ¿Olvidaste tu contraseña?
+                </Link>
+              </div>
+
+              <Button
+                type="submit"
+                className="h-11 w-full bg-gradient-to-r from-violet-600 via-primary to-primary text-base font-semibold shadow-md shadow-primary/25 hover:opacity-95"
+                disabled={loading}
+              >
+                {loading ? (
+                  <Loader2 aria-hidden className="size-4 animate-spin" />
+                ) : null}
+                {loading ? 'Ingresando…' : 'Ingresar'}
+              </Button>
+            </form>
+          )}
         </div>
       </div>
     </div>
@@ -144,163 +290,115 @@ export function LoginPage() {
     navigate(getPostLoginRedirect(location.state), { replace: true })
   }
 
+  const formProps = {
+    twoFactorStep,
+    backupCodesNotice,
+    loading,
+    error,
+    email,
+    password,
+    setEmail,
+    setPassword,
+    setError,
+    setTwoFactorStep,
+    handleSubmit,
+    handleTwoFactorSuccess,
+    navigate,
+    locationState: location.state,
+  }
+
   return (
-    <div className="relative flex min-h-svh overflow-hidden bg-background">
+    <div className="relative flex min-h-svh flex-col overflow-hidden bg-background">
       <LoginBackground />
 
-      <div className="relative z-10 flex w-full flex-col lg:flex-row">
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col lg:flex-row">
         <section
           className={cn(
-            'hidden flex-1 flex-col justify-between border-e border-border/50 bg-card/40 p-10 xl:p-14 lg:flex',
+            'relative hidden flex-[1.12] flex-col justify-between overflow-hidden lg:flex',
+            'bg-gradient-to-br from-[#0f0818] via-[#15103a] to-[#0a2d45]',
           )}
         >
-          <KoraLogoMark size="lg" align="start" />
+          <div
+            className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_90%_70%_at_20%_0%,rgba(147,51,234,0.28),transparent_55%)]"
+            aria-hidden
+          />
+          <div
+            className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_100%_100%,rgba(6,182,212,0.2),transparent_50%)]"
+            aria-hidden
+          />
+          <div
+            className="pointer-events-none absolute inset-0 opacity-[0.12]"
+            style={{
+              backgroundImage:
+                'linear-gradient(to right, rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.08) 1px, transparent 1px)',
+              backgroundSize: '56px 56px',
+            }}
+            aria-hidden
+          />
 
-          <div className="max-w-md space-y-8 py-12">
-            <div className="space-y-3">
-              <p className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary">
-                <Sparkles aria-hidden className="size-3.5" />
-                Bienvenido de nuevo
-              </p>
-              <h1 className="text-3xl font-bold leading-tight tracking-tight text-foreground xl:text-4xl">
-                Tu operación comercial,
-                <span className="text-primary"> en un solo lugar</span>
-              </h1>
-              <p className="text-base leading-relaxed text-muted-foreground">
-                Centraliza ventas, compras, inventario y equipos con una experiencia
-                pensada para equipos que necesitan claridad y velocidad.
-              </p>
+          <div className="relative flex flex-1 flex-col px-10 py-10 xl:px-14 xl:py-12">
+            <KoraLogoMark variant="hero" tone="light" size="lg" align="start" />
+
+            <div className="flex flex-1 flex-col justify-center py-10 xl:py-14">
+              <div className="max-w-lg space-y-6">
+                <p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-white/90 backdrop-blur-sm">
+                  <Sparkles aria-hidden className="size-3.5 text-cyan-300" />
+                  Bienvenido de nuevo
+                </p>
+                <h1 className="text-[2rem] font-bold leading-[1.12] tracking-tight text-white xl:text-[2.65rem]">
+                  Tu operación comercial,
+                  <span className="block bg-gradient-to-r from-violet-300 via-fuchsia-200 to-cyan-300 bg-clip-text text-transparent">
+                    en un solo lugar
+                  </span>
+                </h1>
+                <p className="max-w-md text-base leading-relaxed text-white/65">
+                  Centraliza ventas, compras, inventario y equipos con una plataforma
+                  diseñada para claridad, velocidad y control del negocio.
+                </p>
+              </div>
+
+              <ul className="mt-10 grid max-w-xl gap-3">
+                {HIGHLIGHTS.map(({ icon: Icon, title, description }) => (
+                  <li
+                    key={title}
+                    className="flex gap-4 rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur-md transition-colors hover:border-white/20 hover:bg-white/[0.09]"
+                  >
+                    <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-violet-500/30 to-cyan-500/25 text-cyan-200 ring-1 ring-white/10">
+                      <Icon aria-hidden className="size-5" />
+                    </span>
+                    <div className="min-w-0 pt-0.5">
+                      <p className="font-semibold text-white">{title}</p>
+                      <p className="mt-1 text-sm leading-snug text-white/55">{description}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
             </div>
 
-            <ul className="space-y-3">
-              {HIGHLIGHTS.map(({ icon: Icon, title, description }) => (
-                <li
-                  key={title}
-                  className="flex gap-4 rounded-xl border border-border/70 bg-background/80 p-4"
-                >
-                  <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
-                    <Icon aria-hidden className="size-5" />
-                  </span>
-                  <div>
-                    <p className="font-semibold text-foreground">{title}</p>
-                    <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <div className="flex flex-wrap items-end justify-between gap-4 border-t border-white/10 pt-6">
+              <p className="flex items-center gap-2 text-xs text-white/45">
+                <Shield aria-hidden className="size-3.5 shrink-0 text-cyan-300/80" />
+                Acceso seguro con permisos por perfil
+              </p>
+              <LoginAtriaCredit tone="light" />
+            </div>
           </div>
-
-          <p className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Shield aria-hidden className="size-3.5 shrink-0 text-primary/80" />
-            Acceso seguro con permisos por perfil
-          </p>
         </section>
 
-        <section className="flex flex-1 flex-col items-center justify-center px-4 py-10 sm:px-8 lg:max-w-xl lg:px-12">
-          <div className="mb-8 flex w-full max-w-md justify-center lg:hidden">
-            <KoraLogoMark size="md" align="center" />
+        <section className="flex flex-1 flex-col items-center justify-center px-5 py-10 sm:px-10 lg:min-h-0 lg:px-12 xl:px-16">
+          <div className="mb-8 w-full max-w-[420px] lg:hidden">
+            <KoraLogoMark variant="hero" size="md" align="center" />
           </div>
 
-          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card shadow-lg">
-            <div className="border-b border-border px-6 py-5">
-              <h2 className="text-xl font-semibold tracking-tight text-foreground">
-                {twoFactorStep
-                  ? twoFactorStep.mode === 'enroll'
-                    ? 'Configurar 2FA'
-                    : 'Verificación en dos pasos'
-                  : backupCodesNotice
-                    ? 'Códigos de respaldo'
-                    : 'Iniciar sesión'}
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {backupCodesNotice
-                  ? 'Guárdalos en un lugar seguro; cada uno solo sirve una vez.'
-                  : twoFactorStep
-                    ? 'Google Authenticator, Microsoft Authenticator u otra app TOTP'
-                    : 'Accede al CRM con tus credenciales corporativas'}
-              </p>
-            </div>
+          <LoginFormCard {...formProps} />
 
-            <div className="px-6 py-6">
-              {backupCodesNotice ? (
-                <div className="space-y-4">
-                  <ul className="grid gap-2 rounded-lg border border-border bg-muted/40 p-4 font-mono text-sm">
-                    {backupCodesNotice.map((c) => (
-                      <li key={c}>{c}</li>
-                    ))}
-                  </ul>
-                  <Button
-                    type="button"
-                    className="w-full"
-                    onClick={() =>
-                      navigate(getPostLoginRedirect(location.state), { replace: true })
-                    }
-                  >
-                    Continuar al CRM
-                  </Button>
-                </div>
-              ) : twoFactorStep ? (
-                <LoginTwoFactorFlow
-                  mode={twoFactorStep.mode}
-                  challengeId={
-                    twoFactorStep.mode === 'verify' ? twoFactorStep.challengeId : undefined
-                  }
-                  enrollmentToken={
-                    twoFactorStep.mode === 'enroll'
-                      ? twoFactorStep.enrollmentToken
-                      : undefined
-                  }
-                  userEmail={twoFactorStep.userEmail}
-                  onSuccess={handleTwoFactorSuccess}
-                  onBack={() => {
-                    setTwoFactorStep(null)
-                    setError(null)
-                  }}
-                />
-              ) : (
-              <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-                <ContactFormInput
-                  id="login-email"
-                  label="Email"
-                  type="email"
-                  value={email}
-                  onChange={setEmail}
-                  required
-                />
-                <ContactFormInput
-                  id="login-password"
-                  label="Contraseña"
-                  type="password"
-                  value={password}
-                  onChange={setPassword}
-                  required
-                />
-
-                {error ? <LoginFormAlert message={error} /> : null}
-
-                <div className="flex justify-end">
-                  <Link
-                    to="/olvide-contraseña"
-                    className="text-sm text-primary underline-offset-2 hover:underline"
-                  >
-                    ¿Olvidaste tu contraseña?
-                  </Link>
-                </div>
-
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? (
-                    <Loader2 aria-hidden className="size-4 animate-spin" />
-                  ) : null}
-                  {loading ? 'Ingresando…' : 'Ingresar'}
-                </Button>
-              </form>
-              )}
-            </div>
-          </div>
-
-          <p className="mt-6 max-w-md text-center text-xs text-muted-foreground">
+          <p className="mt-7 max-w-[420px] text-center text-xs leading-relaxed text-muted-foreground">
             ¿Primera vez? Revisa el correo de bienvenida para activar tu cuenta.
           </p>
+
+          <div className="mt-8 flex w-full max-w-[420px] flex-col items-center gap-3 border-t border-border/60 pt-6 lg:hidden">
+            <LoginAtriaCredit />
+          </div>
         </section>
       </div>
     </div>

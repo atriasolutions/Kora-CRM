@@ -20,7 +20,7 @@ import { toast } from '@/lib/toast'
 type InviteUserDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSubmit: (values: UserFormValues) => void
+  onSubmit: (values: UserFormValues) => void | Promise<void>
 }
 
 export function InviteUserDialog({
@@ -37,14 +37,14 @@ export function InviteUserDialog({
     })
   }, [open])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     const validation = validateUserFormValues(form)
     if (validation) {
       toast.warning(validation)
       return
     }
-    onSubmit({ ...form, status: 'Por verificar' })
+    await onSubmit({ ...form, status: 'Por verificar' })
     onOpenChange(false)
   }
 

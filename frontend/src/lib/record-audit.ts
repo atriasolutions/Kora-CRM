@@ -1,3 +1,4 @@
+import { formatChileDateTimeLabel } from '@/lib/chile-timezone'
 import {
   findUserInDisplayCacheByName,
   getUserFromDisplayCache,
@@ -109,13 +110,7 @@ export function formatAuditDateTime(value: string | undefined | null): string {
   if (!value?.trim()) return '—'
   const d = parseLegacyDisplayDate(value)
   if (!d) return value
-  return d.toLocaleString('es-CL', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return formatChileDateTimeLabel(d)
 }
 
 export function stampRecordAuditOnCreate<T extends object>(

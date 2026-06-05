@@ -37,8 +37,9 @@ import {
 } from '@/lib/activity-archive'
 import { purgeActivityLocalData } from '@/lib/activity-permanent-delete'
 import { archivedStoreFromList } from '@/lib/registry-archive-from-api'
-import { useRegistryApiBootstrap } from '@/hooks/use-registry-api-bootstrap'
+import { useRegistryApiBootstrap, useSessionCanModule } from '@/hooks/use-registry-api-bootstrap'
 import { ACTIVITIES_UPDATED_EVENT } from '@/lib/realtime-events'
+import { useAuth } from '@/hooks/use-auth'
 const useApi = isApiEnabled()
 const STORAGE_KEY = `${STORAGE_PREFIX}-crm-user-activities`
 
@@ -84,6 +85,8 @@ function entriesFromStore(
 }
 
 export function ActivitiesRegistryProvider({ children }: { children: ReactNode }) {
+  const { isAuthenticated, isReady } = useAuth()
+  const canViewActivities = useSessionCanModule('actividades', 'view')
   const [registryHydrated, setRegistryHydrated] = useState(!useApi)
 
   const [userActivities, setUserActivities] = useState<ActivityListItem[]>(() => {
@@ -114,7 +117,20 @@ export function ActivitiesRegistryProvider({ children }: { children: ReactNode }
     setRegistryHydrated(true)
   }, [])
 
-  useRegistryApiBootstrap(reloadFromApi, { moduleId: 'actividades', enabled: false })
+  useRegistryApiBootstrap(reloadFromApi, { moduleId: 'actividades' })
+
+  useEffect(() => {
+    if (!useApi || !isReady) return
+    if (!isAuthenticated) {
+      setUserActivities([])
+      syncRegistryActivities([])
+      setRegistryHydrated(false)
+      return
+    }
+    if (!canViewActivities) {
+      setRegistryHydrated(true)
+    }
+  }, [useApi, isReady, isAuthenticated, canViewActivities])
 
   useEffect(() => {
     if (!useApi) return
@@ -198,6 +214,20 @@ export function ActivitiesRegistryProvider({ children }: { children: ReactNode }
       const list = listItemFromActivityDetail(merged)
       if (userActivities.some((o) => o.id === detail.id)) {
         save(userActivities.map((o) => (o.id === detail.id ? list : o)))
+      }
+      return merged
+    },
+    [save, userActivities],
+  )
+
+  const upsertActivityFromDetail = useCallback(
+    (detail: ActivityDetail) => {
+      const merged = normalizeActivityDetail(detail)
+      const list = listItemFromActivityDetail(merged)
+      if (userActivities.some((o) => o.id === detail.id)) {
+        save(userActivities.map((o) => (o.id === detail.id ? list : o)))
+      } else {
+        save([list, ...userActivities])
       }
       return merged
     },
@@ -375,6 +405,7 @@ export function ActivitiesRegistryProvider({ children }: { children: ReactNode }
       findById,
       addActivity,
       addActivities,
+      upsertActivityFromDetail,
       updateActivityFromDetail,
       updateActivityStatus,
       archiveActivity,
@@ -394,6 +425,7 @@ export function ActivitiesRegistryProvider({ children }: { children: ReactNode }
       findById,
       addActivity,
       addActivities,
+      upsertActivityFromDetail,
       updateActivityFromDetail,
       updateActivityStatus,
       archiveActivity,

@@ -4,8 +4,8 @@ import { useMemo } from 'react'
 import { AssigneeAvatarStack } from '@/components/shared/AssigneeAvatarStack'
 import { UserAssigneeAvatar } from '@/components/shared/UserAssigneeAvatar'
 import { ContactFormField } from '@/components/contacts/ContactFormField'
+import { useAssigneeDirectory } from '@/hooks/use-assignee-directory'
 import { usePrefetchUserAvatars } from '@/hooks/use-user-avatar-url'
-import { useUsersRegistry } from '@/hooks/use-users-registry'
 import {
   assigneePickerOptions,
   toggleAssignee,
@@ -23,7 +23,7 @@ export function WorkboardAssigneesField({
   assignees,
   onChange,
 }: WorkboardAssigneesFieldProps) {
-  const { allUsers } = useUsersRegistry()
+  const { allUsers, usersDirectoryLoaded } = useAssigneeDirectory()
   const teamNames = useMemo(() => allUsers.map((u) => u.name), [allUsers])
   const list = useMemo(
     () => assignees.map((s) => s.trim()).filter(Boolean),
@@ -49,6 +49,14 @@ export function WorkboardAssigneesField({
           </p>
         </div>
         <ul className="max-h-48 space-y-1 overflow-y-auto" role="listbox" aria-labelledby={id}>
+          {!usersDirectoryLoaded && options.length === 0 ? (
+            <li className="px-2 py-2 text-xs text-muted-foreground">Cargando usuarios…</li>
+          ) : null}
+          {usersDirectoryLoaded && options.length === 0 ? (
+            <li className="px-2 py-2 text-xs text-muted-foreground">
+              No hay usuarios activos en el CRM
+            </li>
+          ) : null}
           {options.map((name) => {
             const selected = list.includes(name)
             return (

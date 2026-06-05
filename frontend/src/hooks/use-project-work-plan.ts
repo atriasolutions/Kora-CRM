@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { apiActionErrorMessage } from '@/api/errors'
 import { isApiEnabled } from '@/api/config'
@@ -12,7 +12,13 @@ import {
 import { toast } from '@/lib/toast'
 import type { ProjectWorkPlan } from '@/types/project-work-plan'
 
-export function useProjectWorkPlan(projectId: string | undefined) {
+export function useProjectWorkPlan(
+  projectId: string | undefined,
+  options?: { readOnly?: boolean; onPlanPersisted?: () => void | Promise<void> },
+) {
+  const readOnly = options?.readOnly ?? false
+  const onPlanPersistedRef = useRef(options?.onPlanPersisted)
+  onPlanPersistedRef.current = options?.onPlanPersisted
   const [plan, setPlan] = useState<ProjectWorkPlan | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -55,14 +61,16 @@ export function useProjectWorkPlan(projectId: string | undefined) {
   }, [projectId])
 
   useEffect(() => {
-    if (!projectId || !isApiEnabled()) return
+    if (!projectId || !isApiEnabled() || readOnly) return
 
     const flush = () => {
-      void flushProjectWorkPlan(projectId).catch((error) => {
-        toast.error(
-          apiActionErrorMessage(error, 'No se pudo guardar el plan de trabajo.'),
-        )
-      })
+      void flushProjectWorkPlan(projectId, () => onPlanPersistedRef.current?.()).catch(
+        (error) => {
+          toast.error(
+            apiActionErrorMessage(error, 'No se pudo guardar el plan de trabajo.'),
+          )
+        },
+      )
     }
 
     const onVisibility = () => {
@@ -77,15 +85,22 @@ export function useProjectWorkPlan(projectId: string | undefined) {
       document.removeEventListener('visibilitychange', onVisibility)
       flush()
     }
-  }, [projectId])
+  }, [projectId, readOnly])
 
   const persist = useCallback(
-    (next: ProjectWorkPlan, options?: WorkPlanPersistOptions) => {
+    (next: ProjectWorkPlan, persistOptions?: WorkPlanPersistOptions) => {
       if (!projectId) return
       setPlan(next)
-      persistProjectWorkPlan(projectId, next, options)
+      if (readOnly) return
+      persistProjectWorkPlan(projectId, next, {
+        ...persistOptions,
+        onAfterSave: async () => {
+          await persistOptions?.onAfterSave?.()
+          await onPlanPersistedRef.current?.()
+        },
+      })
     },
-    [projectId],
+    [projectId, readOnly],
   )
 
   const metrics = useMemo(() => (plan ? computeWorkMetrics(plan) : null), [plan])

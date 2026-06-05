@@ -11,6 +11,7 @@ export type ProductRow = {
   category_name: string | null
   product_type: string | null
   unit_of_measure: string | null
+  billing_period: string | null
   price_cents: string | number
   price_currency: string | null
   price_amount: string | number | null
@@ -80,6 +81,7 @@ export function mapProductRow(row: ProductRow): ProductListItem {
     category: row.category_name ?? 'Sin categoría',
     productType: row.product_type ?? 'Producto',
     unitOfMeasure: unit,
+    billingPeriod: row.billing_period?.trim() || undefined,
     price: priceLabel + (unit && stockNum < 0 ? `/${unit}` : ''),
     priceNum,
     priceCurrency,

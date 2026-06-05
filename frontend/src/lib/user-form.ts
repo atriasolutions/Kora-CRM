@@ -7,9 +7,44 @@ export const USER_ROLE_OPTIONS: { value: UserRole | string; label: string }[] = 
   { value: 'Manager', label: 'Manager' },
   { value: 'Ventas', label: 'Ventas' },
   { value: 'Marketing', label: 'Marketing' },
+  { value: 'Operaciones', label: 'Operaciones' },
+  { value: 'Invitado', label: 'Invitado' },
   { value: 'Soporte', label: 'Soporte' },
   { value: 'CS', label: 'CS (Customer Success)' },
 ]
+
+/** Perfil de acceso sugerido al elegir un rol (coincide por nombre con perfiles del CRM). */
+export const ROLE_DEFAULT_PROFILE_NAME: Record<string, string> = {
+  Admin: 'Administrador',
+  Manager: 'Ventas',
+  Ventas: 'Ventas',
+  Marketing: 'Ventas',
+  CS: 'Ventas',
+  Soporte: 'Solo lectura',
+  Operaciones: 'Operaciones',
+  Invitado: 'Cliente Invitado',
+}
+
+export function resolveProfileIdForRole(
+  role: string,
+  profiles: readonly { id: string; name: string }[],
+): string {
+  const target = ROLE_DEFAULT_PROFILE_NAME[role.trim()]
+  if (target) {
+    const found = profiles.find(
+      (p) => p.name.trim().toLowerCase() === target.toLowerCase(),
+    )
+    if (found) return found.id
+  }
+  const mockId = profileIdForUserRole(role)
+  const byMockId = profiles.find((p) => p.id === mockId)
+  if (byMockId) return byMockId.id
+  const lectura = profiles.find((p) =>
+    p.name.trim().toLowerCase().includes('lectura'),
+  )
+  if (lectura) return lectura.id
+  return profiles[0]?.id ?? mockId
+}
 
 export const USER_STATUS_OPTIONS: { value: UserStatus; label: string }[] = [
   { value: 'Activo', label: 'Activo' },

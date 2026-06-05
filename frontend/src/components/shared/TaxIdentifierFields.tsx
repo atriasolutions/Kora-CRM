@@ -23,6 +23,8 @@ type TaxIdentifierFieldsProps = {
   rutRange: RutRange
   typeOptions: { value: TaxIdentifierType; label: string }[]
   entityName?: 'contact' | 'company'
+  /** Por defecto obligatorio (empresas). En contactos puede ser opcional. */
+  identifierRequired?: boolean
 }
 
 export function TaxIdentifierFields({
@@ -35,12 +37,13 @@ export function TaxIdentifierFields({
   rutRange,
   typeOptions,
   entityName = 'company',
+  identifierRequired = true,
 }: TaxIdentifierFieldsProps) {
   const [dniTouched, setDniTouched] = useState(false)
   const isRut = identifierType === 'RUT'
   const dniError =
     !isRut && (dniTouched || forceShowError)
-      ? getDniValidationMessage(value)
+      ? getDniValidationMessage(value, { required: identifierRequired })
       : null
 
   const handleTypeChange = (nextRaw: string) => {
@@ -68,12 +71,16 @@ export function TaxIdentifierFields({
           label="RUT"
           value={value}
           onChange={onValueChange}
+          required={identifierRequired}
           forceShowError={forceShowError}
           range={rutRange}
           placeholder={rutPlaceholder}
         />
       ) : (
-        <ContactFormField label="DNI *" id={`${idPrefix}-dni`}>
+        <ContactFormField
+          label={identifierRequired ? 'DNI *' : 'DNI'}
+          id={`${idPrefix}-dni`}
+        >
           <Input
             id={`${idPrefix}-dni`}
             type="text"

@@ -33,6 +33,7 @@ import { apiActionErrorMessage } from '@/api/errors'
 import { isApiEnabled } from '@/api/config'
 import { useProjectsRegistry } from '@/hooks/use-projects-registry'
 import { fetchProjectsServerPage } from '@/lib/module-server-list'
+import { useAuth } from '@/hooks/use-auth'
 import { useModulePermissions } from '@/hooks/use-module-permissions'
 import {
   duplicateProjectFormValues,
@@ -45,7 +46,9 @@ import {
 } from '@/lib/project-filters'
 import { PROJECT_ARCHIVE_RETENTION_DAYS } from '@/lib/project-archive'
 import {
+  defaultProjectListScope,
   loadProjectRecentIds,
+  normalizeProjectListScope,
   projectMatchesListScope,
   sortProjectsByRecentlyViewed,
   type ProjectListScope,
@@ -54,6 +57,7 @@ import {
 export function ProjectsPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { profile } = useAuth()
   const { canEdit, canDelete } = useModulePermissions('proyectos')
   const {
     allProjects,
@@ -67,7 +71,9 @@ export function ProjectsPage() {
   } = useProjectsRegistry()
 
   const [view, setView] = useState<ProjectsViewId>('lista')
-  const [listScope, setListScope] = useState<ProjectListScope>('all')
+  const [listScope, setListScope] = useState<ProjectListScope>(() =>
+    defaultProjectListScope(profile),
+  )
   const [query, setQuery] = useState('')
   const [filters, setFilters] = useState<ProjectFilters>(() =>
     createDefaultProjectFilters(),
@@ -80,12 +86,17 @@ export function ProjectsPage() {
     [listRefreshKey, location.key, listScope],
   )
 
+  /** Con API, «Mis proyectos» ya viene filtrado en el servidor; no re-filtrar sin teamMembers. */
+  const serverFiltersMineScope =
+    isApiEnabled() && listScope === 'mine' && view === 'lista'
+
   const rowPredicate = useMemo(
     () => (row: ProjectListItem) =>
       projectRowMatchesFilters(row, filters) &&
       !isArchived(row.id) &&
-      projectMatchesListScope(row, listScope, recentIds),
-    [filters, isArchived, listScope, recentIds],
+      (serverFiltersMineScope ||
+        projectMatchesListScope(row, listScope, recentIds)),
+    [filters, isArchived, listScope, recentIds, serverFiltersMineScope],
   )
 
   const postFilterSort = useMemo(() => {
@@ -98,6 +109,17 @@ export function ProjectsPage() {
       setListRefreshKey((k) => k + 1)
     }
   }, [location.pathname, location.key])
+
+  useEffect(() => {
+    setListScope((current) => normalizeProjectListScope(current, profile))
+  }, [profile])
+
+  const handleListScopeChange = useCallback(
+    (scope: ProjectListScope) => {
+      setListScope(normalizeProjectListScope(scope, profile))
+    },
+    [profile],
+  )
 
   useEffect(() => {
     if (!isApiEnabled()) return
@@ -227,7 +249,7 @@ export function ProjectsPage() {
         filters={filters}
         onFiltersChange={setFilters}
         listScope={listScope}
-        onListScopeChange={setListScope}
+        onListScopeChange={handleListScopeChange}
         archivedCount={archivedProjects.length}
         toolbarEnd={view === 'lista' ? toolbarSlot : undefined}
       />

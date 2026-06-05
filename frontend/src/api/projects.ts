@@ -7,6 +7,7 @@ import type { ProjectListItem } from '@/data/projects.mock'
 import type { CreateProjectFormValues } from '@/lib/project-create'
 import { parseProgressNum } from '@/lib/project-display'
 import { projectCustomerApiFields } from '@/lib/project-customer'
+import { teamToApiInput } from '@/lib/project-team-access'
 import type { ProjectFormValues } from '@/lib/project-form'
 import type { ProjectWorkPlan } from '@/types/project-work-plan'
 
@@ -53,29 +54,40 @@ export function projectFormToApiBody(values: CreateProjectFormValues): ProjectAp
   }
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+function optionalUuid(value: string | undefined): string | undefined {
+  const trimmed = value?.trim()
+  if (!trimmed || !UUID_RE.test(trimmed)) return undefined
+  return trimmed
+}
+
 export function projectDetailToApiBody(detail: ProjectDetail): ProjectApiBody {
+  const progressPct =
+    detail.progressNum != null && Number.isFinite(detail.progressNum)
+      ? Math.round(detail.progressNum)
+      : undefined
+
   return {
     name: detail.name,
-    client: detail.client,
+    client: detail.client || undefined,
     customerKind: detail.customerKind,
-    contactId: detail.contactId,
-    companyId: detail.companyId,
-    opportunityId: detail.opportunityId,
-    acceptedQuoteId: detail.acceptedQuoteId,
-    progress: detail.progress,
-    progressPct: detail.progressNum,
-    deadline: detail.deadline,
-    managerName: detail.manager,
+    contactId: optionalUuid(detail.contactId),
+    companyId: optionalUuid(detail.companyId),
+    opportunityId: optionalUuid(detail.opportunityId),
+    acceptedQuoteId: optionalUuid(detail.acceptedQuoteId),
+    progress: detail.progress || undefined,
+    progressPct,
+    deadline: detail.deadline || undefined,
+    managerName: detail.manager || undefined,
     journeyStage: detail.journeyStage,
     status: detail.status,
     priority: detail.priority,
     health: detail.health,
-    budget: detail.budget,
-    startDate: detail.startDate,
-    team: detail.team.map((m) => ({
-      userName: m.name,
-      roleLabel: m.role,
-    })),
+    budget: detail.budget && detail.budget !== '—' ? detail.budget : undefined,
+    startDate: detail.startDate && detail.startDate !== '—' ? detail.startDate : undefined,
+    team: teamToApiInput(detail.team, detail.manager),
   }
 }
 

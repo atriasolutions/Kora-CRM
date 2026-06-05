@@ -36,7 +36,8 @@ type CompaniesModuleHeaderProps = {
   onQueryChange: (query: string) => void
   onCreateNew: () => void
   onDuplicate: () => void
-  onImportFile: () => void
+  /** Importación CSV (deshabilitada de momento si se omite). */
+  onImportFile?: () => void
   filters: CompanyFilters
   onFiltersChange: (filters: CompanyFilters) => void
   listScope?: CompanyListScope
@@ -104,8 +105,14 @@ export function CompaniesModuleHeader({
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuItem onSelect={onCreateNew}>Crear nueva</DropdownMenuItem>
                   <DropdownMenuItem onSelect={onDuplicate}>Duplicar existente</DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onSelect={onImportFile}>Importar archivo</DropdownMenuItem>
+                  {onImportFile ? (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onSelect={onImportFile}>
+                        Importar archivo
+                      </DropdownMenuItem>
+                    </>
+                  ) : null}
                 </DropdownMenuContent>
               </DropdownMenu>
           ) : null}

@@ -16,7 +16,7 @@ import type {
 } from '@/lib/company-location'
 import {
   formatAddressLine,
-  googleMapsExternalUrl,
+  resolveMapExternalUrl,
 } from '@/lib/company-location'
 import {
   formatTaxIdentifierDisplay,
@@ -119,6 +119,7 @@ export function CompanyLocationsPanel({
         title="Casa matriz"
         street={hq.street}
         city={hq.city}
+        commune={hq.commune}
         region={hq.region}
         country={hq.country}
         postalCode={hq.postalCode}
@@ -166,7 +167,18 @@ export function CompanyLocationsPanel({
                   postalCode: branch.postalCode,
                   country: branch.country,
                 })
-                const mapsUrl = googleMapsExternalUrl(branch.lat, branch.lng, branch.name)
+                const mapsUrl = resolveMapExternalUrl(
+                  {
+                    street: branch.street,
+                    commune: branch.commune,
+                    city: branch.city,
+                    region: branch.region,
+                    postalCode: branch.postalCode,
+                    country: branch.country,
+                  },
+                  branch.lat,
+                  branch.lng,
+                )
 
                 return (
                   <div
@@ -281,7 +293,18 @@ export function CompanyLocationsPanel({
                   </Button>
                   <Button variant="ghost" size="sm" className="shrink-0" asChild>
                     <a
-                      href={googleMapsExternalUrl(addr.lat, addr.lng, addr.label)}
+                      href={resolveMapExternalUrl(
+                        {
+                          street: addr.street,
+                          commune: addr.commune,
+                          city: addr.city,
+                          region: addr.region,
+                          postalCode: addr.postalCode,
+                          country: addr.country,
+                        },
+                        addr.lat,
+                        addr.lng,
+                      )}
                       target="_blank"
                       rel="noopener noreferrer"
                     >

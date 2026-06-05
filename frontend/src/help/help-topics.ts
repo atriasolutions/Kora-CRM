@@ -4,6 +4,7 @@ import {
   HELP_COMPANY_LIFECYCLE_CONCEPTS,
   HELP_CONTACT_STATUS_CONCEPTS,
   HELP_OPPORTUNITY_STAGE_CONCEPTS,
+  HELP_PROJECT_JOURNEY_CONCEPTS,
   HELP_QUOTE_STAGE_CONCEPTS,
 } from '@/help/help-lifecycle-stages'
 
@@ -278,15 +279,68 @@ export const HELP_CONTENT: Record<string, HelpTopic> = {
   ...listDetail('proyectos', {
     titleList: 'Proyectos · listado',
     summary:
-      'Iniciativas con equipo, hitos y seguimiento. Útiles para instalaciones, rollouts u obras relacionadas al cliente.',
-    actions: ['Listar proyectos por estado.', 'Abrir proyecto para ver tareas vinculadas.'],
-    actionsIfCreate: ['Crear proyecto con nombre y fechas objetivo.'],
-    actionsIfEdit: ['Actualizar estado y fechas.', 'Archivar proyecto cerrado.'],
-    keywords: ['implementación', 'hitos'],
+      'Iniciativas de implementación, obra o servicio: equipo, fechas, plan de trabajo y vínculo con oportunidad o cotización aceptada.',
+    actions: [
+      'Filtrar y buscar proyectos por nombre, cliente o estado.',
+      'Usar «Mis proyectos» para ver solo los proyectos donde figuras como gerente o miembro en la pestaña Equipo de la ficha.',
+      'Los perfiles Administrador pueden usar «Todos los proyectos» para ver el listado completo.',
+      'Abrir la ficha para ver plan de trabajo, actividades y documentos.',
+      'Revisar archivados desde la vista de papelera si tu perfil lo permite.',
+    ],
+    actionsIfCreate: ['Crear proyecto con nombre, cliente, gerente y fechas objetivo.'],
+    actionsIfEdit: ['Actualizar datos desde el listado o la ficha.', 'Archivar proyectos cerrados.'],
+    keywords: ['implementación', 'hitos', 'plan de trabajo', 'obra'],
   }, {
     titleDetail: 'Proyectos · ficha',
-    summary: 'Vista única del proyecto con detalle ejecutivo y entregables.',
-    actionsIfEdit: ['Actualizar información de equipo y estado.'],
+    summary:
+      'Centro de operación del proyecto: camino de éxito, encabezado con KPIs, pestañas de detalle, plan de trabajo (tabla, Gantt y horas), actividades, notas y archivos.',
+    actions: [
+      'Revisar el encabezado: cliente, gerente, salud, prioridad, presupuesto, fechas, horas y barra de avance (calculada desde el plan de trabajo cuando existe).',
+      'Usar el camino de éxito para ver la etapa actual y el historial de cambios.',
+      'Pestaña Detalle: leer la descripción y gestionar el plan de trabajo (grupos, actividades, responsables, fechas y estados de cada ítem).',
+      'Cambiar la vista del plan entre Tabla, Gantt y Horas por persona.',
+      'Pestaña Información: vínculos CRM (empresa, oportunidad, cotización aceptada), fechas y presupuesto.',
+      'Pestaña Equipo: ver y gestionar quién tiene acceso al proyecto (gerente y miembros). Solo esas personas ven el proyecto en «Mis proyectos»; debajo puedes ver el resumen de horas del plan de trabajo.',
+      'Pestaña Actividad: listar seguimientos registrados en el proyecto y abrir el detalle de cada uno.',
+      'Pestaña Notas: consultar notas internas del equipo.',
+      'Pestaña Archivos: descargar documentos adjuntos al proyecto.',
+      'Registrar actividad (llamada, reunión, etc.) desde el botón del encabezado; queda vinculada al proyecto.',
+      'Ir a la ficha de empresa, oportunidad o cotización desde los enlaces del encabezado o de Información.',
+    ],
+    actionsIfEdit: [
+      'Editar nombre, descripción, cliente, gerente, estado, salud, prioridad, fechas y presupuesto.',
+      'Vincular o cambiar oportunidad y cotización de referencia (cotización aceptada).',
+      'Avanzar o pausar el proyecto en el camino de éxito (incluye detenciones por cliente o internas).',
+      'Pestaña Equipo: agregar usuarios del CRM al equipo o quitar miembros (el gerente no se puede quitar desde aquí).',
+      'Plan de trabajo: crear grupos (fases/entregables), añadir actividades y subactividades, asignar responsables, estimar horas, fechas y estado; reordenar con arrastrar y soltar.',
+      'Subir, renombrar o eliminar archivos en la pestaña Archivos.',
+      'Añadir y eliminar notas en la pestaña Notas.',
+      'Archivar el proyecto (papelera temporal; restaurar o eliminación definitiva según política del módulo).',
+    ],
+    concepts: [
+      ...HELP_PROJECT_JOURNEY_CONCEPTS,
+      'Plan de trabajo — estados de cada actividad: No iniciado, Planificado, En proceso, Detenido, Completado, Cancelado. El avance % del encabezado pondera los ítems completados.',
+      'Asignar un responsable en el plan puede generar notificación al usuario (si está configurado en el sistema).',
+      'Equipo del proyecto — en la pestaña Equipo defines quién ve el proyecto en «Mis proyectos» (además del gerente), sin asignarlos a todas las actividades. Quien sea responsable en el plan se agrega al equipo automáticamente.',
+    ],
+    permissionsNote:
+      'Editar el plan, archivos y el camino de éxito requiere permiso de edición en Proyectos. Archivar suele requerir eliminación/archivo según perfil.',
+    tips: [
+      'Sin plan de trabajo cargado, la pestaña Equipo indica que debes definir actividades en Detalle.',
+      'Expande grupos y filas padre en la tabla para ver subactividades; en Gantt visualizas el cronograma.',
+      'Las actividades del módulo Actividades y las del plan de trabajo son complementarias: el plan organiza la ejecución; Actividad registra interacciones y tareas de seguimiento.',
+    ],
+    keywords: [
+      'detalle proyecto',
+      'camino de éxito',
+      'plan de trabajo',
+      'gantt',
+      'responsable',
+      'archivos',
+      'notas',
+      'cotización',
+      'oportunidad',
+    ],
   }),
 
   ...listDetail('compras', {

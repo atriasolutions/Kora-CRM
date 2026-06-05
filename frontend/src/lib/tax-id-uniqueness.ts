@@ -14,6 +14,7 @@ type TaxIdRecord = {
   id: string
   name: string
   rut?: string
+  email?: string
 }
 
 export function normalizeDniKey(value: string): string {
@@ -115,6 +116,37 @@ export function getDuplicateContactTaxIdMessage(
   if (!duplicate) return null
   const label = type === 'RUT' ? 'RUT' : 'DNI'
   return `Ya existe un contacto con ese ${label}: «${duplicate.name}».`
+}
+
+export function normalizeContactEmailKey(value: string): string {
+  return value.trim().toLowerCase()
+}
+
+export function findDuplicateContactByEmail(
+  email: string,
+  excludeId?: string,
+  candidates: TaxIdRecord[] = getRegistryContacts(),
+): TaxIdRecord | null {
+  const key = normalizeContactEmailKey(email)
+  if (!key) return null
+  return (
+    candidates.find(
+      (row) =>
+        row.id !== excludeId &&
+        row.email?.trim() &&
+        normalizeContactEmailKey(row.email) === key,
+    ) ?? null
+  )
+}
+
+export function getDuplicateContactEmailMessage(
+  email: string,
+  excludeId?: string,
+  candidates?: ContactListItem[],
+): string | null {
+  const duplicate = findDuplicateContactByEmail(email, excludeId, candidates)
+  if (!duplicate) return null
+  return `Ya existe un contacto con ese correo: «${duplicate.name}».`
 }
 
 export function getDuplicateCompanyTaxIdMessage(

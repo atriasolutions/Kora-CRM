@@ -1,55 +1,20 @@
+import {
+  formatChileActivityLabel,
+  formatChileDateLabel,
+  formatChileDateTimeLabel,
+  formatChileSessionWhen,
+  isoToChileDatetimeLocal,
+  parseChileDatetimeInput,
+} from '../lib/chile-timezone.js'
+
 /** Etiqueta para sesiones de usuario (incluye hora). */
 export function formatSessionWhen(iso: string | Date | null | undefined): string {
-  if (!iso) return '—'
-  const date = typeof iso === 'string' ? new Date(iso) : iso
-  if (Number.isNaN(date.getTime())) return '—'
-
-  const now = new Date()
-  const time = date.toLocaleTimeString('es-CL', {
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-  const dayDiff = Math.round(
-    (startOfToday.getTime() - startOfDate.getTime()) / (24 * 60 * 60 * 1000),
-  )
-
-  if (dayDiff === 0) return `Hoy, ${time}`
-  if (dayDiff === 1) return `Ayer, ${time}`
-
-  const dateLabel = date.toLocaleDateString('es-CL', {
-    day: 'numeric',
-    month: 'short',
-  })
-  return `${dateLabel}, ${time}`
+  return formatChileSessionWhen(iso)
 }
 
 /** Etiqueta legible para listas (aprox. formato demo). */
 export function formatActivityLabel(iso: string | Date | null | undefined): string {
-  if (!iso) return '—'
-  const date = typeof iso === 'string' ? new Date(iso) : iso
-  if (Number.isNaN(date.getTime())) return '—'
-
-  const now = new Date()
-  const isToday =
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate()
-
-  const time = date.toLocaleTimeString('es-CL', {
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-
-  if (isToday) return `Hoy, ${time}`
-
-  return date.toLocaleDateString('es-CL', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })
+  return formatChileActivityLabel(iso)
 }
 
 export function formatReminderLabelFromAt(
@@ -68,25 +33,13 @@ export function formatReminderLabelFromAt(
     : null
 
   if (!scheduled || Number.isNaN(scheduled.getTime())) {
-    const when = reminder.toLocaleString('es-CL', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
+    const when = formatChileDateTimeLabel(reminder)
     return `Personalizado · ${when}`
   }
 
   const diffMs = scheduled.getTime() - reminder.getTime()
   if (diffMs <= 60_000) {
-    const when = reminder.toLocaleString('es-CL', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
+    const when = formatChileDateTimeLabel(reminder)
     return `Personalizado · ${when}`
   }
 
@@ -101,13 +54,7 @@ export function formatReminderLabelFromAt(
     return hours === 1 ? '1 hora antes' : `${hours} horas antes`
   }
 
-  const when = reminder.toLocaleString('es-CL', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  const when = formatChileDateTimeLabel(reminder)
   return `Personalizado · ${when}`
 }
 
@@ -119,29 +66,15 @@ export function toIsoString(value: Date | string | null | undefined): string {
 
 /** Fecha corta para listas (ej. `30 jun 2024`). */
 export function formatDateLabel(value: Date | string | null | undefined): string {
-  if (!value) return '—'
-  const date = value instanceof Date ? value : new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleDateString('es-CL', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })
+  return formatChileDateLabel(value)
 }
 
 export function parseDatetimeInput(value: string | null | undefined): Date | null {
-  if (!value?.trim()) return null
-  const parsed = new Date(value.trim())
-  if (Number.isNaN(parsed.getTime())) return null
-  return parsed
+  return parseChileDatetimeInput(value)
 }
 
 export function toDatetimeLocalValue(iso: string | Date | null | undefined): string {
-  if (!iso) return ''
-  const date = typeof iso === 'string' ? new Date(iso) : iso
-  if (Number.isNaN(date.getTime())) return ''
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  return isoToChileDatetimeLocal(iso)
 }
 
 const MONTHS_ES: Record<string, number> = {

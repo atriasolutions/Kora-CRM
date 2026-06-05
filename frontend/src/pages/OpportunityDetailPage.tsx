@@ -2,7 +2,6 @@ import {
   ArrowLeft,
   ChevronRight,
   FileSpreadsheet,
-  FileText,
   FolderOpen,
   LayoutList,
   StickyNote,
@@ -17,6 +16,7 @@ import { RegisterActivityDialog } from '@/components/contacts/RegisterActivityDi
 import { EditOpportunityDialog } from '@/components/opportunities/EditOpportunityDialog'
 import { OpportunityDetailHeader } from '@/components/opportunities/OpportunityDetailHeader'
 import { OpportunityDetailSidebar } from '@/components/opportunities/OpportunityDetailSidebar'
+import { OpportunityFilesPanel } from '@/components/opportunities/OpportunityFilesPanel'
 import { OpportunityQuotesPanel } from '@/components/opportunities/OpportunityQuotesPanel'
 import { OpportunitySuccessPath } from '@/components/opportunities/OpportunitySuccessPath'
 import { EntityNotesPanel } from '@/components/shared/EntityNotesPanel'
@@ -51,6 +51,7 @@ import type { CreateQuoteFormValues } from '@/lib/quote-create'
 import { quoteSummariesFromListItems } from '@/lib/quote-relations'
 import { lastContactLabelFromActivity } from '@/lib/contact-activity'
 import { recordEntityView } from '@/lib/entity-recently-viewed'
+import { persistOpportunityFiles } from '@/lib/opportunity-files'
 import { OPPORTUNITY_ARCHIVE_RETENTION_DAYS } from '@/lib/opportunity-archive'
 import {
   buildOpportunityStageHistoryOnTransition,
@@ -117,6 +118,26 @@ export function OpportunityDetailPage() {
       updateOpportunityFromDetail(normalizeOpportunityDetail(next))
     },
   })
+
+  const handleFilesChange = useCallback(
+    async (files: OpportunityDetail['files']) => {
+      if (!opportunity) return
+      setOpportunity((prev) => (prev ? { ...prev, files } : prev))
+      try {
+        const saved = await persistOpportunityFiles(
+          opportunity.id,
+          opportunity.name,
+          files,
+        )
+        setOpportunity((prev) => (prev ? { ...prev, files: saved } : prev))
+      } catch (error) {
+        toast.error(
+          apiActionErrorMessage(error, 'No se pudieron guardar los archivos.'),
+        )
+      }
+    },
+    [opportunity],
+  )
 
   const handleOpportunitySaved = useCallback(
     (updated: OpportunityDetail, linkedQuotes?: OpportunityDetail['quotes']) => {
@@ -313,28 +334,33 @@ export function OpportunityDetailPage() {
       <OpportunitySuccessPath
         currentStage={opportunity.stage}
         history={opportunity.stageHistory}
-        onStageChange={(stage: OpportunityJourneyStage) => {
-          if (
-            !canTransition(opportunity.stage, stage, {
-              history: opportunity.stageHistory,
-            })
-          ) {
-            return
-          }
-          const outcome = journeyStageToOutcome(stage, opportunity.lossReason)
-          const nextOpportunity = normalizeOpportunityDetail({
-            ...opportunity,
-            stage,
-            outcome,
-            stageHistory: buildOpportunityStageHistoryOnTransition(
-              opportunity.stage,
-              stage,
-              opportunity.stageHistory ?? [],
-            ),
-          })
-          void updateOpportunityFromDetail(nextOpportunity)
-          setOpportunity(nextOpportunity)
-        }}
+        readOnly={!canEdit}
+        onStageChange={
+          canEdit
+            ? (stage: OpportunityJourneyStage) => {
+                if (
+                  !canTransition(opportunity.stage, stage, {
+                    history: opportunity.stageHistory,
+                  })
+                ) {
+                  return
+                }
+                const outcome = journeyStageToOutcome(stage, opportunity.lossReason)
+                const nextOpportunity = normalizeOpportunityDetail({
+                  ...opportunity,
+                  stage,
+                  outcome,
+                  stageHistory: buildOpportunityStageHistoryOnTransition(
+                    opportunity.stage,
+                    stage,
+                    opportunity.stageHistory ?? [],
+                  ),
+                })
+                void updateOpportunityFromDetail(nextOpportunity)
+                setOpportunity(nextOpportunity)
+              }
+            : undefined
+        }
       />
 
       <div className="min-w-0 space-y-4">
@@ -468,15 +494,11 @@ export function OpportunityDetailPage() {
           ) : null}
 
           {tab === 'archivos' ? (
-            <Card className="shadow-sm">
-              <CardContent className="flex min-h-[200px] flex-col items-center justify-center py-12 text-center">
-                <FileText aria-hidden className="mb-3 size-10 text-muted-foreground" />
-                <p className="text-sm font-medium text-foreground">Sin archivos adjuntos</p>
-                <Button variant="outline" className="mt-6 border-border">
-                  Subir archivo
-                </Button>
-              </CardContent>
-            </Card>
+            <OpportunityFilesPanel
+              authorName={opportunity.owner}
+              files={opportunity.files}
+              onFilesChange={handleFilesChange}
+            />
           ) : null}
       </div>
     </PageScrollArea>

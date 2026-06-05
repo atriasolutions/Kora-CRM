@@ -2,6 +2,7 @@ import nodemailer from 'nodemailer'
 import { MailtrapTransport } from 'mailtrap'
 
 import { env } from '../config/env.js'
+import { KORA_EMAIL_LOGO_CID, resolveKoraEmailLogoPath } from '../emails/brand.js'
 
 export type SendMailInput = {
   to: string
@@ -23,7 +24,14 @@ function isMailConfigured(): boolean {
 function getTransport(): nodemailer.Transporter | null {
   if (!isMailConfigured()) return null
   if (!transport) {
-    if (env.mailSmtpUser && env.mailSmtpPass) {
+    if (env.mailtrapToken.trim()) {
+      transport = nodemailer.createTransport(
+        MailtrapTransport({
+          token: env.mailtrapToken,
+        }),
+      )
+      console.info('[mail] transporte Mailtrap API (Sending)')
+    } else if (env.mailSmtpUser && env.mailSmtpPass) {
       transport = nodemailer.createTransport({
         host: env.mailSmtpHost,
         port: env.mailSmtpPort,
@@ -33,13 +41,6 @@ function getTransport(): nodemailer.Transporter | null {
         },
       })
       console.info('[mail] transporte SMTP Mailtrap Sandbox:', env.mailSmtpHost)
-    } else {
-      transport = nodemailer.createTransport(
-        MailtrapTransport({
-          token: env.mailtrapToken,
-        }),
-      )
-      console.info('[mail] transporte Mailtrap API (token)')
     }
   }
   return transport
@@ -71,13 +72,28 @@ export async function sendMail(input: SendMailInput): Promise<boolean> {
     : input.html
 
   try {
-    await tx.sendMail({
+    const logoPath = resolveKoraEmailLogoPath()
+    const attachments =
+      logoPath && input.html.includes(`cid:${KORA_EMAIL_LOGO_CID}`)
+        ? [
+            {
+              filename: 'logo_kora_limpio.png',
+              path: logoPath,
+              cid: KORA_EMAIL_LOGO_CID,
+            },
+          ]
+        : undefined
+
+    const mailOptions: nodemailer.SendMailOptions & { category?: string } = {
       from: { address: env.mailFromAddress, name: env.mailFromName },
       to: [to],
       subject,
       text,
       html,
-    })
+      attachments,
+    }
+    if (input.category) mailOptions.category = input.category
+    await tx.sendMail(mailOptions)
     if (useOverride) {
       console.info('[mail] redirigido a MAIL_OVERRIDE_TO:', to, '(destino real:', input.to, ')')
     }

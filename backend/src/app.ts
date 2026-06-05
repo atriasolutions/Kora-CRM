@@ -16,9 +16,8 @@ export function createApp() {
       credentials: true,
     }),
   )
-  // Las imágenes del producto se envían como data URL (base64), que crece ~33%.
-  // 2 MB binarios pueden superar 2 MB en JSON; dejamos margen seguro.
-  app.use(express.json({ limit: '6mb' }))
+  // Archivos e imágenes viajan como data URL (base64, ~+33%). Hasta 30 × 10 MB por registro.
+  app.use(express.json({ limit: '64mb' }))
 
   app.get('/health', async (_req, res) => {
     try {

@@ -26,6 +26,8 @@ type WarehouseDestinationFieldsProps = {
   addressFieldId: string
   warehouseLabel?: string
   addressLabel?: string
+  /** Texto bajo la dirección en modo solo lectura. */
+  addressHelperText?: string
   /** La dirección solo se muestra; se obtiene de la bodega en Configuración. */
   readOnlyDeliveryAddress?: boolean
 }
@@ -39,6 +41,7 @@ export function WarehouseDestinationFields({
   addressFieldId,
   warehouseLabel = 'Bodega destino',
   addressLabel = 'Dirección de entrega',
+  addressHelperText = 'Se carga desde Configuración → Bodegas al elegir la bodega destino.',
   readOnlyDeliveryAddress = false,
 }: WarehouseDestinationFieldsProps) {
   const { catalog } = useCatalogSettings()
@@ -86,9 +89,7 @@ export function WarehouseDestinationFields({
           <p className="truncate rounded-md border border-border bg-muted/40 px-3 py-2 text-sm font-medium text-foreground">
             {deliveryAddress?.trim() || '—'}
           </p>
-          <p className="text-xs text-muted-foreground">
-            Se carga desde Configuración → Bodegas al elegir la bodega destino.
-          </p>
+          <p className="text-xs text-muted-foreground">{addressHelperText}</p>
           {selectedId && !addressFromCatalog ? (
             <p className="text-xs text-amber-700 dark:text-amber-400">
               Esta bodega no tiene dirección, región y comuna configuradas. Complétalas en

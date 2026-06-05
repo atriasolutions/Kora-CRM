@@ -25,6 +25,7 @@ const MODULE_BY_ENTITY: Record<EntityFileType, MenuModuleId> = {
   compra: 'compras',
   factura: 'facturacion',
   cotizacion: 'cotizaciones',
+  oportunidad: 'oportunidades',
   proyecto: 'proyectos',
 }
 

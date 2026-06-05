@@ -113,6 +113,52 @@ function isSamePersonName(a: string, b: string): boolean {
   return a.trim().toLowerCase() === b.trim().toLowerCase()
 }
 
+/** Notifica a un responsable nuevo en una actividad del plan de trabajo. */
+export async function notifyProjectWorkItemAssignment(params: {
+  actor: AuditActor
+  assigneeName: string
+  projectId: string
+  projectName: string
+  workItemName: string
+}): Promise<void> {
+  const assigneeName = params.assigneeName?.trim()
+  if (!assigneeName) return
+  if (isSamePersonName(assigneeName, params.actor.userName)) return
+
+  const itemLabel = params.workItemName.trim() || 'Actividad'
+  const projectLabel = params.projectName.trim() || 'Proyecto'
+
+  await notifyByUserName(assigneeName, {
+    type: 'assignment',
+    title: 'Te asignaron una actividad de proyecto',
+    message: `${params.actor.userName} te asignó «${itemLabel}» en ${projectLabel}`,
+    href: `/proyectos/${params.projectId}`,
+    entityType: 'proyecto',
+    entityId: params.projectId,
+  })
+}
+
+/** Notifica a un miembro nuevo del equipo del proyecto (pestaña Equipo). */
+export async function notifyProjectTeamMemberAdded(params: {
+  actor: AuditActor
+  memberName: string
+  projectId: string
+  projectName: string
+}): Promise<void> {
+  const memberName = params.memberName?.trim()
+  if (!memberName) return
+  if (isSamePersonName(memberName, params.actor.userName)) return
+
+  await notifyByUserName(memberName, {
+    type: 'assignment',
+    title: 'Te agregaron a un proyecto',
+    message: `${params.actor.userName} te agregó al equipo del proyecto: ${params.projectName}`,
+    href: `/proyectos/${params.projectId}`,
+    entityType: 'proyecto',
+    entityId: params.projectId,
+  })
+}
+
 /** Notifica al gerente de proyecto (usuario activo con el mismo nombre en CRM). */
 export async function notifyProjectAssignment(params: {
   actor: AuditActor

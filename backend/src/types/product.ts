@@ -7,6 +7,7 @@ export type ProductListItem = {
   category: string
   productType: string
   unitOfMeasure: string
+  billingPeriod?: string
   price: string
   priceNum: number
   priceCurrency: import('./currency.js').ProductCurrency
@@ -33,6 +34,7 @@ export type CreateProductInput = {
   category?: string
   productType?: string
   unitOfMeasure?: string
+  billingPeriod?: string
   priceNum?: number
   priceCurrency?: import('./currency.js').ProductCurrency
   costPriceNum?: number

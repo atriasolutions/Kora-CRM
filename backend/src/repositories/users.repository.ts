@@ -1,6 +1,10 @@
 import { pool } from '../db/pool.js'
 import { mapUserDetail, mapUserRow, type UserRow } from '../mappers/user.mapper.js'
-import { badRequest, notFound } from '../middleware/errors.js'
+import {
+  assertUserEmailAvailable,
+  isUniqueViolation,
+} from '../lib/user-email-uniqueness.js'
+import { badRequest, conflict, notFound } from '../middleware/errors.js'
 import { listRecentUserSessions } from './user-sessions.repository.js'
 import { propagateUserDisplayName, reconcileUserDenormalizedNames } from '../services/user-name-propagate.service.js'
 import * as twoFactorRepo from './two-factor.repository.js'
@@ -103,7 +107,11 @@ export async function createUser(
     input.status ??
     (password ? 'Invitado' : 'Por verificar')
 
-  const result = password
+  await assertUserEmailAvailable(input.email.trim())
+
+  let result
+  try {
+    result = password
     ? await pool.query<{ id: string }>(
         `INSERT INTO crm_users (
           email, name, password_hash, role, profile_id, status, avatar_url,
@@ -159,6 +167,14 @@ export async function createUser(
           actor.userName,
         ],
       )
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      throw conflict(
+        `Ya existe un usuario con el correo «${input.email.trim()}». El correo debe ser único.`,
+      )
+    }
+    throw error
+  }
 
   const userId = result.rows[0]!.id
   if (!password && sendInvite) {
@@ -183,8 +199,13 @@ export async function updateUser(
     values.push(input.name.trim())
   }
   if (input.email !== undefined) {
+    const nextEmail = input.email.trim()
+    const currentEmail = existing.email.trim().toLowerCase()
+    if (nextEmail.toLowerCase() !== currentEmail) {
+      await assertUserEmailAvailable(nextEmail, id)
+    }
     sets.push(`email = lower($${idx++})`)
-    values.push(input.email.trim())
+    values.push(nextEmail)
   }
   if (input.role !== undefined) {
     sets.push(`role = $${idx++}`)
@@ -251,11 +272,20 @@ export async function updateUser(
   values.push(actor.userName)
   values.push(id)
 
-  await pool.query(
-    `UPDATE crm_users SET ${sets.join(', ')}, updated_at = now()
-     WHERE id = $${idx} AND deleted_at IS NULL`,
-    values,
-  )
+  try {
+    await pool.query(
+      `UPDATE crm_users SET ${sets.join(', ')}, updated_at = now()
+       WHERE id = $${idx} AND deleted_at IS NULL`,
+      values,
+    )
+  } catch (error) {
+    if (isUniqueViolation(error) && input.email !== undefined) {
+      throw conflict(
+        `Ya existe un usuario con el correo «${input.email.trim()}». El correo debe ser único.`,
+      )
+    }
+    throw error
+  }
 
   if (input.name !== undefined && input.name.trim() !== existing.name) {
     await propagateUserDisplayName(id, input.name.trim(), existing.name)

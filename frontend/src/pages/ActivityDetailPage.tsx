@@ -62,7 +62,7 @@ export function ActivityDetailPage() {
   const navigate = useNavigate()
   const { activityId } = useParams<{ activityId: string }>()
   const { canEdit, canDelete } = useModulePermissions('actividades')
-  const { archiveActivity, isArchived, updateActivityFromDetail, updateActivityStatus } =
+  const { archiveActivity, isArchived, updateActivityFromDetail, updateActivityStatus, upsertActivityFromDetail } =
     useActivitiesRegistry()
   const [activity, setActivity] = useState<ActivityDetail | null>(null)
   const { loadState, reason, unavailableDetail, reload } = useRecordDetail({
@@ -71,6 +71,7 @@ export function ActivityDetailPage() {
     isArchived,
     onLoaded: (id, record) => {
       setActivity(record)
+      upsertActivityFromDetail(record)
       recordEntityView('actividades', id)
     },
   })
@@ -115,7 +116,7 @@ export function ActivityDetailPage() {
 
   const persistStatusChange = useCallback(
     async (status: ActivityStatus) => {
-      if (!activity) return
+      if (!activity || !canEdit) return
       const next = activityDetailWithStatus(activity, status)
       try {
         await updateActivityStatus(activity, status)
@@ -124,7 +125,7 @@ export function ActivityDetailPage() {
         toast.error('No se pudo actualizar el estado.')
       }
     },
-    [activity, updateActivityStatus],
+    [activity, canEdit, updateActivityStatus],
   )
 
   const markComplete = useCallback(() => {
@@ -179,7 +180,7 @@ export function ActivityDetailPage() {
       <ActivityDetailHeader
         activity={activity}
         onStartEdit={canEdit ? () => setEditDialogOpen(true) : undefined}
-        onMarkComplete={markComplete}
+        onMarkComplete={canEdit ? markComplete : undefined}
         onArchive={canDelete ? () => setArchiveOpen(true) : undefined}
       />
 
@@ -216,7 +217,8 @@ export function ActivityDetailPage() {
       <ActivitySuccessPath
         currentStage={activity.status}
         history={journeyHistoryFromStatusHistory(activity.statusHistory)}
-        onStageChange={handleStatusChange}
+        readOnly={!canEdit}
+        onStageChange={canEdit ? handleStatusChange : undefined}
       />
 
       <div className="min-w-0 space-y-4">

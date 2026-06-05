@@ -11,8 +11,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { useAssigneeDirectory } from '@/hooks/use-assignee-directory'
 import { usePrefetchUserAvatars } from '@/hooks/use-user-avatar-url'
-import { useUsersRegistry } from '@/hooks/use-users-registry'
 import {
   assigneePickerOptions,
   toggleAssignee,
@@ -23,22 +23,24 @@ type WorkboardAssigneeCellProps = {
   assignees: string[]
   readOnly?: boolean
   onChange: (assignees: string[]) => void
+  teamMemberNames?: string[]
 }
 
 export function WorkboardAssigneeCell({
   assignees,
   readOnly = false,
   onChange,
+  teamMemberNames,
 }: WorkboardAssigneeCellProps) {
-  const { allUsers } = useUsersRegistry()
-  const teamNames = useMemo(() => allUsers.map((u) => u.name), [allUsers])
+  const { allUsers, usersDirectoryLoaded, ensureLoaded } = useAssigneeDirectory()
+  const crmNames = useMemo(() => allUsers.map((u) => u.name), [allUsers])
   const list = useMemo(
     () => assignees.map((s) => s.trim()).filter(Boolean),
     [assignees],
   )
   const options = useMemo(
-    () => assigneePickerOptions(list, teamNames),
-    [list, teamNames],
+    () => assigneePickerOptions(list, teamMemberNames ?? crmNames),
+    [list, teamMemberNames, crmNames],
   )
   usePrefetchUserAvatars([...list, ...options])
 
@@ -58,7 +60,11 @@ export function WorkboardAssigneeCell({
         : `${list.length} responsables`
 
   return (
-    <DropdownMenu>
+    <DropdownMenu
+      onOpenChange={(open) => {
+        if (open) ensureLoaded()
+      }}
+    >
       <DropdownMenuTrigger asChild>
         <button
           type="button"
@@ -86,6 +92,16 @@ export function WorkboardAssigneeCell({
           Sin responsables
         </DropdownMenuItem>
         <DropdownMenuSeparator />
+        {!usersDirectoryLoaded && options.length === 0 ? (
+          <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+            Cargando usuarios…
+          </DropdownMenuItem>
+        ) : null}
+        {usersDirectoryLoaded && options.length === 0 ? (
+          <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+            No hay usuarios activos en el CRM
+          </DropdownMenuItem>
+        ) : null}
         {options.map((name) => {
           const selected = list.includes(name)
           return (

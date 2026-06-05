@@ -19,6 +19,7 @@ export type ProductApiBody = {
   category?: string
   productType?: string
   unitOfMeasure?: string
+  billingPeriod?: string
   priceNum?: number
   priceCurrency?: string
   costPriceNum?: number
@@ -56,6 +57,7 @@ export function productFormToApiBody(
     category: values.category?.trim(),
     productType: values.productType,
     unitOfMeasure: unitFromForm(values),
+    billingPeriod: 'billingPeriod' in values ? values.billingPeriod : undefined,
     priceNum: parseProductPrice(values.price, 'priceCurrency' in values ? values.priceCurrency : 'CLP'),
     priceCurrency: 'priceCurrency' in values ? values.priceCurrency : 'CLP',
     costPriceNum: values.costPrice?.trim() ? parseMoneyNum(values.costPrice) : undefined,
@@ -86,6 +88,7 @@ export function productDetailToApiBody(detail: ProductDetail): ProductApiBody {
     category: detail.category,
     productType: detail.productType,
     unitOfMeasure: detail.unitOfMeasure,
+    billingPeriod: detail.billingPeriod,
     priceNum: detail.priceNum,
     priceCurrency: detail.priceCurrency ?? 'CLP',
     costPriceNum: detail.costPriceNum > 0 ? detail.costPriceNum : undefined,

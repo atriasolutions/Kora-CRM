@@ -17,6 +17,7 @@ import { purgeEntityNotesAndFiles } from '../services/entity-purge.service.js'
 
 const SELECT_COLUMNS = `
   p.id, p.name, p.sku, c.name AS category_name, p.product_type, p.unit_of_measure,
+  p.billing_period,
   p.price_cents, p.price_currency, p.price_amount, p.cost_price_cents,
   CASE
     WHEN p.track_inventory THEN COALESCE(FLOOR(inv.total_on_hand), 0)::int
@@ -221,6 +222,32 @@ export async function getProductById(id: string): Promise<ProductListItem> {
   return mapProductDetail(row)
 }
 
+async function assertSkuAvailable(
+  sku: string,
+  excludeProductId?: string,
+  client?: PoolClient,
+): Promise<void> {
+  const trimmed = sku.trim()
+  if (!trimmed) return
+
+  const db = client ?? pool
+  const result = await db.query<{ id: string; name: string }>(
+    `SELECT id, name
+     FROM crm_products
+     WHERE lower(trim(sku)) = lower($1)
+       AND deleted_at IS NULL
+       ${excludeProductId ? 'AND id <> $2' : ''}
+     LIMIT 1`,
+    excludeProductId ? [trimmed, excludeProductId] : [trimmed],
+  )
+  const row = result.rows[0]
+  if (row) {
+    throw badRequest(
+      `Ya existe un producto con el SKU «${trimmed}» (${row.name})`,
+    )
+  }
+}
+
 export async function createProduct(
   input: CreateProductInput,
   actor: AuditActor,
@@ -244,23 +271,25 @@ export async function createProduct(
     // soft-borradas antes de insertar para permitir reutilizar el SKU.
     await client.query(
       `DELETE FROM crm_products
-       WHERE sku = $1 AND deleted_at IS NOT NULL`,
+       WHERE lower(trim(sku)) = lower($1) AND deleted_at IS NOT NULL`,
       [input.sku.trim()],
     )
+
+    await assertSkuAvailable(input.sku.trim(), undefined, client)
 
     const priceFields = priceFieldsFromInput(input)
 
     const result = await client.query<{ id: string }>(
       `INSERT INTO crm_products (
-        name, sku, category_id, product_type, unit_of_measure,
+        name, sku, category_id, product_type, unit_of_measure, billing_period,
         price_cents, price_currency, price_amount, cost_price_cents, stock_qty, status, track_inventory,
         min_stock, max_stock, barcode, image_url,
         created_by_id, created_by_name, owner_name, updated_by_id, updated_by_name
       ) VALUES (
-        $1, $2, $3, $4, $5,
-        $6, $7, $8, $9, $10, $11, $12,
-        $13, $14, $15, $16,
-        $17, $18, $19, $17, $18
+        $1, $2, $3, $4, $5, $6,
+        $7, $8, $9, $10, $11, $12, $13,
+        $14, $15, $16, $17,
+        $18, $19, $20, $18, $19
       ) RETURNING id`,
       [
         input.name.trim(),
@@ -268,6 +297,7 @@ export async function createProduct(
         categoryId,
         input.productType?.trim() || 'Producto',
         input.unitOfMeasure?.trim() || 'ud',
+        input.billingPeriod?.trim() || null,
         priceFields.priceCents,
         priceFields.priceCurrency,
         priceFields.priceAmount,
@@ -329,8 +359,12 @@ export async function updateProduct(
     values.push(input.name.trim())
   }
   if (input.sku !== undefined) {
+    const nextSku = input.sku.trim()
+    if (nextSku.toLowerCase() !== existing.sku.trim().toLowerCase()) {
+      await assertSkuAvailable(nextSku, id)
+    }
     sets.push(`sku = $${idx++}`)
-    values.push(input.sku.trim())
+    values.push(nextSku)
   }
   if (input.category !== undefined) {
     sets.push(`category_id = $${idx++}`)
@@ -347,6 +381,10 @@ export async function updateProduct(
   if (input.unitOfMeasure !== undefined) {
     sets.push(`unit_of_measure = $${idx++}`)
     values.push(input.unitOfMeasure.trim())
+  }
+  if (input.billingPeriod !== undefined) {
+    sets.push(`billing_period = $${idx++}`)
+    values.push(input.billingPeriod.trim() || null)
   }
   if (input.priceNum !== undefined || input.priceCurrency !== undefined) {
     const priceFields = priceFieldsFromInput({
@@ -401,11 +439,19 @@ export async function updateProduct(
   values.push(actor.userName)
   values.push(id)
 
-  await pool.query(
-    `UPDATE crm_products SET ${sets.join(', ')}, updated_at = now()
-     WHERE id = $${idx} AND deleted_at IS NULL`,
-    values,
-  )
+  try {
+    await pool.query(
+      `UPDATE crm_products SET ${sets.join(', ')}, updated_at = now()
+       WHERE id = $${idx} AND deleted_at IS NULL`,
+      values,
+    )
+  } catch (err) {
+    if (err && typeof err === 'object' && 'code' in err && (err as { code: string }).code === '23505') {
+      throw badRequest('Ya existe un producto con ese SKU')
+    }
+    throw err
+  }
+
   const detail = await getProductById(id)
   if (input.ownerName !== undefined) {
     maybeNotifyRecordOwnerChange({

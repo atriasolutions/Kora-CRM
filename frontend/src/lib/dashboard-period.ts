@@ -9,7 +9,7 @@ export type DashboardPeriodOption = {
   period: DashboardPeriod
 }
 
-const MONTH_NAMES = [
+export const MONTH_NAMES = [
   'Enero',
   'Febrero',
   'Marzo',

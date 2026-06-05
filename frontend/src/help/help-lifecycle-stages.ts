@@ -45,3 +45,14 @@ export const HELP_QUOTE_STAGE_CONCEPTS = [
   '· Si sales de Aceptada hacia Borrador, revisión, Enviada, negociación, espera, rechazada, vencida o cancelada: se libera la reserva de stock.',
   '· PDF y duplicar: según permisos en otras etapas. Facturación: requiere cotización Aceptada.',
 ]
+
+export const HELP_PROJECT_JOURNEY_CONCEPTS = [
+  'En la ficha, el «camino de éxito» muestra la etapa del proyecto y las transiciones permitidas (con permiso de edición). Al cambiar etapa se actualiza el estado del listado y queda registro en el historial.',
+  'Ruta principal:',
+  '· Nuevo → En Levantamiento → En Proceso → Entregado a Cliente → Cerrado.',
+  '· Puedes retroceder un paso en la ruta principal cuando el flujo lo permite.',
+  'Detenciones (desde En Levantamiento o En Proceso):',
+  '· Detenido por Cliente, Detenido internamente o En Espera Cliente pausan el avance.',
+  '· Al reanudar desde una detención, vuelves a la etapa principal desde la que saliste.',
+  'Acciones en el sistema: mover etapa en el camino de éxito; el encabezado muestra salud, prioridad, presupuesto, fechas y avance del plan de trabajo.',
+]

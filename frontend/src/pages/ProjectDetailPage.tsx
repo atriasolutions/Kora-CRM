@@ -23,9 +23,21 @@ import { EntityNotesPanel } from '@/components/shared/EntityNotesPanel'
 import { Badge } from '@/components/ui/badge'
 import { RecordAuditMeta } from '@/components/shared/RecordAuditMeta'
 import { ProjectWorkBoard } from '@/components/projects/workboard/ProjectWorkBoard'
-import { ProjectWorkTeamPanel } from '@/components/projects/workboard/ProjectWorkTeamPanel'
+import { ProjectTeamMembersPanel } from '@/components/projects/ProjectTeamMembersPanel'
+import type { ProjectTeamMember } from '@/data/project-detail.mock'
+import { useAssigneeDirectory } from '@/hooks/use-assignee-directory'
 import { useProjectWorkPlan } from '@/hooks/use-project-work-plan'
-import { collectWorkPlanAssigneeNames } from '@/lib/project-work-assignees'
+import { isApiEnabled } from '@/api/config'
+import {
+  collectNewWorkPlanAssigneeNames,
+  collectWorkPlanAssigneeNames,
+} from '@/lib/project-work-assignees'
+import {
+  collectNewTeamMembersFromLists,
+  collectProjectTeamMemberNames,
+  dedupeProjectTeamMembers,
+  mergeAssigneesIntoProjectTeam,
+} from '@/lib/project-team-access'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -75,10 +87,24 @@ export function ProjectDetailPage() {
   const navigate = useNavigate()
   const { projectId } = useParams<{ projectId: string }>()
   const { canEdit, canDelete } = useModulePermissions('proyectos')
+  const { canCreate: canCreateActivity } = useModulePermissions('actividades')
   const { archiveProject, isArchived, updateProject, updateProjectFromDetail } =
     useProjectsRegistry()
-  const { plan, setPlan, metrics } = useProjectWorkPlan(projectId)
   const [project, setProject] = useState<ProjectDetail | null>(null)
+  const reloadProject = useCallback(async () => {
+    if (!projectId) return
+    try {
+      const fresh = await loadProjectDetail(projectId)
+      setProject(fresh)
+    } catch {
+      /* ignore refresh errors */
+    }
+  }, [projectId])
+  const { plan, setPlan: persistPlan, metrics } = useProjectWorkPlan(projectId, {
+    readOnly: !canEdit,
+    onPlanPersisted: reloadProject,
+  })
+  const { allUsers } = useAssigneeDirectory(canEdit)
   const { loadState, reason, unavailableDetail, reload } = useRecordDetail({
     id: projectId,
     load: loadProjectDetail,
@@ -99,14 +125,46 @@ export function ProjectDetailPage() {
     entityId: projectId,
     setRecord: setProject,
     onAdded: () => setTab('notas'),
-    onAfterChange: (next) => {
-      updateProjectFromDetail(next)
-    },
+    onAfterChange: canEdit
+      ? (next) => {
+          void updateProjectFromDetail(next)
+        }
+      : undefined,
   })
+
+  const handlePlanChange = useCallback(
+    (
+      next: import('@/types/project-work-plan').ProjectWorkPlan,
+      options?: import('@/lib/project-work-plan').WorkPlanPersistOptions,
+    ) => {
+      if (plan && project && canEdit) {
+        const newAssignees = collectNewWorkPlanAssigneeNames(plan, next)
+        if (newAssignees.length > 0) {
+          const mergedTeam = mergeAssigneesIntoProjectTeam(
+            project.team ?? [],
+            newAssignees,
+            project.manager,
+            allUsers,
+          )
+          if (mergedTeam.length > (project.team?.length ?? 0)) {
+            const withTeam = { ...project, team: mergedTeam }
+            setProject(withTeam)
+            if (!isApiEnabled()) {
+              void updateProjectFromDetail(withTeam).catch(() => {
+                /* toast on explicit save */
+              })
+            }
+          }
+        }
+      }
+      persistPlan(next, options)
+    },
+    [plan, project, canEdit, allUsers, persistPlan, updateProjectFromDetail],
+  )
 
   const handleFilesChange = useCallback(
     async (files: ProjectDetail['files']) => {
-      if (!project) return
+      if (!project || !canEdit) return
       setProject((prev) => (prev ? { ...prev, files } : prev))
       try {
         const saved = await persistProjectFiles(project.id, project.name, files)
@@ -117,7 +175,7 @@ export function ProjectDetailPage() {
         )
       }
     },
-    [project],
+    [project, canEdit],
   )
 
   const handleProjectSaved = useCallback(
@@ -151,12 +209,12 @@ export function ProjectDetailPage() {
       setProject((prev) => {
         if (!prev) return prev
         const next = { ...prev, activities: [activity, ...prev.activities] }
-        updateProjectFromDetail(next)
+        if (canEdit) void updateProjectFromDetail(next)
         return next
       })
       setTab('actividad')
     },
-    [updateProjectFromDetail],
+    [updateProjectFromDetail, canEdit],
   )
 
   const handleArchiveConfirm = useCallback(async () => {
@@ -215,7 +273,7 @@ export function ProjectDetailPage() {
         project={project}
         workMetrics={metrics ?? undefined}
         onStartEdit={canEdit ? () => setEditDialogOpen(true) : undefined}
-        onRegisterActivity={openRegisterActivity}
+        onRegisterActivity={canCreateActivity ? openRegisterActivity : undefined}
         onArchive={canDelete ? () => setArchiveOpen(true) : undefined}
       />
 
@@ -263,34 +321,39 @@ export function ProjectDetailPage() {
       <ProjectSuccessPath
         currentStage={project.journeyStage}
         history={project.journeyHistory}
-        onStageChange={(stage: ProjectJourneyStage) => {
-          if (
-            !canTransition(project.journeyStage, stage, {
-              history: project.journeyHistory,
-            })
-          ) {
-            return
-          }
-          saveJourneyOverride(project.id, stage)
-          void updateProject(project.id, {
-            journeyStage: stage,
-            status: journeyToListStatus(stage),
-          })
-          setProject((prev) =>
-            prev
-              ? {
-                  ...prev,
+        readOnly={!canEdit}
+        onStageChange={
+          canEdit
+            ? (stage: ProjectJourneyStage) => {
+                if (
+                  !canTransition(project.journeyStage, stage, {
+                    history: project.journeyHistory,
+                  })
+                ) {
+                  return
+                }
+                saveJourneyOverride(project.id, stage)
+                void updateProject(project.id, {
                   journeyStage: stage,
                   status: journeyToListStatus(stage),
-                  journeyHistory: buildJourneyHistoryOnTransition(
-                    prev.journeyStage,
-                    stage,
-                    prev.journeyHistory,
-                  ),
-                }
-              : prev,
-          )
-        }}
+                })
+                setProject((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        journeyStage: stage,
+                        status: journeyToListStatus(stage),
+                        journeyHistory: buildJourneyHistoryOnTransition(
+                          prev.journeyStage,
+                          stage,
+                          prev.journeyHistory,
+                        ),
+                      }
+                    : prev,
+                )
+              }
+            : undefined
+        }
       />
 
       <div className="min-w-0 space-y-4">
@@ -345,8 +408,10 @@ export function ProjectDetailPage() {
                 <ProjectWorkBoard
                   plan={plan}
                   metrics={metrics}
-                  onChange={setPlan}
+                  onChange={handlePlanChange}
+                  readOnly={!canEdit}
                   projectTitle={project.name}
+                  teamMemberNames={collectProjectTeamMemberNames(project)}
                 />
               ) : null}
               <RecordAuditMeta record={project} />
@@ -360,29 +425,48 @@ export function ProjectDetailPage() {
             />
           ) : null}
 
-          {tab === 'equipo' ? (
-            plan ? (
-              <ProjectWorkTeamPanel plan={plan} managerName={project.manager} />
-            ) : (
-              <Card className="shadow-sm">
-                <CardHeader>
-                  <CardTitle className="text-base font-semibold">Equipo del proyecto</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    Carga el plan de trabajo para ver el equipo asignado por actividad.
-                  </p>
-                </CardContent>
-              </Card>
-            )
+          {tab === 'equipo' && project ? (
+            <ProjectTeamMembersPanel
+              project={project}
+              canEdit={canEdit}
+              onTeamChange={async (team: ProjectTeamMember[]) => {
+                const previous = project
+                const added = collectNewTeamMembersFromLists(
+                  previous.team ?? [],
+                  team,
+                  previous.manager,
+                )
+                const dedupedTeam = dedupeProjectTeamMembers(team, previous.manager)
+                const next = { ...project, team: dedupedTeam }
+                setProject(next)
+                try {
+                  const saved = await updateProjectFromDetail(next)
+                  setProject((p) => (p ? { ...p, team: saved.team ?? team } : p))
+                  if (added.length > 0) {
+                    toast.success(
+                      added.length === 1
+                        ? `Se agregó a ${added[0]!.name} al equipo. Se envió notificación y correo si el usuario tiene email activo.`
+                        : `Se agregaron ${added.length} miembros al equipo.`,
+                    )
+                  }
+                } catch (error) {
+                  setProject(previous)
+                  toast.error(
+                    apiActionErrorMessage(error, 'No se pudo actualizar el equipo del proyecto.'),
+                  )
+                  throw error
+                }
+              }}
+            />
           ) : null}
 
           {tab === 'notas' ? (
             <EntityNotesPanel
               notes={project.notes}
               authorName={project.manager}
-              onAddNote={handleNoteAdded}
-              onDeleteNote={handleNoteDeleted}
+              disabled={!canEdit}
+              onAddNote={canEdit ? handleNoteAdded : undefined}
+              onDeleteNote={canEdit ? handleNoteDeleted : undefined}
             />
           ) : null}
 
@@ -390,7 +474,9 @@ export function ProjectDetailPage() {
             <EntityActivitiesSection
               activities={project.activities}
               entityKind="proyecto"
-              onRegister={() => openRegisterActivity()}
+              onRegister={
+                canCreateActivity ? () => openRegisterActivity() : undefined
+              }
             />
           ) : null}
 

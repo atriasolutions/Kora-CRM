@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "tsc && mkdir -p dist/assets && cp -R src/assets/. dist/assets/",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test src/**/*.test.ts",
@@ -14,7 +14,8 @@
     "db:migrate-purchase-detail-fields": "tsx scripts/migrate-purchase-detail-fields.ts",
     "db:migrate-exchange-rates": "tsx scripts/migrate-exchange-rates.ts",
     "db:migrate-user-totp-2fa": "tsx scripts/migrate-user-totp-2fa.ts",
-    "db:migrate-purchase-line-discount": "tsx scripts/migrate-purchase-line-discount.ts"
+    "db:migrate-purchase-line-discount": "tsx scripts/migrate-purchase-line-discount.ts",
+    "mail:test": "tsx scripts/send-test-mail.ts"
   },
   "dependencies": {
     "chilean-territorial-divisions": "^1.0.1",

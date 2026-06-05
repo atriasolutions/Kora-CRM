@@ -5,6 +5,7 @@ export const ENTITY_FILE_TYPES = [
   'compra',
   'factura',
   'cotizacion',
+  'oportunidad',
   'proyecto',
 ] as const
 

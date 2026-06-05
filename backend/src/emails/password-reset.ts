@@ -1,4 +1,4 @@
-import { emailButton, emailLayout } from './layout.js'
+import { emailButton, emailLayout, emailNotice, emailParagraph } from './layout.js'
 
 export function passwordResetEmail(params: {
   userName: string
@@ -19,14 +19,21 @@ Si no solicitaste el cambio, ignora este correo; tu contraseña actual seguirá 
 
   const html = emailLayout({
     title: 'Restablecer contraseña',
+    subtitle: 'Crea una nueva contraseña para volver a acceder a tu cuenta.',
     preheader: 'Enlace para crear una nueva contraseña.',
     bodyHtml: `
-      <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#334155;">Hola <strong>${params.userName}</strong>,</p>
-      <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#334155;">
-        Solicitaste restablecer tu contraseña. Usa el botón siguiente para elegir una nueva.
-      </p>
+      ${emailParagraph(`Hola <strong>${params.userName}</strong>,`)}
+      ${emailParagraph(
+        'Recibimos una solicitud para restablecer la contraseña de tu cuenta en <strong>Kora CRM</strong>. Usa el botón siguiente para elegir una nueva.',
+      )}
       ${emailButton(params.resetUrl, 'Restablecer contraseña')}
-      <p style="margin:0;font-size:13px;color:#64748b;">El enlace caduca en <strong>${params.expiresHours} horas</strong>.</p>
+      ${emailNotice(
+        `El enlace caduca en <strong>${params.expiresHours} horas</strong>.`,
+      )}
+      ${emailNotice(
+        'Si <strong>no</strong> solicitaste este cambio, ignora este correo. Tu contraseña actual seguirá vigente y nadie podrá cambiarla sin el enlace.',
+        'warning',
+      )}
     `,
   })
 

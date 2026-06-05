@@ -16,6 +16,7 @@ import {
   validateCreateProductForm,
   type CreateProductFormValues,
 } from '@/lib/product-create'
+import { useProductsRegistry } from '@/hooks/use-products-registry'
 import {
   productFormValuesToCreateSlice,
   productDefaultTaxRate,
@@ -87,6 +88,7 @@ export function CreateProductDialog({
   initialValues,
   onSubmit,
 }: CreateProductDialogProps) {
+  const { allProducts } = useProductsRegistry()
   const [form, setForm] = useState<ProductFormValues>(() =>
     createToFormValues(createDefaultProductFormValues(initialValues)),
   )
@@ -105,7 +107,9 @@ export function CreateProductDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (saving) return
-    const validation = validateCreateProductForm(productFormValuesToCreateSlice(form))
+    const validation = validateCreateProductForm(productFormValuesToCreateSlice(form), {
+      existingProducts: allProducts,
+    })
     if (validation) {
       toast.warning(validation)
       return

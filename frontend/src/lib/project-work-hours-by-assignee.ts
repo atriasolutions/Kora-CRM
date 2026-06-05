@@ -46,11 +46,98 @@ function inclusiveDayCount(start: Date, end: Date): number {
   return daysBetween(start, end) + 1
 }
 
-function parseMonthKey(month?: string): { year: number; month: number } | null {
+export function parseWorkHoursMonthKey(
+  month?: string,
+): { year: number; month: number } | null {
   if (!month?.trim()) return null
   const [y, m] = month.split('-').map((x) => Number.parseInt(x, 10))
   if (!Number.isFinite(y) || !Number.isFinite(m) || m < 1 || m > 12) return null
   return { year: y, month: m }
+}
+
+export function buildWorkHoursMonthKey(year: number, month: number): string {
+  return `${year}-${String(month).padStart(2, '0')}`
+}
+
+export function buildWorkHoursDayKey(year: number, month: number, day: number): string {
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
+export type WorkHoursPeriodAvailability = {
+  /** YYYY-MM con al menos un día planificado en actividades hoja. */
+  monthKeys: string[]
+  /** YYYY-MM-DD con al menos una actividad hoja en ese día. */
+  dayKeys: string[]
+}
+
+/** Meses y días seleccionables según rangos planificados del plan (excluye canceladas). */
+export function getWorkHoursPeriodAvailability(
+  plan: ProjectWorkPlan,
+): WorkHoursPeriodAvailability {
+  const monthSet = new Set<string>()
+  const daySet = new Set<string>()
+
+  for (const item of leafItems(plan)) {
+    if (isWorkItemCancelled(item)) continue
+    const range = itemPlannedRange(item)
+    if (!range) continue
+
+    const cursor = startOfDay(range.start)
+    const end = startOfDay(range.end)
+    while (cursor <= end) {
+      const y = cursor.getFullYear()
+      const m = cursor.getMonth() + 1
+      const d = cursor.getDate()
+      monthSet.add(buildWorkHoursMonthKey(y, m))
+      daySet.add(buildWorkHoursDayKey(y, m, d))
+      cursor.setDate(cursor.getDate() + 1)
+    }
+  }
+
+  const sortKeys = (a: string, b: string) => a.localeCompare(b)
+  return {
+    monthKeys: [...monthSet].sort(sortKeys),
+    dayKeys: [...daySet].sort(sortKeys),
+  }
+}
+
+export function pickDefaultWorkHoursMonth(monthKeys: string[]): string {
+  if (monthKeys.length === 0) return defaultWorkHoursMonthKey()
+  const today = defaultWorkHoursMonthKey()
+  if (monthKeys.includes(today)) return today
+  return monthKeys[monthKeys.length - 1]!
+}
+
+export function pickDefaultWorkHoursDay(dayKeys: string[]): string {
+  if (dayKeys.length === 0) return defaultWorkHoursDayKey()
+  const today = defaultWorkHoursDayKey()
+  if (dayKeys.includes(today)) return today
+  return dayKeys[dayKeys.length - 1]!
+}
+
+/** Meses (1–12) con datos para un año dado, en orden cronológico. */
+export function monthsWithDataForYear(
+  monthKeys: string[],
+  year: number,
+): number[] {
+  const prefix = `${year}-`
+  return monthKeys
+    .filter((k) => k.startsWith(prefix))
+    .map((k) => parseWorkHoursMonthKey(k)!.month)
+}
+
+/** Años con al menos un mes con datos, en orden ascendente. */
+export function yearsWithData(monthKeys: string[]): number[] {
+  const years = new Set<number>()
+  for (const key of monthKeys) {
+    const parsed = parseWorkHoursMonthKey(key)
+    if (parsed) years.add(parsed.year)
+  }
+  return [...years].sort((a, b) => a - b)
+}
+
+function parseMonthKey(month?: string): { year: number; month: number } | null {
+  return parseWorkHoursMonthKey(month)
 }
 
 function parseDayKey(day?: string): Date | null {

@@ -42,6 +42,7 @@ type WorkboardItemRowProps = {
   onToggleExpand: () => void
   onChange: (plan: ProjectWorkPlan, options?: WorkPlanPersistOptions) => void
   dragDisabled?: boolean
+  teamMemberNames?: string[]
 }
 
 export function WorkboardItemRow({
@@ -53,6 +54,7 @@ export function WorkboardItemRow({
   onToggleExpand,
   onChange,
   dragDisabled = false,
+  teamMemberNames,
 }: WorkboardItemRowProps) {
   const kids = childrenOf(plan, item.id)
   const hasKids = kids.length > 0
@@ -174,6 +176,7 @@ export function WorkboardItemRow({
             assignees={item.assignees}
             readOnly={readOnly}
             onChange={(assignees) => patchItem({ assignees })}
+            teamMemberNames={teamMemberNames}
           />
         </td>
         <td className={cn(workboardTdClass, 'min-w-[8.5rem]')}>

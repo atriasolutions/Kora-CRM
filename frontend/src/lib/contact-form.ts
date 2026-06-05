@@ -11,7 +11,10 @@ import {
   inferContactIdentifierType,
   normalizeTaxIdValue,
 } from '@/lib/tax-identifier'
-import { getDuplicateContactTaxIdMessage } from '@/lib/tax-id-uniqueness'
+import {
+  getDuplicateContactEmailMessage,
+  getDuplicateContactTaxIdMessage,
+} from '@/lib/tax-id-uniqueness'
 import {
   getEmailValidationError,
   getPhoneValidationError,
@@ -209,17 +212,24 @@ export function validateContactFormValues(
   const taxIdError = getContactTaxIdValidationMessage(
     values.identifierType,
     values.rut,
-    { required: true },
+    { required: false },
   )
   if (taxIdError) return taxIdError
-  const duplicateError = getDuplicateContactTaxIdMessage(
-    values.identifierType,
-    values.rut,
-    options?.excludeId,
-  )
-  if (duplicateError) return duplicateError
+  if (values.rut.trim()) {
+    const duplicateTaxIdError = getDuplicateContactTaxIdMessage(
+      values.identifierType,
+      values.rut,
+      options?.excludeId,
+    )
+    if (duplicateTaxIdError) return duplicateTaxIdError
+  }
   const emailError = getEmailValidationError(values.email, { required: true })
   if (emailError) return emailError
+  const duplicateEmailError = getDuplicateContactEmailMessage(
+    values.email,
+    options?.excludeId,
+  )
+  if (duplicateEmailError) return duplicateEmailError
   const mobileError = getPhoneValidationError(values.mobilePhone, { required: true })
   if (mobileError) return mobileError
   if (!values.ownerName.trim()) return 'El responsable es obligatorio.'

@@ -57,6 +57,37 @@ export function assigneePickerOptions(
   return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'))
 }
 
+/** Responsables recién añadidos en alguna actividad (comparando dos versiones del plan). */
+export function collectNewWorkPlanAssigneeNames(
+  previous: ProjectWorkPlan,
+  next: ProjectWorkPlan,
+): string[] {
+  const prevByItem = new Map<string, Set<string>>()
+  for (const item of previous.items) {
+    const names = new Set<string>()
+    for (const raw of item.assignees) {
+      const t = raw.trim().toLowerCase()
+      if (t) names.add(t)
+    }
+    prevByItem.set(item.id, names)
+  }
+
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const item of next.items) {
+    const prev = prevByItem.get(item.id) ?? new Set<string>()
+    for (const raw of item.assignees) {
+      const name = raw.trim()
+      if (!name) continue
+      const key = name.toLowerCase()
+      if (prev.has(key) || seen.has(key)) continue
+      seen.add(key)
+      out.push(name)
+    }
+  }
+  return out
+}
+
 export function toggleAssignee(current: string[], name: string): string[] {
   const trimmed = name.trim()
   if (!trimmed) return current

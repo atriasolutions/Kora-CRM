@@ -12,6 +12,7 @@ export type EntityFilesScope =
   | 'compra'
   | 'factura'
   | 'cotizacion'
+  | 'oportunidad'
   | 'proyecto'
 
 function storageKey(scope: EntityFilesScope, entityId: string): string {

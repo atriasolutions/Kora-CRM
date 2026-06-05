@@ -14,7 +14,6 @@ import {
 } from '@/components/contacts/ContactsModuleHeader'
 import { ContactsArchivedView } from '@/components/contacts/ContactsArchivedView'
 import { ContactsSegmentsView } from '@/components/contacts/ContactsSegmentsView'
-import { ImportContactsDialog } from '@/components/contacts/ImportContactsDialog'
 import { ListPageLayout } from '@/components/list/ListPageLayout'
 import { ModuleListPage, type ListSelectionAction } from '@/components/list/ModuleListPage'
 import { Button } from '@/components/ui/button'
@@ -63,7 +62,6 @@ export function ContactsPage() {
   const {
     allContacts,
     addContact,
-    addContacts,
     updateContactFromDetail,
     archiveContact,
     archiveContacts,
@@ -114,7 +112,6 @@ export function ContactsPage() {
 
   const [createOpen, setCreateOpen] = useState(false)
   const [duplicateOpen, setDuplicateOpen] = useState(false)
-  const [importOpen, setImportOpen] = useState(false)
   const [createInitial, setCreateInitial] = useState<Partial<CreateContactFormValues>>()
   const [createTitle, setCreateTitle] = useState('Nuevo contacto')
   const [editOpen, setEditOpen] = useState(false)
@@ -131,10 +128,6 @@ export function ContactsPage() {
 
   const openDuplicate = useCallback(() => {
     setDuplicateOpen(true)
-  }, [])
-
-  const openImport = useCallback(() => {
-    setImportOpen(true)
   }, [])
 
   const handleCreateSubmit = useCallback(
@@ -231,19 +224,6 @@ export function ContactsPage() {
     [canDeleteContacts],
   )
 
-  const handleImport = useCallback(
-    async (rows: CreateContactFormValues[]) => {
-      const items = await addContacts(rows)
-      toast.success(
-        `${items.length} contacto${items.length === 1 ? '' : 's'} importado${items.length === 1 ? '' : 's'}.`,
-      )
-      if (items.length === 1) {
-        navigate(`/contactos/${items[0]!.id}`)
-      }
-    },
-    [addContacts, navigate],
-  )
-
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <ListPageLayout
@@ -255,7 +235,6 @@ export function ContactsPage() {
             onQueryChange={setQuery}
             onCreateNew={openCreateNew}
             onDuplicate={openDuplicate}
-            onImportFile={openImport}
             filters={filters}
             onFiltersChange={setFilters}
             listScope={listScope}
@@ -334,12 +313,6 @@ export function ContactsPage() {
         onOpenChange={setDuplicateOpen}
         contacts={allContacts}
         onSelectDuplicate={handleDuplicateSelect}
-      />
-
-      <ImportContactsDialog
-        open={importOpen}
-        onOpenChange={setImportOpen}
-        onImport={handleImport}
       />
 
       {canEditContacts && editingContact ? (

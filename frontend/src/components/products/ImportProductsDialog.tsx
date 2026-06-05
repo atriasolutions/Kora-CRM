@@ -14,17 +14,20 @@ import {
   parseProductsCsv,
   type CreateProductFormValues,
 } from '@/lib/product-create'
+import type { ProductSkuRecord } from '@/lib/product-sku-uniqueness'
 import { cn } from '@/lib/utils'
 
 type ImportProductsDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
+  existingProducts?: ProductSkuRecord[]
   onImport: (rows: CreateProductFormValues[]) => void
 }
 
 export function ImportProductsDialog({
   open,
   onOpenChange,
+  existingProducts = [],
   onImport,
 }: ImportProductsDialogProps) {
   const inputRef = useRef<HTMLInputElement>(null)
@@ -49,7 +52,7 @@ export function ImportProductsDialog({
 
   const handleFile = async (file: File) => {
     const text = await file.text()
-    const result = parseProductsCsv(text)
+    const result = parseProductsCsv(text, existingProducts)
     setFileName(file.name)
     setParsedRows(result.rows)
     setPreviewCount(result.rows.length)

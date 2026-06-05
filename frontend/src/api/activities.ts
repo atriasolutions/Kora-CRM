@@ -4,6 +4,10 @@ import { fetchAllPages } from '@/api/list-all'
 import type { ApiItemResponse } from '@/api/types'
 import type { ActivityDetail } from '@/data/activity-detail.mock'
 import type { ActivityListItem } from '@/data/activities.mock'
+import {
+  chileDatetimeLocalToIso,
+  parseChileDatetimeInput,
+} from '@/lib/chile-timezone'
 import type { CreateActivityFormValues } from '@/lib/activity-create'
 import { parseDurationMinutes } from '@/lib/activity-create'
 import {
@@ -22,15 +26,14 @@ function isUuid(value: string | undefined): boolean {
   return Boolean(value?.trim() && UUID_RE.test(value.trim()))
 }
 
-/** No enviar etiquetas de UI («Hoy, 14:30») al API. */
 function scheduledAtForApi(detail: ActivityDetail): string | undefined {
   const raw = detail.scheduledAt?.trim()
   if (!raw) return undefined
-  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(raw)) return raw
-  const parsed = new Date(raw)
-  if (!Number.isNaN(parsed.getTime()) && !/^(hoy|mañana|\d{1,2}\s+[a-záéíóú])/i.test(raw)) {
-    return parsed.toISOString()
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(raw)) {
+    return chileDatetimeLocalToIso(raw) ?? raw
   }
+  const parsed = parseChileDatetimeInput(raw)
+  if (parsed) return parsed.toISOString()
   return undefined
 }
 
@@ -68,7 +71,7 @@ export function activityFormToApiBody(values: CreateActivityFormValues): Activit
     relatedId: values.relatedId!.trim(),
     relatedName: values.relatedName.trim() || undefined,
     companyName: values.companyName?.trim() || undefined,
-    scheduledAt: values.scheduledAt,
+    scheduledAt: chileDatetimeLocalToIso(values.scheduledAt) ?? values.scheduledAt,
     assigneeName: values.assigneeName.trim() || undefined,
     status: values.status,
     priority: values.priority,

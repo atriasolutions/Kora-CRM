@@ -11,6 +11,7 @@ export const createProductSchema = z.object({
   category: z.string().max(128).optional(),
   productType: z.string().max(64).optional(),
   unitOfMeasure: z.string().max(32).optional(),
+  billingPeriod: z.string().max(32).optional(),
   priceNum: z.coerce.number().min(0).optional(),
   priceCurrency: z.enum(['CLP', 'UF', 'USD', 'EUR']).optional(),
   costPriceNum: z.coerce.number().min(0).optional(),

@@ -68,6 +68,7 @@ import { getInventoryFiles } from '@/lib/inventory-files'
 import { getInvoiceFiles } from '@/lib/invoice-files'
 import { getPurchaseFiles } from '@/lib/purchase-files'
 import { getQuoteFiles } from '@/lib/quote-files'
+import { getOpportunityFiles } from '@/lib/opportunity-files'
 import { getProjectFiles } from '@/lib/project-files'
 import type { ContactActivityType } from '@/data/contact-detail.mock'
 import { loadCatalogSettings } from '@/lib/catalog-settings'
@@ -258,6 +259,7 @@ export function normalizeOpportunityDetail(
     lineItems,
     activities: api.activities ?? [],
     notes: api.notes ?? [],
+    files: api.files ?? [],
     quotes,
     stageHistory: api.stageHistory ?? [],
     pendingActivities: api.pendingActivities ?? 0,
@@ -293,6 +295,11 @@ export async function loadOpportunityDetail(id: string): Promise<OpportunityDeta
   }
 
   detail.notes = await mergeEntityNotes('oportunidad', id, detail.notes ?? [])
+  detail.files = await mergeEntityFiles(
+    'oportunidad',
+    id,
+    getOpportunityFiles(id, detail.owner),
+  )
   return detail
 }
 

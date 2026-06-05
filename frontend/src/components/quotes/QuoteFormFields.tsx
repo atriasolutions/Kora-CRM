@@ -5,9 +5,9 @@ import {
 } from '@/components/contacts/ContactFormField'
 import { OpportunityLookupField } from '@/components/shared/OpportunityLookupField'
 import { QuoteCustomerSummary } from '@/components/quotes/QuoteCustomerSummary'
+import { QuoteInternalInventorySection } from '@/components/quotes/QuoteInternalInventorySection'
 import type { OpportunityListItem } from '@/data/opportunities.mock'
 import { UserLookupField } from '@/components/shared/UserLookupField'
-import { WarehouseDestinationFields } from '@/components/shared/WarehouseDestinationFields'
 import { QUOTE_STATUS_OPTIONS, type QuoteFormValues } from '@/lib/quote-form'
 
 export type QuoteFormFieldsModel = QuoteFormValues & {
@@ -88,26 +88,20 @@ export function QuoteFormFields({
         value={form.title}
         onChange={(title) => onChange({ title })}
       />
-      <section className="space-y-3 rounded-lg border border-border bg-muted/20 p-4">
-        <h3 className="text-sm font-semibold text-foreground">Logística y entrega</h3>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <WarehouseDestinationFields
-            warehouseFieldId="quote-warehouse"
-            addressFieldId="quote-delivery-address"
-            warehouseId={form.destinationWarehouseId}
-            warehouseName={form.destinationWarehouse}
-            deliveryAddress={form.deliveryAddress}
-            readOnlyDeliveryAddress
-            onChange={(patch) =>
-              onChange({
-                destinationWarehouseId: patch.warehouseId,
-                destinationWarehouse: patch.warehouse,
-                deliveryAddress: patch.deliveryAddress,
-              })
-            }
-          />
-        </div>
-      </section>
+      <QuoteInternalInventorySection
+        warehouseFieldId="quote-warehouse"
+        addressFieldId="quote-delivery-address"
+        warehouseId={form.destinationWarehouseId}
+        warehouseName={form.destinationWarehouse}
+        deliveryAddress={form.deliveryAddress}
+        onChange={(patch) =>
+          onChange({
+            destinationWarehouseId: patch.warehouseId,
+            destinationWarehouse: patch.warehouse,
+            deliveryAddress: patch.deliveryAddress,
+          })
+        }
+      />
 
       <div className="grid gap-3 sm:grid-cols-2">
         <ContactFormDateInput

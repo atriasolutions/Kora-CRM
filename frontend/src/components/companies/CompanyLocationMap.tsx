@@ -3,8 +3,8 @@ import { ExternalLink, MapPin } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   formatAddressLine,
-  googleMapsEmbedFromCoords,
-  googleMapsExternalUrl,
+  resolveMapEmbedUrl,
+  resolveMapExternalUrl,
 } from '@/lib/company-location'
 import { cn } from '@/lib/utils'
 
@@ -12,6 +12,7 @@ type CompanyLocationMapProps = {
   title: string
   street: string
   city: string
+  commune?: string
   region: string
   country: string
   postalCode?: string
@@ -25,6 +26,7 @@ export function CompanyLocationMap({
   title,
   street,
   city,
+  commune,
   region,
   country,
   postalCode,
@@ -33,9 +35,10 @@ export function CompanyLocationMap({
   className,
   compact = false,
 }: CompanyLocationMapProps) {
-  const addressLine = formatAddressLine({ street, city, region, country, postalCode })
-  const embedUrl = googleMapsEmbedFromCoords(lat, lng, compact ? 14 : 15)
-  const externalUrl = googleMapsExternalUrl(lat, lng, `${title} — ${addressLine}`)
+  const addressParts = { street, commune, city, region, country, postalCode }
+  const addressLine = formatAddressLine(addressParts)
+  const embedUrl = resolveMapEmbedUrl(addressParts, lat, lng, compact ? 14 : 15)
+  const externalUrl = resolveMapExternalUrl(addressParts, lat, lng)
 
   return (
     <div className={cn('overflow-hidden rounded-xl border border-border bg-card shadow-sm', className)}>

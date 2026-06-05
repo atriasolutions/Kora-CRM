@@ -184,5 +184,13 @@ export function listItemFromProjectDetail(project: ProjectDetail): ProjectListIt
     notes: _n,
     ...list
   } = project
-  return stampRecordAuditOnUpdate(list)
+  return stampRecordAuditOnUpdate({
+    ...list,
+    teamMembers: project.team.map((m) => ({
+      id: m.id,
+      name: m.name,
+      userId: m.userId,
+      role: m.role,
+    })),
+  })
 }
