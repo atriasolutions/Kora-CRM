@@ -21,7 +21,10 @@ import {
 } from '@/lib/user-form'
 import { mergeUserDetailFromApi, userListItemForRegistry } from '@/lib/user-detail-merge'
 import { registerUserInDisplayCache, registerUsersInDisplayCache } from '@/lib/user-display-cache'
-import { invalidateUserAvatarCache } from '@/lib/user-avatar-resolve'
+import {
+  cacheUserAvatarUrl,
+  invalidateUserAvatarCache,
+} from '@/lib/user-avatar-resolve'
 import { useAuth } from '@/hooks/use-auth'
 import { useRegistryApiBootstrap } from '@/hooks/use-registry-api-bootstrap'
 import { canModule, getProfilePermissionMap } from '@/lib/access-control'
@@ -105,8 +108,23 @@ export function UsersRegistryProvider({ children }: { children: ReactNode }) {
   const addUser = useCallback(
     async (values: UserFormValues) => {
       if (useApi) {
-        const detail = await createUserApi(userFormToApiBody(values))
-        const item = userListItemForRegistry(listItemFromUserDetail(detail))
+        const avatarUrl = values.avatarUrl?.trim() || undefined
+        const detail = await createUserApi(
+          userFormToApiBody(avatarUrl ? { ...values, avatarUrl: '' } : values),
+        )
+        const saved = avatarUrl
+          ? await updateUserApi(detail.id, { avatarUrl })
+          : detail
+        invalidateUserAvatarCache(saved.name, saved.id)
+        if (saved.avatarUrl?.trim()) {
+          cacheUserAvatarUrl(saved.id, saved.name, saved.avatarUrl)
+        }
+        const item = userListItemForRegistry(listItemFromUserDetail(saved))
+        registerUserInDisplayCache({
+          id: item.id,
+          name: item.name,
+          email: item.email,
+        })
         save([item, ...userUsers])
         return item
       }

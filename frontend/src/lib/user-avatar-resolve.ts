@@ -134,6 +134,15 @@ export function prefetchUserAvatarsById(userIds: Iterable<string>): void {
   }
 }
 
+/** Guarda avatar recién subido (p. ej. tras crear usuario) sin esperar otro GET. */
+export function cacheUserAvatarUrl(
+  userId: string,
+  displayName: string | undefined,
+  url: string | undefined,
+): void {
+  storeAvatar(userId, displayName, url?.trim() || undefined)
+}
+
 export function invalidateUserAvatarCache(
   displayName?: string,
   userId?: string,

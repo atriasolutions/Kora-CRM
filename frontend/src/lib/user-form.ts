@@ -1,6 +1,14 @@
+import { isApiEnabled } from '@/api/config'
 import { profileIdForUserRole, profileNameForId } from '@/data/profiles.mock'
 import type { UserDetail } from '@/data/user-detail.mock'
 import type { UserListItem, UserRole, UserStatus } from '@/data/users.mock'
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+function isUuid(value: string): boolean {
+  return UUID_RE.test(value.trim())
+}
 
 export const USER_ROLE_OPTIONS: { value: UserRole | string; label: string }[] = [
   { value: 'Admin', label: 'Admin' },
@@ -98,12 +106,16 @@ export type UserFormValues = {
 
 export function createDefaultUserFormValues(
   partial?: Partial<UserFormValues>,
+  profileOptions: readonly { id: string; name: string }[] = [],
 ): UserFormValues {
+  const role = partial?.role ?? 'Ventas'
   return {
     name: '',
     email: '',
-    role: 'Ventas',
-    profileId: profileIdForUserRole('Ventas'),
+    role,
+    profileId:
+      partial?.profileId ??
+      resolveProfileIdForRole(role, profileOptions),
     status: 'Por verificar',
     phone: '',
     department: '',
@@ -198,6 +210,9 @@ export function validateUserFormValues(values: UserFormValues): string | null {
   }
   if (!values.role.trim()) return 'Selecciona un rol.'
   if (!values.profileId.trim()) return 'Selecciona un perfil de acceso.'
+  if (isApiEnabled() && !isUuid(values.profileId)) {
+    return 'Selecciona un perfil de acceso válido en la lista.'
+  }
   if (!values.timezone.trim()) return 'Selecciona una zona horaria.'
   if (!values.language.trim()) return 'Selecciona un idioma.'
   return null

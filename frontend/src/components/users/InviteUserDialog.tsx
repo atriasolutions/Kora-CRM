@@ -10,8 +10,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { useProfilesRegistry } from '@/hooks/use-profiles-registry'
 import {
   createDefaultUserFormValues,
+  resolveProfileIdForRole,
   validateUserFormValues,
   type UserFormValues,
 } from '@/lib/user-form'
@@ -28,14 +30,29 @@ export function InviteUserDialog({
   onOpenChange,
   onSubmit,
 }: InviteUserDialogProps) {
-  const [form, setForm] = useState(() => createDefaultUserFormValues())
+  const { listItems: profileOptions } = useProfilesRegistry()
+  const [form, setForm] = useState(() => createDefaultUserFormValues(undefined, []))
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (!open) return
     queueMicrotask(() => {
-      setForm(createDefaultUserFormValues())
+      setForm(createDefaultUserFormValues(undefined, profileOptions))
+      setSaving(false)
     })
-  }, [open])
+  }, [open, profileOptions])
+
+  useEffect(() => {
+    if (!open || profileOptions.length === 0) return
+    setForm((prev) => {
+      const valid = profileOptions.some((p) => p.id === prev.profileId)
+      if (valid) return prev
+      return {
+        ...prev,
+        profileId: resolveProfileIdForRole(prev.role, profileOptions),
+      }
+    })
+  }, [open, profileOptions])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -44,8 +61,15 @@ export function InviteUserDialog({
       toast.warning(validation)
       return
     }
-    await onSubmit({ ...form, status: 'Por verificar' })
-    onOpenChange(false)
+    setSaving(true)
+    try {
+      await onSubmit({ ...form, status: 'Por verificar' })
+      onOpenChange(false)
+    } catch {
+      /* UsersPage muestra el toast de error */
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -69,7 +93,9 @@ export function InviteUserDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button type="submit">Enviar invitación</Button>
+            <Button type="submit" disabled={saving}>
+              {saving ? 'Enviando…' : 'Enviar invitación'}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
