@@ -74,18 +74,14 @@ export function ProjectDetailHeader({
   const displayPriority = isEditing && form ? form.priority : project.priority
   const displayProgressNum = workMetrics
     ? workMetrics.statusProgressPct
-    : isEditing && form
-      ? Number.parseInt(form.progress.replace(/[^\d]/g, ''), 10) || 0
-      : project.progressNum
+    : project.progressNum
 
   const metrics = [
     {
       label: workMetrics ? 'Avance (estado)' : 'Avance',
       value: workMetrics
         ? `${workMetrics.statusProgressPct}%`
-        : isEditing && form
-          ? form.progress
-          : project.progress,
+        : project.progress,
     },
     { label: 'Presupuesto', value: isEditing && form ? form.budget : project.budget },
     { label: 'Entrega', value: isEditing && form ? form.deadline : project.deadline },
@@ -167,12 +163,6 @@ export function ProjectDetailHeader({
                       value: p,
                       label: p,
                     }))}
-                  />
-                  <ContactFormInput
-                    id="pr-header-progress"
-                    label="Avance (%)"
-                    value={form.progress}
-                    onChange={(progress) => patch({ progress })}
                   />
                 </div>
               ) : (

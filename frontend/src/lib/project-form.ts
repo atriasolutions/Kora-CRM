@@ -24,7 +24,6 @@ import {
   PROJECT_PRIORITY_OPTIONS,
   PROJECT_STATUS_OPTIONS,
 } from '@/data/projects.mock'
-import { parseProgressNum } from '@/lib/project-display'
 import { parsePurchaseDisplayDate } from '@/lib/purchase-dates'
 
 function isEmptyProjectDate(value: string): boolean {
@@ -140,7 +139,6 @@ export function applyFormValuesToProject(
   project: ProjectDetail,
   values: ProjectFormValues,
 ): ProjectDetail {
-  const progressNum = parseProgressNum(values.progress)
   const opportunityId = values.opportunityId.trim() || undefined
   const acceptedQuoteId = values.acceptedQuoteId.trim() || undefined
   const customerPatch = projectCustomerToListPatch(values)
@@ -151,8 +149,6 @@ export function applyFormValuesToProject(
     client: resolveProjectClientName(values),
     opportunityId,
     acceptedQuoteId,
-    progress: values.progress.trim(),
-    progressNum,
     deadline: values.deadline.trim(),
     manager: values.managerName.trim(),
     journeyStage: values.journeyStage,

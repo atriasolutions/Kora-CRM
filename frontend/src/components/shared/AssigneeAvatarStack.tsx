@@ -40,7 +40,7 @@ function PersonAvatar({
   )
 }
 
-/** Agrupa avatares al estilo Monday: 0 vacío, 1–2 visibles, 3+ con contador +N. */
+/** Muestra un avatar por responsable, superpuestos horizontalmente. */
 export function AssigneeAvatarStack({
   assignees,
   size = 'sm',
@@ -66,43 +66,20 @@ export function AssigneeAvatarStack({
     )
   }
 
-  if (list.length === 1) {
-    return (
-      <div className={cn('flex justify-center', className)} title={list[0]}>
-        <PersonAvatar name={list[0]!} size={size} />
-      </div>
-    )
-  }
-
-  if (list.length === 2) {
-    return (
-      <div
-        className={cn('flex items-center justify-center', className)}
-        title={list.join(', ')}
-      >
-        <PersonAvatar name={list[0]!} size={size} />
-        <PersonAvatar name={list[1]!} size={size} className="-ms-2.5" />
-      </div>
-    )
-  }
-
-  const overflow = list.length - 1
   return (
     <div
-      className={cn('flex items-center justify-center', className)}
+      className={cn('flex items-center', className)}
       title={list.join(', ')}
+      aria-label={`Responsables: ${list.join(', ')}`}
     >
-      <PersonAvatar name={list[0]!} size={size} />
-      <span
-        className={cn(
-          '-ms-2.5 flex shrink-0 items-center justify-center rounded-full border-2 border-background bg-muted font-semibold text-foreground',
-          sizeClass[size],
-          size === 'sm' ? 'text-[10px]' : 'text-[11px]',
-        )}
-        aria-label={`y ${overflow} más`}
-      >
-        +{overflow}
-      </span>
+      {list.map((name, index) => (
+        <PersonAvatar
+          key={`${name}-${index}`}
+          name={name}
+          size={size}
+          className={index > 0 ? '-ms-2.5' : undefined}
+        />
+      ))}
     </div>
   )
 }

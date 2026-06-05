@@ -17,6 +17,7 @@ import {
   todayMarkerPct,
   type GanttRow,
 } from '@/lib/project-gantt'
+import { useUsersRegistry } from '@/hooks/use-users-registry'
 import { usePrefetchUserAvatars } from '@/hooks/use-user-avatar-url'
 import type { ProjectWorkPlan } from '@/types/project-work-plan'
 import { cn } from '@/lib/utils'
@@ -86,9 +87,6 @@ function GanttRowLabel({ row }: { row: GanttRow }) {
             <span className="shrink-0 text-[10px] text-emerald-600 dark:text-emerald-400">✓</span>
           ) : null}
         </div>
-        <p className="truncate text-[10px] text-muted-foreground" title={assigneeLabel}>
-          {assigneeLabel}
-        </p>
       </div>
     </div>
   )
@@ -155,6 +153,7 @@ function GanttRowBars({
 
 export function ProjectWorkGantt({ plan, projectTitle = 'Proyecto' }: ProjectWorkGanttProps) {
   const [exporting, setExporting] = useState(false)
+  const { allUsers } = useUsersRegistry()
   const timeline = useMemo(() => buildGanttTimeline(plan), [plan])
   const rows = useMemo(() => buildGanttRows(plan), [plan])
   const widthPx = timeline ? ganttTimelineWidthPx(timeline) : 0
@@ -170,7 +169,7 @@ export function ProjectWorkGantt({ plan, projectTitle = 'Proyecto' }: ProjectWor
   const handleExportPng = async () => {
     setExporting(true)
     try {
-      const ok = await downloadGanttPng(plan, projectTitle)
+      const ok = await downloadGanttPng(plan, projectTitle, { users: allUsers })
       if (ok) toast.success('Gantt exportado a PNG.')
       else toast.warning('No hay fechas planificadas para exportar.')
     } catch {

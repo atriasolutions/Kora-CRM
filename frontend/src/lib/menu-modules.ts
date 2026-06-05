@@ -25,7 +25,7 @@ export type MenuModuleDef = {
 }
 
 export const MENU_MODULE_DEFINITIONS: MenuModuleDef[] = [
-  { id: 'dashboard', label: 'Dashboard', pathSegment: '' },
+  { id: 'dashboard', label: 'Dashboard', pathSegment: 'dashboard' },
   { id: 'contactos', label: 'Contactos', pathSegment: 'contactos' },
   { id: 'empresas', label: 'Empresas', pathSegment: 'empresas' },
   { id: 'oportunidades', label: 'Oportunidades', pathSegment: 'oportunidades' },
@@ -127,12 +127,12 @@ export function createViewOnlyModulePermissions(
 
 export function pathToModuleId(pathname: string): MenuModuleId | null {
   const segment = pathname.replace(/^\//, '').split('/')[0] ?? ''
-  if (!segment) return 'dashboard'
+  if (!segment) return null
   const found = MENU_MODULE_DEFINITIONS.find((m) => m.pathSegment === segment)
   return found?.id ?? null
 }
 
 export function moduleIdFromNavPath(path: string): MenuModuleId | null {
-  if (path === '/') return 'dashboard'
+  if (path === '/') return null
   return pathToModuleId(path)
 }

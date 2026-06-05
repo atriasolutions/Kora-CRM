@@ -44,6 +44,7 @@ import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { ResetPasswordPage } from '@/pages/ResetPasswordPage'
 import { SettingsPage } from '@/pages/SettingsPage'
+import { WelcomePage } from '@/pages/WelcomePage'
 
 const listRoutePaths = new Set<string>(listModuleSlugs)
 
@@ -61,7 +62,8 @@ export default function App() {
             <Route element={<AppDataProviders />}>
               <Route element={<AppShell />}>
                 <Route element={<RouteAccessGuard />}>
-                  <Route index element={<DashboardPage />} />
+                  <Route index element={<WelcomePage />} />
+                  <Route path="dashboard" element={<DashboardPage />} />
                   <Route path="contactos" element={<ContactsPage />} />
                   <Route path="contactos/:contactId" element={<ContactDetailPage />} />
                   <Route path="empresas" element={<CompaniesPage />} />

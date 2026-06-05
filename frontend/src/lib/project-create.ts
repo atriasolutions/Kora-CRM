@@ -2,7 +2,6 @@ import { stampRecordAuditOnCreate } from '@/lib/record-audit'
 import type { ProjectListItem } from '@/data/projects.mock'
 import { journeyToListStatus } from '@/lib/project-journey'
 import { findOpportunityById } from '@/lib/project-relations'
-import { parseProgressNum } from '@/lib/project-display'
 import { validateProjectRelations } from '@/lib/project-relations'
 import {
   defaultProjectFormValues,
@@ -74,7 +73,6 @@ export function formValuesToListItem(
   values: CreateProjectFormValues,
   id = createProjectId(),
 ): ProjectListItem {
-  const progressNum = parseProgressNum(values.progress)
   const opportunityId = values.opportunityId.trim() || undefined
   const acceptedQuoteId = values.acceptedQuoteId.trim() || undefined
   const opp = opportunityId ? findOpportunityById(opportunityId) : undefined
@@ -88,8 +86,8 @@ export function formValuesToListItem(
     companyId: customerPatch.companyId ?? opp?.companyId,
     opportunityId,
     acceptedQuoteId,
-    progress: values.progress.trim() || '0%',
-    progressNum,
+    progress: '0%',
+    progressNum: 0,
     deadline: values.deadline.trim(),
     manager: values.managerName.trim(),
     journeyStage,

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 
 import type { MenuModuleId } from '@/lib/menu-modules'
+import { DASHBOARD_PATH } from '@/lib/app-routes'
 
 export type NavItemDef = {
   label: string
@@ -32,12 +33,18 @@ export type NavSectionDef =
   | { type: 'group'; heading: string; items: NavItemDef[] }
   | { type: 'items'; items: NavItemDef[] }
 
-/** Rutas coherentes con el sidebar; el dashboard es índice. */
+/** Rutas coherentes con el sidebar; la bienvenida es `/` (sin permisos). */
 export const navSections: NavSectionDef[] = [
   {
     type: 'items',
     items: [
-      { label: 'Dashboard', path: '/', icon: Home, moduleId: 'dashboard', end: true },
+      {
+        label: 'Dashboard',
+        path: DASHBOARD_PATH,
+        icon: Home,
+        moduleId: 'dashboard',
+        end: true,
+      },
       { label: 'Contactos', path: '/contactos', icon: Contact, moduleId: 'contactos' },
       { label: 'Empresas', path: '/empresas', icon: Building2, moduleId: 'empresas' },
       { label: 'Oportunidades', path: '/oportunidades', icon: Target, moduleId: 'oportunidades' },
@@ -67,5 +74,5 @@ const allNavItems: NavItemDef[] = navSections.flatMap((s) =>
   s.type === 'items' ? s.items : s.items,
 )
 
-/** Todas las entradas del sidebar excepto el dashboard (`/`). */
+/** Todas las entradas del sidebar excepto la bienvenida (`/`). */
 export const sidebarRoutes = allNavItems.filter((i) => i.path !== '/')

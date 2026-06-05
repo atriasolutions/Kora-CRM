@@ -22,8 +22,6 @@ type ProjectFormFieldsProps = {
   onChange: (patch: Partial<ProjectFormValues>) => void
   idPrefix?: string
   disabled?: boolean
-  /** Etiqueta del campo de avance (creación vs edición). */
-  progressLabel?: string
 }
 
 export function ProjectFormFields({
@@ -31,7 +29,6 @@ export function ProjectFormFields({
   onChange,
   idPrefix = 'pr',
   disabled = false,
-  progressLabel = 'Avance',
 }: ProjectFormFieldsProps) {
   const patch = (partial: Partial<ProjectFormValues>) => onChange(partial)
 
@@ -99,18 +96,10 @@ export function ProjectFormFields({
 
       <ContactFormSection
         title="Planificación"
-        description="Fechas, avance y presupuesto"
+        description="Fechas y presupuesto"
         icon={CalendarClock}
       >
         <div className="grid gap-4 sm:grid-cols-2">
-          <ContactFormInput
-            id={`${idPrefix}-progress`}
-            label={progressLabel}
-            inputVariant="percent"
-            value={values.progress}
-            onChange={(progress) => patch({ progress })}
-            disabled={disabled}
-          />
           <ContactFormInput
             id={`${idPrefix}-budget`}
             label="Presupuesto"

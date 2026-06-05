@@ -1,5 +1,13 @@
 import * as XLSX from 'xlsx'
 
+import type { UserListItem } from '@/data/users.mock'
+import {
+  buildGanttExportAvatarMap,
+  computeGanttExportLabelWidth,
+  ganttExportAssigneeStackWidth,
+  renderGanttAssigneeStackSvg,
+  type GanttExportAvatarMap,
+} from '@/lib/project-gantt-export-avatars'
 import {
   buildGanttRows,
   buildGanttTimeline,
@@ -13,7 +21,6 @@ import { formatDisplayDate } from '@/lib/project-work-plan'
 import { workItemStatusLabel } from '@/lib/project-work-status'
 import type { ProjectWorkPlan } from '@/types/project-work-plan'
 
-const LABEL_WIDTH = 280
 const HEADER_HEIGHT = 40
 const GROUP_ROW_HEIGHT = 36
 const ITEM_ROW_HEIGHT = 44
@@ -126,9 +133,11 @@ function renderGanttSvg(
   timeline: GanttTimeline,
   widthPx: number,
   projectTitle: string,
+  avatarMap: GanttExportAvatarMap,
+  labelWidth: number,
 ): string {
   const timelineWidth = widthPx
-  const totalWidth = LABEL_WIDTH + timelineWidth
+  const totalWidth = labelWidth + timelineWidth
   const bodyHeight = rows.reduce((h, r) => h + rowHeight(r), 0)
   const totalHeight = HEADER_HEIGHT + bodyHeight
   const todayPct = todayMarkerPct(timeline)
@@ -143,17 +152,17 @@ function renderGanttSvg(
   )
 
   parts.push(
-    `<rect x="0" y="${HEADER_HEIGHT - 40}" width="${LABEL_WIDTH}" height="${HEADER_HEIGHT}" fill="#f1f5f9" stroke="#e2e8f0"/>`,
+    `<rect x="0" y="${HEADER_HEIGHT - 40}" width="${labelWidth}" height="${HEADER_HEIGHT}" fill="#f1f5f9" stroke="#e2e8f0"/>`,
   )
   parts.push(
     `<text x="12" y="${HEADER_HEIGHT - 14}" font-family="Inter, system-ui, sans-serif" font-size="10" font-weight="600" fill="#64748b">ACTIVIDAD</text>`,
   )
   parts.push(
-    `<rect x="${LABEL_WIDTH}" y="${HEADER_HEIGHT - 40}" width="${timelineWidth}" height="${HEADER_HEIGHT}" fill="#f1f5f9" stroke="#e2e8f0"/>`,
+    `<rect x="${labelWidth}" y="${HEADER_HEIGHT - 40}" width="${timelineWidth}" height="${HEADER_HEIGHT}" fill="#f1f5f9" stroke="#e2e8f0"/>`,
   )
 
   for (const tick of timeline.ticks) {
-    const x = LABEL_WIDTH + (tick.leftPct / 100) * timelineWidth
+    const x = labelWidth + (tick.leftPct / 100) * timelineWidth
     parts.push(
       `<line x1="${x}" y1="${HEADER_HEIGHT - 40}" x2="${x}" y2="${totalHeight}" stroke="#e2e8f0" stroke-width="1"/>`,
     )
@@ -163,7 +172,7 @@ function renderGanttSvg(
   }
 
   if (todayPct != null) {
-    const x = LABEL_WIDTH + (todayPct / 100) * timelineWidth
+    const x = labelWidth + (todayPct / 100) * timelineWidth
     parts.push(
       `<line x1="${x}" y1="${HEADER_HEIGHT - 40}" x2="${x}" y2="${totalHeight}" stroke="#ef4444" stroke-width="2" opacity="0.75"/>`,
     )
@@ -183,20 +192,30 @@ function renderGanttSvg(
       )
     } else {
       parts.push(
-        `<rect x="0" y="${y}" width="${LABEL_WIDTH}" height="${h}" fill="#ffffff" stroke="#e2e8f0"/>`,
+        `<rect x="0" y="${y}" width="${labelWidth}" height="${h}" fill="#ffffff" stroke="#e2e8f0"/>`,
       )
       parts.push(
-        `<rect x="${LABEL_WIDTH}" y="${y}" width="${timelineWidth}" height="${h}" fill="#ffffff" stroke="#e2e8f0"/>`,
+        `<rect x="${labelWidth}" y="${y}" width="${timelineWidth}" height="${h}" fill="#ffffff" stroke="#e2e8f0"/>`,
       )
 
-      const assignees =
-        row.item.assignees.map((s) => s.trim()).filter(Boolean).join(', ') || 'Sin responsables'
+      const assignees = row.item.assignees.map((s) => s.trim()).filter(Boolean)
       const labelX = row.depth === 1 ? 20 : 12
+      const stackWidth = ganttExportAssigneeStackWidth(assignees)
+      const nameX = labelX + stackWidth
+      const rowCenterY = y + h / 2
+
       parts.push(
-        `<text x="${labelX}" y="${y + 18}" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="600" fill="#0f172a">${escapeXml(row.item.name)}</text>`,
+        renderGanttAssigneeStackSvg(
+          assignees,
+          labelX,
+          rowCenterY,
+          avatarMap,
+          `gantt-${row.item.id.replace(/[^a-zA-Z0-9_-]/g, '')}`,
+          escapeXml,
+        ),
       )
       parts.push(
-        `<text x="${labelX}" y="${y + 32}" font-family="Inter, system-ui, sans-serif" font-size="9" fill="#64748b">${escapeXml(assignees)}</text>`,
+        `<text x="${nameX}" y="${rowCenterY + 4}" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="600" fill="#0f172a">${escapeXml(row.item.name)}</text>`,
       )
 
       const drawBar = (
@@ -208,7 +227,7 @@ function renderGanttSvg(
       ) => {
         if (!range) return
         const style = rangeToBarStyle(range, timeline)
-        const x = LABEL_WIDTH + (style.leftPct / 100) * timelineWidth
+        const x = labelWidth + (style.leftPct / 100) * timelineWidth
         const w = Math.max(4, (style.widthPct / 100) * timelineWidth)
         parts.push(
           `<rect x="${x}" y="${y + top}" width="${w}" height="${barH}" rx="2" fill="${fill}" stroke="${stroke}"/>`,
@@ -275,12 +294,21 @@ function svgToPngDownload(svg: string, filename: string): Promise<void> {
 export async function downloadGanttPng(
   plan: ProjectWorkPlan,
   projectTitle: string,
+  options?: { users?: UserListItem[] },
 ): Promise<boolean> {
   const timeline = buildGanttTimeline(plan)
   if (!timeline) return false
   const rows = buildGanttRows(plan)
+  const assigneeNames = rows.flatMap((row) =>
+    row.kind === 'item' ? row.item.assignees : [],
+  )
+  const avatarMap = await buildGanttExportAvatarMap(
+    assigneeNames,
+    options?.users ?? [],
+  )
   const widthPx = ganttTimelineWidthPx(timeline)
-  const svg = renderGanttSvg(rows, timeline, widthPx, projectTitle)
+  const labelWidth = computeGanttExportLabelWidth(rows)
+  const svg = renderGanttSvg(rows, timeline, widthPx, projectTitle, avatarMap, labelWidth)
   const base = sanitizeExportBaseName(projectTitle)
   await svgToPngDownload(svg, `${base}-gantt-${exportTimestamp()}.png`)
   return true

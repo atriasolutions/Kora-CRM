@@ -96,10 +96,14 @@ export function ProjectDetailPage() {
     try {
       const fresh = await loadProjectDetail(projectId)
       setProject(fresh)
+      void updateProject(projectId, {
+        progress: fresh.progress,
+        progressNum: fresh.progressNum,
+      })
     } catch {
       /* ignore refresh errors */
     }
-  }, [projectId])
+  }, [projectId, updateProject])
   const { plan, setPlan: persistPlan, metrics } = useProjectWorkPlan(projectId, {
     readOnly: !canEdit,
     onPlanPersisted: reloadProject,

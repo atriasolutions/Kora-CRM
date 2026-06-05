@@ -3,6 +3,7 @@ import type {
   ProjectListItem,
   ProjectTeamMemberDto,
 } from '../types/project.js'
+import { computeWorkPlanProgressPct } from '../lib/project-work-plan-progress.js'
 import { formatCentsToMoney, formatPercent } from '../utils/money.js'
 import { formatDateLabel, toIsoString } from '../utils/format.js'
 
@@ -18,6 +19,7 @@ export type ProjectRow = {
   accepted_quote_id: string | null
   quote_code: string
   progress_pct: number | string
+  work_plan_json?: unknown
   deadline: Date | string | null
   manager_name: string | null
   journey_stage: string | null
@@ -58,8 +60,15 @@ function mapCustomerKind(
   return undefined
 }
 
+function resolveProjectProgressPct(row: ProjectRow): number {
+  if (row.work_plan_json != null) {
+    return computeWorkPlanProgressPct(row.work_plan_json)
+  }
+  return Number(row.progress_pct ?? 0)
+}
+
 export function mapProjectRow(row: ProjectRow): ProjectListItem {
-  const progressPct = Number(row.progress_pct ?? 0)
+  const progressPct = resolveProjectProgressPct(row)
   const budgetCents = row.budget_cents != null ? Number(row.budget_cents) : null
   const customerKind = mapCustomerKind(row.customer_kind)
   return {

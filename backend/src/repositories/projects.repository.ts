@@ -30,14 +30,14 @@ import type {
   UpdateProjectInput,
 } from '../types/project.js'
 import { parseDateInput } from '../utils/format.js'
-import { parseMoneyToCents, parsePercentToInt } from '../utils/money.js'
+import { parseMoneyToCents } from '../utils/money.js'
 import { paginationOffset } from '../utils/pagination.js'
 import { purgeEntityNotesAndFiles } from '../services/entity-purge.service.js'
 
 const PROJECT_COLUMNS = `
   id, name, client_name, customer_kind, company_id, contact_id,
   opportunity_id, opportunity_name,
-  accepted_quote_id, quote_code, progress_pct, deadline, manager_name,
+  accepted_quote_id, quote_code, progress_pct, work_plan_json, deadline, manager_name,
   journey_stage, status, priority, health, budget_cents, start_date,
   created_at, created_by_id, created_by_name,
   updated_at, updated_by_id, updated_by_name
@@ -125,13 +125,6 @@ function mapTeamRowsToListMembers(
     userId: row.user_id ?? undefined,
     role: row.role_label ?? undefined,
   }))
-}
-
-function resolveProgressPct(input: CreateProjectInput | UpdateProjectInput): number | null {
-  if (input.progressPct != null) return input.progressPct
-  if (input.progressNum != null) return input.progressNum
-  if (input.progress != null) return parsePercentToInt(input.progress) ?? 0
-  return null
 }
 
 function resolveBudgetCents(input: CreateProjectInput | UpdateProjectInput): number | null {
@@ -442,7 +435,6 @@ export async function createProject(
   if (!links.clientName) throw badRequest('El cliente es obligatorio')
   const { customerKind, contactId } = clientFields
 
-  const progressPct = resolveProgressPct(input) ?? 0
   const budgetCents = resolveBudgetCents(input)
   const managerName = input.managerName?.trim() || actor.userName
 
@@ -474,7 +466,7 @@ export async function createProject(
         links.opportunityName,
         links.acceptedQuoteId,
         links.quoteCode,
-        progressPct,
+        0,
         parseDateInput(input.deadline),
         managerName,
         input.journeyStage ?? 'Nuevo',
@@ -579,7 +571,6 @@ export async function updateProject(
     )
   }
 
-  const progressPct = resolveProgressPct(input)
   const budgetCents = resolveBudgetCents(input)
 
   const client = await pool.connect()
@@ -596,17 +587,16 @@ export async function updateProject(
         opportunity_name = $8,
         accepted_quote_id = $9,
         quote_code = $10,
-        progress_pct = COALESCE($11, progress_pct),
-        deadline = COALESCE($12, deadline),
-        manager_name = COALESCE($13, manager_name),
-        journey_stage = COALESCE($14, journey_stage),
-        status = COALESCE($15, status),
-        priority = COALESCE($16, priority),
-        health = COALESCE($17, health),
-        budget_cents = COALESCE($18, budget_cents),
-        start_date = COALESCE($19, start_date),
-        updated_by_id = $20,
-        updated_by_name = $21,
+        deadline = COALESCE($11, deadline),
+        manager_name = COALESCE($12, manager_name),
+        journey_stage = COALESCE($13, journey_stage),
+        status = COALESCE($14, status),
+        priority = COALESCE($15, priority),
+        health = COALESCE($16, health),
+        budget_cents = COALESCE($17, budget_cents),
+        start_date = COALESCE($18, start_date),
+        updated_by_id = $19,
+        updated_by_name = $20,
         updated_at = now()
       WHERE id = $1 AND deleted_at IS NULL
       RETURNING ${PROJECT_COLUMNS}`,
@@ -621,7 +611,6 @@ export async function updateProject(
         links.opportunityName,
         links.acceptedQuoteId,
         links.quoteCode,
-        progressPct,
         parseDateInput(input.deadline),
         input.managerName?.trim() || null,
         input.journeyStage ?? null,

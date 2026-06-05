@@ -18,9 +18,9 @@ export function resolveHelpContext(pathname: string): HelpContext {
 
   if (normalized === '/' || normalized === '') {
     return {
-      moduleId: 'dashboard',
-      view: 'dashboard',
-      contentKey: 'dashboard',
+      moduleId: null,
+      view: 'list',
+      contentKey: 'home',
     }
   }
 

@@ -1,4 +1,5 @@
 import { isSystemAccessProfile } from '@/lib/access-profile-admin'
+import { isPublicAppPath } from '@/lib/app-routes'
 import type { MenuModuleId, MenuModulePermission, PermissionAction } from '@/lib/menu-modules'
 import {
   createFullModulePermissions,
@@ -50,6 +51,7 @@ export function canAccessPath(
   pathname: string,
   map: Map<MenuModuleId, MenuModulePermission['flags']>,
 ): boolean {
+  if (isPublicAppPath(pathname)) return true
   const moduleId = pathToModuleId(pathname)
   if (!moduleId) return true
   return canModule(map, moduleId, 'menu')

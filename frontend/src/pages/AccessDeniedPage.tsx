@@ -2,6 +2,7 @@ import { ShieldOff } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
+import { APP_HOME_PATH } from '@/lib/app-routes'
 
 export function AccessDeniedPage() {
   return (
@@ -13,7 +14,7 @@ export function AccessDeniedPage() {
         administrador si necesitas acceso.
       </p>
       <Button variant="outline" asChild>
-        <Link to="/">Ir al inicio</Link>
+        <Link to={APP_HOME_PATH}>Ir al inicio</Link>
       </Button>
     </div>
   )

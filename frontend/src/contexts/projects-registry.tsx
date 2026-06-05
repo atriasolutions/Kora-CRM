@@ -195,21 +195,19 @@ export function ProjectsRegistryProvider({ children }: { children: ReactNode }) 
 
   const updateProject = useCallback(
     async (id: string, patch: Partial<ProjectListItem>) => {
-      if (useApi) {
-        await updateProjectApi(id, projectPatchToApiBody(patch))
-        const idx = userProjects.findIndex((p) => p.id === id)
-        if (idx >= 0) {
-          save(
-            userProjects.map((p) =>
-              p.id === id ? stampRecordAuditOnUpdate({ ...p, ...patch }) : p,
-            ),
-          )
-        }
-        return
+      const apiBody = projectPatchToApiBody(patch)
+      const hasApiFields = Object.keys(apiBody).length > 0
+      if (useApi && hasApiFields) {
+        await updateProjectApi(id, apiBody)
       }
       const idx = userProjects.findIndex((p) => p.id === id)
-      if (idx < 0) return
-      save(userProjects.map((p) => (p.id === id ? { ...p, ...patch } : p)))
+      if (idx >= 0) {
+        save(
+          userProjects.map((p) =>
+            p.id === id ? stampRecordAuditOnUpdate({ ...p, ...patch }) : p,
+          ),
+        )
+      }
     },
     [save, userProjects],
   )

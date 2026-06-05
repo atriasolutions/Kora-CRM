@@ -2,6 +2,7 @@ import {
   normalizeWorkPlanJson,
   type ProjectWorkPlanJson,
 } from '../lib/project-work-plan-json.js'
+import { computeWorkPlanProgressPct } from '../lib/project-work-plan-progress.js'
 import { notifyNewWorkItemAssignees } from '../lib/project-work-plan-notify.js'
 import { syncNewAssigneesToProjectTeam } from '../lib/project-team-member-sync.js'
 import { pool } from '../db/pool.js'
@@ -43,15 +44,17 @@ export async function saveProjectWorkPlan(
 
   const previousPlan = normalizeWorkPlanJson(previous.work_plan_json)
   const normalized = normalizeWorkPlanJson(plan)
+  const progressPct = computeWorkPlanProgressPct(normalized)
   const result = await pool.query<{ work_plan_json: unknown }>(
     `UPDATE crm_projects SET
       work_plan_json = $2::jsonb,
+      progress_pct = $5,
       updated_by_id = $3,
       updated_by_name = $4,
       updated_at = now()
      WHERE id = $1 AND deleted_at IS NULL
      RETURNING work_plan_json`,
-    [projectId, JSON.stringify(normalized), actor.userId, actor.userName],
+    [projectId, JSON.stringify(normalized), actor.userId, actor.userName, progressPct],
   )
   const row = result.rows[0]
   if (!row) throw notFound('Proyecto no encontrado')

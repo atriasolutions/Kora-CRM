@@ -102,6 +102,22 @@ const listDetail = (
 }
 
 export const HELP_CONTENT: Record<string, HelpTopic> = {
+  home: {
+    title: 'Inicio',
+    summary:
+      'Pantalla de bienvenida al entrar a Kora. Muestra un saludo y accesos rápidos a los módulos que tu perfil permite usar.',
+    actions: [
+      'Usar las tarjetas de acceso rápido para ir a un módulo.',
+      'Pulsar el logo superior izquierdo para volver aquí desde cualquier pantalla.',
+      'Abrir el Dashboard desde el botón o el menú lateral, si tu perfil lo incluye.',
+    ],
+    permissionsNote:
+      'Esta pantalla está disponible para todos los usuarios. Los módulos listados dependen de tu perfil de acceso.',
+    tips: [
+      'Los invitados suelen ver solo los módulos que el administrador les asignó, sin métricas del negocio.',
+    ],
+    keywords: ['bienvenida', 'inicio', 'home'],
+  },
   dashboard: {
     title: 'Dashboard',
     summary:

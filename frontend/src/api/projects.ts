@@ -5,7 +5,6 @@ import type { ApiItemResponse } from '@/api/types'
 import type { ProjectDetail } from '@/data/project-detail.mock'
 import type { ProjectListItem } from '@/data/projects.mock'
 import type { CreateProjectFormValues } from '@/lib/project-create'
-import { parseProgressNum } from '@/lib/project-display'
 import { projectCustomerApiFields } from '@/lib/project-customer'
 import { teamToApiInput } from '@/lib/project-team-access'
 import type { ProjectFormValues } from '@/lib/project-form'
@@ -41,8 +40,6 @@ export function projectFormToApiBody(values: CreateProjectFormValues): ProjectAp
     ...customer,
     opportunityId: values.opportunityId.trim() || undefined,
     acceptedQuoteId: values.acceptedQuoteId.trim() || undefined,
-    progress: values.progress.trim() || undefined,
-    progressPct: parseProgressNum(values.progress),
     deadline: values.deadline.trim(),
     managerName: values.managerName.trim() || undefined,
     journeyStage: values.journeyStage,
@@ -64,11 +61,6 @@ function optionalUuid(value: string | undefined): string | undefined {
 }
 
 export function projectDetailToApiBody(detail: ProjectDetail): ProjectApiBody {
-  const progressPct =
-    detail.progressNum != null && Number.isFinite(detail.progressNum)
-      ? Math.round(detail.progressNum)
-      : undefined
-
   return {
     name: detail.name,
     client: detail.client || undefined,
@@ -77,8 +69,6 @@ export function projectDetailToApiBody(detail: ProjectDetail): ProjectApiBody {
     companyId: optionalUuid(detail.companyId),
     opportunityId: optionalUuid(detail.opportunityId),
     acceptedQuoteId: optionalUuid(detail.acceptedQuoteId),
-    progress: detail.progress || undefined,
-    progressPct,
     deadline: detail.deadline || undefined,
     managerName: detail.manager || undefined,
     journeyStage: detail.journeyStage,
@@ -98,8 +88,6 @@ export function projectFormValuesToApiBody(values: ProjectFormValues): ProjectAp
     ...customer,
     opportunityId: values.opportunityId.trim() || undefined,
     acceptedQuoteId: values.acceptedQuoteId.trim() || undefined,
-    progress: values.progress.trim(),
-    progressPct: parseProgressNum(values.progress),
     deadline: values.deadline.trim(),
     managerName: values.managerName.trim() || undefined,
     journeyStage: values.journeyStage,
@@ -120,10 +108,6 @@ export function projectPatchToApiBody(patch: Partial<ProjectListItem>): ProjectA
   if (patch.contactId !== undefined) body.contactId = patch.contactId
   if (patch.opportunityId !== undefined) body.opportunityId = patch.opportunityId
   if (patch.acceptedQuoteId !== undefined) body.acceptedQuoteId = patch.acceptedQuoteId
-  if (patch.progress !== undefined) {
-    body.progress = patch.progress
-    body.progressPct = patch.progressNum ?? parseProgressNum(patch.progress)
-  }
   if (patch.deadline !== undefined) body.deadline = patch.deadline
   if (patch.manager !== undefined) body.managerName = patch.manager
   if (patch.journeyStage !== undefined) body.journeyStage = patch.journeyStage

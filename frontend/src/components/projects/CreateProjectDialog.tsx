@@ -72,7 +72,6 @@ export function CreateProjectDialog({
             values={form}
             onChange={patch}
             idPrefix="create-pr"
-            progressLabel="Avance inicial"
           />
           <DialogFooter className="gap-2 border-t border-border pt-4 sm:gap-0">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

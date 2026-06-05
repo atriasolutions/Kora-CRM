@@ -16,10 +16,12 @@ import { useNavigate } from 'react-router-dom'
 
 import { globalSearchApi } from '@/api/search'
 import { Input } from '@/components/ui/input'
+import { useMenuAccess } from '@/hooks/use-menu-access'
 import {
   GLOBAL_SEARCH_TYPE_LABELS,
   globalSearchResultPath,
 } from '@/lib/global-search-paths'
+import { filterGlobalSearchResults, SEARCH_ENTITY_MODULE_MAP } from '@/lib/global-search-access'
 import type { GlobalSearchEntityType, GlobalSearchResult } from '@/types/global-search'
 import { cn } from '@/lib/utils'
 
@@ -66,6 +68,7 @@ function groupResults(results: GlobalSearchResult[]) {
 
 export function GlobalSearch() {
   const navigate = useNavigate()
+  const { can } = useMenuAccess()
   const inputRef = useRef<HTMLInputElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const [query, setQuery] = useState('')
@@ -111,8 +114,11 @@ export function GlobalSearch() {
       try {
         const data = await globalSearchApi(debouncedQuery)
         if (!cancelled) {
-          setResults(data.results)
-          setActiveIndex(data.results.length > 0 ? 0 : -1)
+          const filtered = filterGlobalSearchResults(data.results, (moduleId) =>
+            can(moduleId, 'view'),
+          )
+          setResults(filtered)
+          setActiveIndex(filtered.length > 0 ? 0 : -1)
         }
       } catch {
         if (!cancelled) {
@@ -128,7 +134,7 @@ export function GlobalSearch() {
     return () => {
       cancelled = true
     }
-  }, [debouncedQuery])
+  }, [debouncedQuery, can])
 
   useEffect(() => {
     const onPointerDown = (event: MouseEvent) => {
@@ -145,6 +151,15 @@ export function GlobalSearch() {
     return () => document.removeEventListener('mousedown', onPointerDown)
   }, [])
 
+  const searchPlaceholder = useMemo(() => {
+    const labels = Object.entries(GLOBAL_SEARCH_TYPE_LABELS)
+      .filter(([type]) => can(SEARCH_ENTITY_MODULE_MAP[type as GlobalSearchEntityType], 'view'))
+      .map(([, label]) => label.toLowerCase())
+    if (labels.length === 0) return 'Buscar…'
+    if (labels.length === 1) return `Buscar ${labels[0]}…`
+    if (labels.length <= 3) return `Buscar ${labels.join(', ')}…`
+    return 'Buscar en tus módulos…'
+  }, [can])
   const groups = useMemo(() => groupResults(results), [results])
   const flatResults = useMemo(() => groups.flatMap((g) => g.items), [groups])
 
@@ -183,7 +198,7 @@ export function GlobalSearch() {
       <Input
         ref={inputRef}
         type="search"
-        placeholder="Buscar contactos, empresas, cotizaciones…"
+        placeholder={searchPlaceholder}
         value={query}
         onChange={(e) => {
           setQuery(e.target.value)

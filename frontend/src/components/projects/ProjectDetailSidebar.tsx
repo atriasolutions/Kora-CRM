@@ -119,12 +119,6 @@ export function ProjectDetailSidebar({
               value={form.client}
               onChange={(client) => patch({ client })}
             />
-            <ContactFormInput
-              id="edit-pr-progress"
-              label="Avance"
-              value={form.progress}
-              onChange={(progress) => patch({ progress })}
-            />
             <ContactFormField id="edit-pr-desc" label="Descripción">
               <textarea
                 id="edit-pr-desc"

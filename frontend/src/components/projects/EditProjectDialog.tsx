@@ -87,7 +87,6 @@ export function EditProjectDialog({
             onChange={patch}
             idPrefix="edit-pr"
             disabled={saving}
-            progressLabel="Avance"
           />
 
           <DialogFooter className="gap-2 border-t border-border pt-4 sm:gap-0">

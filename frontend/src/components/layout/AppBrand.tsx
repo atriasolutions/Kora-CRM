@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { AppLogoImage } from '@/components/layout/AppLogoImage'
 import { KoraLogoMark } from '@/components/layout/KoraLogoMark'
 import { APP_NAME } from '@/config/brand'
+import { APP_HOME_PATH } from '@/lib/app-routes'
 import { useOrganizationSettings } from '@/hooks/use-organization-settings'
 import { cn } from '@/lib/utils'
 
@@ -22,7 +23,7 @@ export function AppBrand({ className, variant = 'sidebar' }: AppBrandProps) {
   if (!hasCustomLogo) {
     return (
       <Link
-        to="/"
+        to={APP_HOME_PATH}
         className={cn(
           'block min-w-0 rounded-lg outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring',
           className,
@@ -41,7 +42,7 @@ export function AppBrand({ className, variant = 'sidebar' }: AppBrandProps) {
   if (!isCompact) {
     return (
       <Link
-        to="/"
+        to={APP_HOME_PATH}
         className={cn(
           'flex min-w-0 flex-col items-center gap-1 rounded-lg py-0.5 outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring',
           className,
@@ -61,7 +62,7 @@ export function AppBrand({ className, variant = 'sidebar' }: AppBrandProps) {
 
   return (
     <Link
-      to="/"
+      to={APP_HOME_PATH}
       className={cn(
         'flex min-w-0 items-center gap-2 rounded-lg outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring',
         className,
