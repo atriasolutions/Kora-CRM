@@ -7,6 +7,7 @@ import type { Notification } from '../types/notification.js'
 type WsClient = {
   readyState: number
   send: (data: string) => void
+  ping: () => void
   close: (code?: number, reason?: string) => void
   on: (event: 'close', listener: () => void) => void
 }
@@ -41,6 +42,9 @@ export function attachNotificationsWS(httpServer: import('node:http').Server) {
   })
 
   wss.on('connection', async (ws: WsClient, req: IncomingMessage) => {
+    let userId: string | null = null
+    let pingTimer: ReturnType<typeof setInterval> | null = null
+
     try {
       const token = parseTokenFromRequest(req)
       if (!token) {
@@ -52,10 +56,25 @@ export function attachNotificationsWS(httpServer: import('node:http').Server) {
         ws.close(4401, 'Invalid session')
         return
       }
-      const userId = session.user.id
+      userId = session.user.id
       addClient(userId, ws)
-      ws.on('close', () => removeClient(userId, ws))
+
+      pingTimer = setInterval(() => {
+        if (ws.readyState === 1) {
+          try {
+            ws.ping()
+          } catch {
+            // ignore
+          }
+        }
+      }, 25_000)
+
+      ws.on('close', () => {
+        if (pingTimer) clearInterval(pingTimer)
+        if (userId) removeClient(userId, ws)
+      })
     } catch {
+      if (pingTimer) clearInterval(pingTimer)
       ws.close()
     }
   })
@@ -67,7 +86,10 @@ export function broadcastNotification(userId: string, notification: Notification
 
 export function broadcastToUser(userId: string, message: Record<string, unknown>) {
   const set = clientsByUserId.get(userId)
-  if (!set) return
+  if (!set || set.size === 0) {
+    console.warn(`[ws] sin clientes conectados para userId=${userId}`)
+    return
+  }
   const payload = JSON.stringify(message)
   for (const ws of set) {
     try {
@@ -76,5 +98,12 @@ export function broadcastToUser(userId: string, message: Record<string, unknown>
       // ignore
     }
   }
+}
+
+export function countConnectedClients(userId?: string): number {
+  if (userId) return clientsByUserId.get(userId)?.size ?? 0
+  let total = 0
+  for (const set of clientsByUserId.values()) total += set.size
+  return total
 }
 

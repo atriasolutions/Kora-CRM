@@ -1,4 +1,6 @@
-import { pool } from '../db/pool.js'
+import { tenantQuery } from '../db/tenant-query.js'
+import { pushTenantCondition, tenantWhereParam } from '../lib/tenant-sql.js'
+import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import {
   mapActivityDetail,
   mapActivityRow,
@@ -62,22 +64,23 @@ async function resolveRelatedSnapshot(
 
   const queries: Record<string, string> = {
     contacto: `SELECT name, company_name FROM crm_contacts WHERE id = $1`,
-    empresa: `SELECT name FROM crm_companies WHERE id = $1 AND deleted_at IS NULL`,
+    empresa: `SELECT name FROM crm_companies WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
     oportunidad: `SELECT name, company_name FROM crm_opportunities WHERE id = $1`,
-    cotizacion: `SELECT code AS name, company_name FROM crm_quotes WHERE id = $1 AND deleted_at IS NULL`,
-    compra: `SELECT reference AS name, supplier_name AS company_name FROM crm_purchases WHERE id = $1 AND deleted_at IS NULL`,
-    factura: `SELECT number AS name, client_name AS company_name FROM crm_invoices WHERE id = $1 AND deleted_at IS NULL`,
-    proyecto: `SELECT name, client_name AS company_name FROM crm_projects WHERE id = $1 AND deleted_at IS NULL`,
-    ingreso: `SELECT number AS name, supplier_name AS company_name FROM crm_stock_receipts WHERE id = $1 AND deleted_at IS NULL`,
-    producto: `SELECT name, '' AS company_name FROM crm_products WHERE id = $1 AND deleted_at IS NULL`,
-    inventario: `SELECT sku AS name, warehouse_name AS company_name FROM crm_inventory_positions WHERE id = $1 AND deleted_at IS NULL`,
+    cotizacion: `SELECT code AS name, company_name FROM crm_quotes WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
+    compra: `SELECT reference AS name, supplier_name AS company_name FROM crm_purchases WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
+    factura: `SELECT number AS name, client_name AS company_name FROM crm_invoices WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
+    proyecto: `SELECT name, client_name AS company_name FROM crm_projects WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
+    ingreso: `SELECT number AS name, supplier_name AS company_name FROM crm_stock_receipts WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
+    producto: `SELECT name, '' AS company_name FROM crm_products WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
+    inventario: `SELECT sku AS name, warehouse_name AS company_name FROM crm_inventory_positions WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
   }
 
   const sql = queries[relatedType]
   if (!sql) throw badRequest('Tipo de registro relacionado no válido')
 
-  const result = await pool.query<{ name: string; company_name?: string }>(sql, [
+  const result = await tenantQuery<{ name: string; company_name?: string }>(sql, [
     relatedId,
+    getTenantIdOrDefault(),
   ])
   const row = result.rows[0]
   if (!row) throw badRequest('Registro relacionado no encontrado')
@@ -104,6 +107,7 @@ export async function listActivities(
   } else {
     conditions.push('deleted_at IS NULL')
   }
+  idx = pushTenantCondition(conditions, values, idx)
   if (params.status) {
     conditions.push(`status = $${idx++}`)
     values.push(params.status)
@@ -129,7 +133,7 @@ export async function listActivities(
   }
 
   const where = `WHERE ${conditions.join(' AND ')}`
-  const countResult = await pool.query<{ count: string }>(
+  const countResult = await tenantQuery<{ count: string }>(
     `SELECT count(*)::text AS count FROM crm_activities ${where}`,
     values,
   )
@@ -137,7 +141,7 @@ export async function listActivities(
   const offset = paginationOffset(params.page, params.pageSize)
   values.push(params.pageSize, offset)
 
-  const result = await pool.query<ActivityRow>(
+  const result = await tenantQuery<ActivityRow>(
     `SELECT ${ACTIVITY_COLUMNS}
      FROM crm_activities
      ${where}
@@ -150,11 +154,11 @@ export async function listActivities(
 }
 
 export async function getActivityById(id: string): Promise<ActivityDetail> {
-  const result = await pool.query<ActivityRow>(
+  const result = await tenantQuery<ActivityRow>(
     `SELECT ${ACTIVITY_COLUMNS}
      FROM crm_activities
-     WHERE id = $1 AND deleted_at IS NULL`,
-    [id],
+     WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
+    [id, getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   if (!row) throw notFound('Actividad no encontrada')
@@ -177,15 +181,15 @@ export async function createActivity(
 
   const scheduled = scheduledFromInput(input) ?? new Date()
   const reminder = parseDatetimeInput(input.reminderAt)
-  const result = await pool.query<ActivityRow>(
+  const result = await tenantQuery<ActivityRow>(
     `INSERT INTO crm_activities (
       title, activity_type, type_label, related_type, related_id, related_name,
       company_name, due_at, assignee_name, status, priority, scheduled_at, reminder_at,
-      created_by_id, created_by_name, updated_by_id, updated_by_name
+      created_by_id, created_by_name, updated_by_id, updated_by_name, tenant_id
     ) VALUES (
       $1, $2, $3, $4, $5, $6,
       $7, $8, $9, $10, $11, $12, $13,
-      $14, $15, $14, $15
+      $14, $15, $14, $15, $16
     )
     RETURNING ${ACTIVITY_COLUMNS}`,
     [
@@ -204,6 +208,7 @@ export async function createActivity(
       reminder,
       actor.userId,
       actor.userName,
+      getTenantIdOrDefault(),
     ],
   )
   const row = result.rows[0]
@@ -269,7 +274,7 @@ export async function updateActivity(
   const reminder =
     input.reminderAt !== undefined ? parseDatetimeInput(input.reminderAt) : undefined
 
-  const result = await pool.query<ActivityRow>(
+  const result = await tenantQuery<ActivityRow>(
     `UPDATE crm_activities SET
       title = COALESCE($2, title),
       activity_type = COALESCE($3, activity_type),
@@ -287,7 +292,7 @@ export async function updateActivity(
       updated_by_id = $15,
       updated_by_name = $16,
       updated_at = now()
-    WHERE id = $1 AND deleted_at IS NULL
+    WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(17)}
     RETURNING ${ACTIVITY_COLUMNS}`,
     [
       id,
@@ -306,17 +311,18 @@ export async function updateActivity(
       reminder !== undefined ? reminder : null,
       actor.userId,
       actor.userName,
+      getTenantIdOrDefault(),
     ],
   )
   const row = result.rows[0]
   if (!row) throw notFound('Actividad no encontrada')
 
   if (reminder !== undefined) {
-    await pool.query(
+    await tenantQuery(
       `ALTER TABLE crm_activities
        ADD COLUMN IF NOT EXISTS reminder_notified_at TIMESTAMPTZ`,
     )
-    await pool.query(
+    await tenantQuery(
       `UPDATE crm_activities SET reminder_notified_at = NULL WHERE id = $1`,
       [id],
     )
@@ -350,12 +356,12 @@ export async function archiveActivity(
   id: string,
   actor: AuditActor,
 ): Promise<ActivityListItem> {
-  const result = await pool.query<ActivityRow>(
+  const result = await tenantQuery<ActivityRow>(
     `UPDATE crm_activities
      SET deleted_at = now(), updated_by_id = $2, updated_by_name = $3, updated_at = now()
-     WHERE id = $1 AND deleted_at IS NULL
+     WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(4)}
      RETURNING ${ACTIVITY_COLUMNS}`,
-    [id, actor.userId, actor.userName],
+    [id, actor.userId, actor.userName, getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   if (!row) throw notFound('Actividad no encontrada o ya archivada')
@@ -366,7 +372,7 @@ export async function restoreActivity(
   id: string,
   actor: AuditActor,
 ): Promise<ActivityListItem> {
-  const result = await pool.query<ActivityRow>(
+  const result = await tenantQuery<ActivityRow>(
     `UPDATE crm_activities
      SET deleted_at = NULL, updated_by_id = $2, updated_by_name = $3, updated_at = now()
      WHERE id = $1
@@ -380,7 +386,7 @@ export async function restoreActivity(
 
 export async function permanentlyDeleteActivity(id: string): Promise<void> {
   await purgeEntityNotesAndFiles('actividad', id)
-  const result = await pool.query(
+  const result = await tenantQuery(
     `DELETE FROM crm_activities WHERE id = $1 AND deleted_at IS NOT NULL`,
     [id],
   )
@@ -395,7 +401,7 @@ export async function listActivitiesForRelated(
   relatedId: string,
   limit = 50,
 ): Promise<ActivityListItem[]> {
-  const result = await pool.query<ActivityRow>(
+  const result = await tenantQuery<ActivityRow>(
     `SELECT ${ACTIVITY_COLUMNS}
      FROM crm_activities
      WHERE deleted_at IS NULL AND related_type = $1 AND related_id = $2

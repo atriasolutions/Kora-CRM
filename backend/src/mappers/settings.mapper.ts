@@ -19,6 +19,8 @@ export type OrganizationSettingsRow = {
   email: string | null
   logo_url: string | null
   default_vat_percent: string | number | null
+  invoicing_mode: string | null
+  economic_activity_code: number | null
 }
 
 export type WarehouseRow = {
@@ -56,6 +58,9 @@ export function mapOrganizationSettings(
     email: row.email ?? '',
     logoUrl: row.logo_url ?? '',
     defaultVatPercent: Number(row.default_vat_percent ?? 19),
+    invoicingMode: row.invoicing_mode === 'sii' ? 'sii' : 'manual',
+    economicActivityCode:
+      row.economic_activity_code != null ? Number(row.economic_activity_code) : null,
   }
 }
 

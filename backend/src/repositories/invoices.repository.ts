@@ -12,6 +12,9 @@ import { getExchangeRatesForDocumentDate } from '../services/exchange-rates.serv
 import { withStockTransaction } from '../lib/inventory-stock-lock.js'
 import { resolveCustomerSnapshots } from '../lib/relation-snapshots.js'
 import { pool } from '../db/pool.js'
+import { setTenantLocal, tenantQuery } from '../db/tenant-query.js'
+import { pushTenantCondition, tenantWhereParam } from '../lib/tenant-sql.js'
+import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import {
   mapInvoiceDetail,
   mapInvoiceRow,
@@ -21,6 +24,7 @@ import {
 } from '../mappers/invoice.mapper.js'
 import { maybeNotifyRecordOwnerChange } from '../lib/owner-assignment.js'
 import { badRequest, notFound } from '../middleware/errors.js'
+import * as orgSettingsRepo from './organization-settings.repository.js'
 import type { AuditActor } from '../types/audit.js'
 import type {
   CreateInvoiceInput,
@@ -44,6 +48,7 @@ const INVOICE_COLUMNS = `
   id, number, client_name, customer_kind, contact_id, contact_name,
   company_id, company_name, quote_id, quote_code, amount_cents,
   issue_date, due_date, status, owner_name, payment_method, sii_number,
+  dte_type, sii_track_id, dte_status, dte_xml, sii_emitted_at,
   exchange_rate_uf, exchange_rate_usd, exchange_rate_eur, exchange_rate_date,
   created_at, created_by_id, created_by_name,
   updated_at, updated_by_id, updated_by_name
@@ -70,7 +75,7 @@ export type ListInvoicesParams = {
 }
 
 async function loadInvoiceLineItems(invoiceId: string): Promise<InvoiceLineRow[]> {
-  const result = await pool.query<InvoiceLineRow>(
+  const result = await tenantQuery<InvoiceLineRow>(
     `SELECT ${LINE_COLUMNS}
      FROM crm_invoice_line_items
      WHERE invoice_id = $1
@@ -81,7 +86,7 @@ async function loadInvoiceLineItems(invoiceId: string): Promise<InvoiceLineRow[]
 }
 
 async function loadInvoicePayments(invoiceId: string): Promise<InvoicePaymentRow[]> {
-  const result = await pool.query<InvoicePaymentRow>(
+  const result = await tenantQuery<InvoicePaymentRow>(
     `SELECT ${PAYMENT_COLUMNS}
      FROM crm_invoice_payments
      WHERE invoice_id = $1
@@ -94,12 +99,13 @@ async function loadInvoicePayments(invoiceId: string): Promise<InvoicePaymentRow
 async function nextInvoiceNumber(): Promise<string> {
   const year = new Date().getFullYear()
   const prefix = `FAC-${year}-`
-  const result = await pool.query<{ number: string }>(
+  const tenantId = getTenantIdOrDefault()
+  const result = await tenantQuery<{ number: string }>(
     `SELECT number FROM crm_invoices
-     WHERE number LIKE $1
+     WHERE number LIKE $1 AND ${tenantWhereParam(2)}
      ORDER BY number DESC
      LIMIT 1`,
-    [`${prefix}%`],
+    [`${prefix}%`, tenantId],
   )
   const last = result.rows[0]?.number
   let seq = 1
@@ -115,9 +121,9 @@ async function resolveQuoteSnapshot(
   quoteId?: string | null,
 ): Promise<{ quoteId: string | null; quoteCode: string }> {
   if (!quoteId?.trim()) return { quoteId: null, quoteCode: '' }
-  const result = await pool.query<{ id: string; code: string }>(
-    `SELECT id, code FROM crm_quotes WHERE id = $1 AND deleted_at IS NULL`,
-    [quoteId],
+  const result = await tenantQuery<{ id: string; code: string }>(
+    `SELECT id, code FROM crm_quotes WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
+    [quoteId, getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   if (!row) throw badRequest('Cotización no encontrada')
@@ -216,7 +222,7 @@ async function loadCustomerFromQuote(quoteId: string): Promise<{
   contactName: string
   customerKind: string
 }> {
-  const result = await pool.query<{
+  const result = await tenantQuery<{
     company_id: string | null
     company_name: string
     contact_id: string | null
@@ -224,8 +230,8 @@ async function loadCustomerFromQuote(quoteId: string): Promise<{
     customer_kind: string | null
   }>(
     `SELECT company_id, company_name, contact_id, contact_name, customer_kind
-     FROM crm_quotes WHERE id = $1 AND deleted_at IS NULL`,
-    [quoteId],
+     FROM crm_quotes WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
+    [quoteId, getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   if (!row) throw badRequest('Cotización no encontrada')
@@ -250,6 +256,7 @@ export async function listInvoices(
   } else {
     conditions.push('archived_at IS NULL')
   }
+  idx = pushTenantCondition(conditions, values, idx)
   if (params.status) {
     conditions.push(`status = $${idx++}`)
     values.push(params.status)
@@ -277,7 +284,7 @@ export async function listInvoices(
   }
 
   const where = `WHERE ${conditions.join(' AND ')}`
-  const countResult = await pool.query<{ count: string }>(
+  const countResult = await tenantQuery<{ count: string }>(
     `SELECT count(*)::text AS count FROM crm_invoices ${where}`,
     values,
   )
@@ -285,7 +292,7 @@ export async function listInvoices(
   const offset = paginationOffset(params.page, params.pageSize)
   values.push(params.pageSize, offset)
 
-  const result = await pool.query<InvoiceRow>(
+  const result = await tenantQuery<InvoiceRow>(
     `SELECT ${INVOICE_COLUMNS}
      FROM crm_invoices
      ${where}
@@ -298,11 +305,11 @@ export async function listInvoices(
 }
 
 async function loadInvoiceHeaderRow(id: string): Promise<InvoiceRow> {
-  const result = await pool.query<InvoiceRow>(
+  const result = await tenantQuery<InvoiceRow>(
     `SELECT ${INVOICE_COLUMNS}
      FROM crm_invoices
-     WHERE id = $1 AND deleted_at IS NULL`,
-    [id],
+     WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
+    [id, getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   if (!row) throw notFound('Factura no encontrada')
@@ -371,13 +378,13 @@ export async function createInvoice(
         company_id, company_name, quote_id, quote_code, amount_cents,
         issue_date, due_date, status, owner_name, payment_method, sii_number,
         exchange_rate_uf, exchange_rate_usd, exchange_rate_eur, exchange_rate_date,
-        created_by_id, created_by_name, updated_by_id, updated_by_name
+        created_by_id, created_by_name, updated_by_id, updated_by_name, tenant_id
       ) VALUES (
         $1, $2, $3, $4, $5,
         $6, $7, $8, $9, $10,
         $11, $12, $13, $14, $15, $16,
         $17, $18, $19, $20,
-        $21, $22, $21, $22
+        $21, $22, $21, $22, $23
       )
       RETURNING ${INVOICE_COLUMNS}`,
       [
@@ -403,6 +410,7 @@ export async function createInvoice(
         exchangeRates.exchangeRateDate,
         actor.userId,
         actor.userName,
+        getTenantIdOrDefault(),
       ],
     )
     const row = result.rows[0]!
@@ -437,11 +445,24 @@ export async function updateInvoice(
   id: string,
   input: UpdateInvoiceInput,
   actor: AuditActor,
+  options?: { allowManualSiiNumber?: boolean },
 ): Promise<InvoiceDetail> {
   const existingRow = await loadInvoiceHeaderRow(id)
   const existing = mapInvoiceRow(existingRow)
   const previousStatus = existing.status
   const previousOwner = existing.owner ?? ''
+
+  if (
+    input.siiNumber !== undefined &&
+    !options?.allowManualSiiNumber
+  ) {
+    const org = await orgSettingsRepo.getOrganizationSettings()
+    if (org.invoicingMode === 'sii') {
+      throw badRequest(
+        'En modo SII integrado el folio se asigna al emitir al SII. Usa «Emitir al SII».',
+      )
+    }
+  }
 
   let quoteId = existingRow.quote_id ?? null
   let quoteCode = existingRow.quote_code ?? ''
@@ -530,7 +551,7 @@ export async function updateInvoice(
         updated_by_id = $21,
         updated_by_name = $22,
         updated_at = now()
-      WHERE id = $1 AND deleted_at IS NULL
+      WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(23)}
       RETURNING ${INVOICE_COLUMNS}`,
       [
         id,
@@ -555,6 +576,7 @@ export async function updateInvoice(
         exchangeRates?.exchangeRateDate ?? null,
         actor.userId,
         actor.userName,
+        getTenantIdOrDefault(),
       ],
     )
     const row = result.rows[0]
@@ -618,12 +640,12 @@ export async function archiveInvoice(
   id: string,
   actor: AuditActor,
 ): Promise<InvoiceListItem> {
-  const result = await pool.query<InvoiceRow>(
+  const result = await tenantQuery<InvoiceRow>(
     `UPDATE crm_invoices
      SET archived_at = now(), updated_by_id = $2, updated_by_name = $3, updated_at = now()
-     WHERE id = $1 AND deleted_at IS NULL AND archived_at IS NULL
+     WHERE id = $1 AND deleted_at IS NULL AND archived_at IS NULL AND ${tenantWhereParam(4)}
      RETURNING ${INVOICE_COLUMNS}`,
-    [id, actor.userId, actor.userName],
+    [id, actor.userId, actor.userName, getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   if (!row) throw notFound('Factura no encontrada o ya archivada')
@@ -634,12 +656,12 @@ export async function restoreInvoice(
   id: string,
   actor: AuditActor,
 ): Promise<InvoiceListItem> {
-  const result = await pool.query<InvoiceRow>(
+  const result = await tenantQuery<InvoiceRow>(
     `UPDATE crm_invoices
      SET archived_at = NULL, updated_by_id = $2, updated_by_name = $3, updated_at = now()
-     WHERE id = $1 AND deleted_at IS NULL
+     WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(4)}
      RETURNING ${INVOICE_COLUMNS}`,
-    [id, actor.userId, actor.userName],
+    [id, actor.userId, actor.userName, getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   if (!row) throw notFound('Factura no encontrada')
@@ -654,6 +676,7 @@ export async function permanentlyDeleteInvoice(
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    await setTenantLocal(client)
 
     const inv = await client.query<{ number: string }>(
       `SELECT number

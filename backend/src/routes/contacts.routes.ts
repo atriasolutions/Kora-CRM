@@ -9,6 +9,7 @@ import {
   listContactsQuerySchema,
   updateContactSchema,
 } from '../validators/contact.validator.js'
+import { sendStoredEntityImage } from '../utils/serve-entity-image.js'
 
 export const contactsRouter = Router()
 
@@ -35,6 +36,19 @@ contactsRouter.get(
           totalPages: Math.ceil(result.total / query.pageSize) || 1,
         },
       })
+    } catch (e) {
+      next(e)
+    }
+  },
+)
+
+contactsRouter.get(
+  '/:id/avatar',
+  requirePermission('contactos', 'view'),
+  async (req, res, next) => {
+    try {
+      const stored = await contactsRepo.getContactAvatarStored(routeParam(req))
+      sendStoredEntityImage(res, stored)
     } catch (e) {
       next(e)
     }

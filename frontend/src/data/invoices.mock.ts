@@ -30,6 +30,10 @@ export type InvoiceListItem = {
   paymentMethod: InvoicePaymentMethod
   /** Folio del DTE en el SII (obligatorio al emitir). */
   siiNumber?: string
+  /** Estado del DTE en integración SII. */
+  dteStatus?: string
+  /** Track ID devuelto por el SII al enviar el DTE. */
+  siiTrackId?: string
 } & RecordAuditFields
 
 export const INVOICE_LIST_TOTAL_DEMO = 312

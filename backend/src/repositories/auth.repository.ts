@@ -1,10 +1,15 @@
 import { randomUUID } from 'node:crypto'
 
-import { pool } from '../db/pool.js'
+import { platformQuery } from '../db/tenant-query.js'
+import { runWithTenantAsync } from '../lib/tenant-context.js'
 import { mapUserDetail, type UserRow } from '../mappers/user.mapper.js'
 import { badRequest, notFound } from '../middleware/errors.js'
 import { getAccessProfileById } from './access-profiles.repository.js'
 import * as twoFactorRepo from './two-factor.repository.js'
+import {
+  assertUserMembership,
+  getDefaultTenantIdForUser,
+} from './tenants.repository.js'
 import { listRecentUserSessions, recordUserSession } from './user-sessions.repository.js'
 import type { AccessProfile } from '../types/access-profile.js'
 import type { UserDetail } from '../types/user.js'
@@ -21,6 +26,7 @@ export type AuthLoginResult = {
   token: string
   user: UserDetail
   profile: AccessProfile
+  tenantId: string
 }
 
 export type AuthLoginStepUser = {
@@ -33,12 +39,14 @@ export type AuthLoginRequiresTwoFactor = {
   kind: 'verify'
   challengeId: string
   user: AuthLoginStepUser
+  tenantId: string
 }
 
 export type AuthLoginRequiresEnrollment = {
   kind: 'enroll'
   enrollmentToken: string
   user: AuthLoginStepUser
+  tenantId: string
 }
 
 export type AuthLoginStepResult =
@@ -59,7 +67,7 @@ async function findUserRowByCredentials(
   if (!normalized) throw badRequest('Indica tu correo electrónico')
   if (!password) throw badRequest('Indica tu contraseña')
 
-  const result = await pool.query<UserRow>(
+  const result = await platformQuery<UserRow>(
     `SELECT ${USER_COLUMNS}
      FROM crm_users
      WHERE lower(email) = $1
@@ -81,55 +89,73 @@ async function findUserRowByCredentials(
   return row
 }
 
+async function resolveTenantForLogin(
+  userId: string,
+  tenantId?: string,
+): Promise<{ tenantId: string; profileId: string }> {
+  const resolvedTenantId = tenantId?.trim() || (await getDefaultTenantIdForUser(userId))
+  const membership = await assertUserMembership(userId, resolvedTenantId)
+  return { tenantId: resolvedTenantId, profileId: membership.profileId }
+}
+
 export async function createAuthSessionForUser(
   userId: string,
+  tenantId: string,
   client?: LoginClientInfo,
 ): Promise<AuthLoginResult> {
-  const result = await pool.query<UserRow>(
-    `SELECT ${USER_COLUMNS} FROM crm_users WHERE id = $1 AND deleted_at IS NULL`,
-    [userId],
-  )
-  const row = result.rows[0]
-  if (!row || row.status !== 'Activo') {
-    throw badRequest('Tu cuenta no está activa.')
-  }
+  return runWithTenantAsync({ tenantId }, async () => {
+    const { profileId } = await assertUserMembership(userId, tenantId)
 
-  const token = randomUUID()
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    const result = await platformQuery<UserRow>(
+      `SELECT ${USER_COLUMNS} FROM crm_users WHERE id = $1 AND deleted_at IS NULL`,
+      [userId],
+    )
+    const row = result.rows[0]
+    if (!row || row.status !== 'Activo') {
+      throw badRequest('Tu cuenta no está activa.')
+    }
 
-  await pool.query(
-    `INSERT INTO crm_user_auth_sessions (user_id, token_hash, expires_at, user_agent, ip_address)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [
-      row.id,
-      token,
-      expiresAt,
-      client?.userAgent?.trim() || null,
-      toInetOrNull(client?.ipAddress),
-    ],
-  )
+    const token = randomUUID()
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
 
-  await pool.query(`UPDATE crm_users SET last_login_at = now() WHERE id = $1`, [row.id])
+    await platformQuery(
+      `INSERT INTO crm_user_auth_sessions (user_id, token_hash, expires_at, user_agent, ip_address, tenant_id)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        row.id,
+        token,
+        expiresAt,
+        client?.userAgent?.trim() || null,
+        toInetOrNull(client?.ipAddress),
+        tenantId,
+      ],
+    )
 
-  await recordUserSession({
-    userId: row.id,
-    userAgent: client?.userAgent,
-    ipAddress: client?.ipAddress,
+    await platformQuery(`UPDATE crm_users SET last_login_at = now() WHERE id = $1`, [row.id])
+
+    await recordUserSession({
+      userId: row.id,
+      userAgent: client?.userAgent,
+      ipAddress: client?.ipAddress,
+    })
+
+    const user = mapUserDetail({ ...row, last_login_at: new Date(), profile_id: profileId })
+    user.profileId = profileId
+    user.recentSessions = await listRecentUserSessions(row.id)
+    const profile = await getAccessProfileById(profileId)
+
+    return { token, user, profile, tenantId }
   })
-
-  const user = mapUserDetail({ ...row, last_login_at: new Date() })
-  user.recentSessions = await listRecentUserSessions(row.id)
-  const profile = await getAccessProfileById(row.profile_id)
-
-  return { token, user, profile }
 }
 
 export async function loginWithEmailPassword(
   email: string,
   password: string,
+  tenantId?: string,
   client?: LoginClientInfo,
 ): Promise<AuthLoginStepResult> {
   const row = await findUserRowByCredentials(email, password)
+  const resolved = await resolveTenantForLogin(row.id, tenantId)
   const stepUser: AuthLoginStepUser = {
     id: row.id,
     email: row.email,
@@ -141,24 +167,30 @@ export async function loginWithEmailPassword(
 
   if (totpRow.two_factor_enabled && configured) {
     const challengeId = await twoFactorRepo.createLoginChallenge(row.id)
-    return { kind: 'verify', challengeId, user: stepUser }
+    return { kind: 'verify', challengeId, user: stepUser, tenantId: resolved.tenantId }
   }
 
   if (totpRow.two_factor_enabled && !configured) {
     const enrollmentToken = await twoFactorRepo.createEnrollmentSession(row.id)
-    return { kind: 'enroll', enrollmentToken, user: stepUser }
+    return {
+      kind: 'enroll',
+      enrollmentToken,
+      user: stepUser,
+      tenantId: resolved.tenantId,
+    }
   }
 
-  const result = await createAuthSessionForUser(row.id, client)
+  const result = await createAuthSessionForUser(row.id, resolved.tenantId, client)
   return { kind: 'complete', result }
 }
 
 export async function loginWithEmailPasswordLegacy(
   email: string,
   password: string,
+  tenantId?: string,
   client?: LoginClientInfo,
 ): Promise<AuthLoginResult> {
-  const step = await loginWithEmailPassword(email, password, client)
+  const step = await loginWithEmailPassword(email, password, tenantId, client)
   if (step.kind !== 'complete') {
     throw badRequest('Se requiere verificación en dos pasos.')
   }
@@ -168,12 +200,13 @@ export async function loginWithEmailPasswordLegacy(
 export async function resolveSessionUser(token: string): Promise<{
   user: UserDetail
   profile: AccessProfile
+  tenantId: string
 } | null> {
   const trimmed = token.trim()
   if (!trimmed) return null
 
-  const session = await pool.query<{ user_id: string }>(
-    `SELECT user_id FROM crm_user_auth_sessions
+  const session = await platformQuery<{ user_id: string; tenant_id: string | null }>(
+    `SELECT user_id, tenant_id FROM crm_user_auth_sessions
      WHERE token_hash = $1 AND expires_at > now()
      LIMIT 1`,
     [trimmed],
@@ -181,35 +214,72 @@ export async function resolveSessionUser(token: string): Promise<{
   const userId = session.rows[0]?.user_id
   if (!userId) return null
 
-  const result = await pool.query<UserRow>(
-    `SELECT ${USER_COLUMNS} FROM crm_users WHERE id = $1 AND deleted_at IS NULL`,
-    [userId],
-  )
-  const row = result.rows[0]
-  if (!row || row.status !== 'Activo') return null
+  let tenantId = session.rows[0]?.tenant_id?.trim() ?? ''
+  if (!tenantId) {
+    try {
+      tenantId = await getDefaultTenantIdForUser(userId)
+      await platformQuery(
+        `UPDATE crm_user_auth_sessions SET tenant_id = $2 WHERE token_hash = $1`,
+        [trimmed, tenantId],
+      )
+    } catch {
+      return null
+    }
+  }
 
-  const user = mapUserDetail(row)
-  const profile = await getAccessProfileById(row.profile_id)
-  return { user, profile }
+  const { profileId } = await assertUserMembership(userId, tenantId)
+
+  return runWithTenantAsync({ tenantId }, async () => {
+    const result = await platformQuery<UserRow>(
+      `SELECT ${USER_COLUMNS} FROM crm_users WHERE id = $1 AND deleted_at IS NULL`,
+      [userId],
+    )
+    const row = result.rows[0]
+    if (!row || row.status !== 'Activo') return null
+
+    const user = mapUserDetail(row)
+    user.profileId = profileId
+    const profile = await getAccessProfileById(profileId)
+    return { user, profile, tenantId }
+  })
 }
 
 export async function logoutSession(token: string): Promise<void> {
-  await pool.query(`DELETE FROM crm_user_auth_sessions WHERE token_hash = $1`, [
+  await platformQuery(`DELETE FROM crm_user_auth_sessions WHERE token_hash = $1`, [
     token.trim(),
   ])
 }
 
-export async function getUserByIdForAuth(id: string): Promise<{
+export async function switchTenantSession(
+  userId: string,
+  tenantId: string,
+  currentToken: string,
+  client?: LoginClientInfo,
+): Promise<AuthLoginResult> {
+  await assertUserMembership(userId, tenantId)
+  await logoutSession(currentToken)
+  return createAuthSessionForUser(userId, tenantId, client)
+}
+
+export async function getUserByIdForAuth(
+  id: string,
+  tenantId: string,
+): Promise<{
   user: UserDetail
   profile: AccessProfile
+  tenantId: string
 }> {
-  const result = await pool.query<UserRow>(
-    `SELECT ${USER_COLUMNS} FROM crm_users WHERE id = $1 AND deleted_at IS NULL`,
-    [id],
-  )
-  const row = result.rows[0]
-  if (!row) throw notFound('Usuario no encontrado')
-  const user = mapUserDetail(row)
-  const profile = await getAccessProfileById(row.profile_id)
-  return { user, profile }
+  return runWithTenantAsync({ tenantId }, async () => {
+    const { profileId } = await assertUserMembership(id, tenantId)
+    const result = await platformQuery<UserRow>(
+      `SELECT ${USER_COLUMNS} FROM crm_users WHERE id = $1 AND deleted_at IS NULL`,
+      [id],
+    )
+    const row = result.rows[0]
+    if (!row) throw notFound('Usuario no encontrado')
+    const user = mapUserDetail(row)
+    user.profileId = profileId
+    const profile = await getAccessProfileById(profileId)
+    return { user, profile, tenantId }
+  })
 }

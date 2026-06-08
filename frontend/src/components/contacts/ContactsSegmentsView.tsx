@@ -4,7 +4,8 @@ import { useNavigate } from 'react-router-dom'
 
 import { LargeDatasetBanner } from '@/components/list/LargeDatasetBanner'
 import { SegmentsListPagination } from '@/components/list/SegmentsListPagination'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { EntityAvatarImage } from '@/components/shared/EntityAvatarImage'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import type { ContactLifecycleStatus, ContactListItem } from '@/data/contacts.mock'
@@ -221,7 +222,7 @@ function SegmentContactRow({
       >
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <Avatar className="size-10 border border-border">
-            <AvatarImage src={contact.avatarUrl} alt={contact.name} />
+            <EntityAvatarImage src={contact.avatarUrl} alt={contact.name} />
             <AvatarFallback>{initials(contact.name)}</AvatarFallback>
           </Avatar>
           <div className="min-w-0 flex-1">

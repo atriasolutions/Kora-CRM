@@ -1,9 +1,18 @@
 import { APP_HOME_PATH } from '@/lib/app-routes'
+import { centralLoginUrl, isCentralAppHost } from '@/lib/tenant-host'
 
 export const LOGIN_PATH = '/login'
 
 export function getLoginPath(): string {
   return LOGIN_PATH
+}
+
+/** URL de login: central (koracrm.cl) desde subdominios de tenant; relativa en host central. */
+export function resolveLoginRedirectUrl(): string {
+  if (typeof window === 'undefined') return centralLoginUrl()
+  return isCentralAppHost()
+    ? `${window.location.origin}${LOGIN_PATH}`
+    : centralLoginUrl()
 }
 
 export function getPostLoginRedirect(

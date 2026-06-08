@@ -1,5 +1,5 @@
 import type { ContactDetail, ContactListItem } from '../types/contact.js'
-import { imageUrlForList } from '../utils/entity-image.js'
+import { entityImageUrlForList } from '../utils/entity-image.js'
 import { formatActivityLabel, toIsoString } from '../utils/format.js'
 
 export type ContactRow = {
@@ -43,7 +43,7 @@ export function mapContactRow(row: ContactRow): ContactListItem {
     id: row.id,
     name: row.name,
     subtitle: row.subtitle ?? '',
-    avatarUrl: imageUrlForList(row.avatar_url) ?? '',
+    avatarUrl: entityImageUrlForList(`/api/v1/contacts/${row.id}/avatar`, row.avatar_url),
     companyId: row.company_id ?? undefined,
     company: row.company_name,
     email: row.email ?? '',

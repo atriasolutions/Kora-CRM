@@ -11,11 +11,13 @@ import * as projectsRepo from '../repositories/projects.repository.js'
 import * as purchasesRepo from '../repositories/purchases.repository.js'
 import * as quotesRepo from '../repositories/quotes.repository.js'
 import * as stockReceiptsRepo from '../repositories/stock-receipts.repository.js'
+import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import type { AuditActor } from '../types/audit.js'
 
 const SYSTEM_ACTOR: AuditActor = {
   userId: env.demoUserId,
   userName: 'Sistema Kora',
+  tenantId: getTenantIdOrDefault(),
 }
 
 export type ArchivePurgeEntityResult = {

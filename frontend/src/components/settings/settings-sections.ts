@@ -1,5 +1,6 @@
 import {
   Building2,
+  FileDigit,
   Layers,
   Receipt,
   SlidersHorizontal,
@@ -9,6 +10,7 @@ import {
 
 export type SettingsSectionId =
   | 'empresa'
+  | 'facturacion-sii'
   | 'bodegas'
   | 'categorias'
   | 'impuestos'
@@ -26,6 +28,12 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     label: 'Empresa emisora',
     description: 'Razón social, logo y datos para PDF de cotizaciones y compras.',
     Icon: Building2,
+  },
+  {
+    id: 'facturacion-sii',
+    label: 'Facturación electrónica',
+    description: 'Modo manual o integración con el SII (certificado, folios y RCV).',
+    Icon: FileDigit,
   },
   {
     id: 'bodegas',

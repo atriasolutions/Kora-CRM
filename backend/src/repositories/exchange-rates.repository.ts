@@ -1,4 +1,7 @@
 import { pool } from '../db/pool.js'
+import { tenantQuery } from '../db/tenant-query.js'
+import { tenantWhereParam } from '../lib/tenant-sql.js'
+import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import type { ExchangeRateSnapshot } from '../types/currency.js'
 
 type ExchangeRateRow = {
@@ -29,22 +32,24 @@ function mapRow(row: ExchangeRateRow): ExchangeRateSnapshot {
 export async function getExchangeRatesForDate(
   rateDate: string,
 ): Promise<ExchangeRateSnapshot | null> {
-  const result = await pool.query<ExchangeRateRow>(
+  const result = await tenantQuery<ExchangeRateRow>(
     `SELECT rate_date, uf_clp, usd_clp, eur_clp, source, fetched_at
      FROM crm_exchange_rates
-     WHERE rate_date = $1::date`,
-    [rateDate],
+     WHERE rate_date = $1::date AND ${tenantWhereParam(2)}`,
+    [rateDate, getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   return row ? mapRow(row) : null
 }
 
 export async function getLatestExchangeRates(): Promise<ExchangeRateSnapshot | null> {
-  const result = await pool.query<ExchangeRateRow>(
+  const result = await tenantQuery<ExchangeRateRow>(
     `SELECT rate_date, uf_clp, usd_clp, eur_clp, source, fetched_at
      FROM crm_exchange_rates
+     WHERE ${tenantWhereParam(1)}
      ORDER BY rate_date DESC
      LIMIT 1`,
+    [getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   return row ? mapRow(row) : null
@@ -57,9 +62,9 @@ export async function upsertExchangeRates(params: {
   eurClp: number
   source?: string
 }): Promise<ExchangeRateSnapshot> {
-  const result = await pool.query<ExchangeRateRow>(
-    `INSERT INTO crm_exchange_rates (rate_date, uf_clp, usd_clp, eur_clp, source)
-     VALUES ($1::date, $2, $3, $4, $5)
+  const result = await tenantQuery<ExchangeRateRow>(
+    `INSERT INTO crm_exchange_rates (rate_date, uf_clp, usd_clp, eur_clp, source, tenant_id)
+     VALUES ($1::date, $2, $3, $4, $5, $6)
      ON CONFLICT (rate_date) DO UPDATE SET
        uf_clp = EXCLUDED.uf_clp,
        usd_clp = EXCLUDED.usd_clp,
@@ -73,6 +78,7 @@ export async function upsertExchangeRates(params: {
       params.usdClp,
       params.eurClp,
       params.source ?? 'mindicador.cl',
+      getTenantIdOrDefault(),
     ],
   )
   return mapRow(result.rows[0]!)

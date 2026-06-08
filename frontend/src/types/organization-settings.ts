@@ -1,4 +1,6 @@
 /** Datos del emisor que aparecen en la Orden de Compra (PDF). */
+export type InvoicingMode = 'manual' | 'sii'
+
 export type OrganizationSettings = {
   id?: string
   legalName: string
@@ -15,4 +17,6 @@ export type OrganizationSettings = {
   logoUrl: string
   /** IVA por defecto en documentos (ej. 19). */
   defaultVatPercent: number
+  invoicingMode: InvoicingMode
+  economicActivityCode: number | null
 }

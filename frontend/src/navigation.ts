@@ -33,7 +33,7 @@ export type NavSectionDef =
   | { type: 'group'; heading: string; items: NavItemDef[] }
   | { type: 'items'; items: NavItemDef[] }
 
-/** Rutas coherentes con el sidebar; la bienvenida es `/` (sin permisos). */
+/** Rutas coherentes con el sidebar; la bienvenida autenticada es `/inicio`. */
 export const navSections: NavSectionDef[] = [
   {
     type: 'items',
@@ -74,5 +74,5 @@ const allNavItems: NavItemDef[] = navSections.flatMap((s) =>
   s.type === 'items' ? s.items : s.items,
 )
 
-/** Todas las entradas del sidebar excepto la bienvenida (`/`). */
-export const sidebarRoutes = allNavItems.filter((i) => i.path !== '/')
+/** Todas las entradas del sidebar excepto la bienvenida autenticada. */
+export const sidebarRoutes = allNavItems.filter((i) => i.path !== '/inicio')

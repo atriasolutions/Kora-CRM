@@ -25,7 +25,12 @@ export async function qrDataUrlForOtpAuth(otpauthUrl: string): Promise<string> {
 export async function verifyTotpCode(secret: string, code: string): Promise<boolean> {
   const normalized = code.replace(/\s/g, '')
   if (!/^\d{6}$/.test(normalized)) return false
-  const result = await verify({ secret, token: normalized })
+  const result = await verify({
+    secret,
+    token: normalized,
+    // RFC 6238: ±30 s para diferencias de reloj entre servidor y app autenticadora.
+    epochTolerance: 30,
+  })
   return result.valid
 }
 

@@ -22,7 +22,8 @@ import { ListPageLayout } from '@/components/list/ListPageLayout'
 import { ListTableToolbar } from '@/components/list/ListTableToolbar'
 import { ResizableTableHeadCell } from '@/components/list/ResizableTableHeadCell'
 import { ListPrimaryUserAvatar } from '@/components/shared/ListPrimaryUserAvatar'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { EntityAvatarImage } from '@/components/shared/EntityAvatarImage'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -1023,7 +1024,7 @@ function CellContent<T extends ListRowBase>({
               />
             ) : (
               <Avatar className="size-10 shrink-0 border border-border">
-                {avatarUrl ? <AvatarImage src={avatarUrl} alt={name} /> : null}
+                {avatarUrl ? <EntityAvatarImage src={avatarUrl} alt={name} /> : null}
                 <AvatarFallback>{initials}</AvatarFallback>
               </Avatar>
             )

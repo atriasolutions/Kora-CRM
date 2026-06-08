@@ -10,6 +10,9 @@ import {
   isUniqueViolation,
 } from '../lib/stock-receipt-number.js'
 import { pool } from '../db/pool.js'
+import { setTenantLocal, tenantQuery } from '../db/tenant-query.js'
+import { pushTenantCondition, tenantWhereParam } from '../lib/tenant-sql.js'
+import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import { deriveInventoryStatus } from '../mappers/inventory.mapper.js'
 import {
   mapStockReceiptDetail,
@@ -49,7 +52,7 @@ export type ListStockReceiptsParams = {
 }
 
 async function loadReceiptLines(receiptId: string): Promise<StockReceiptLineRow[]> {
-  const result = await pool.query<StockReceiptLineRow>(
+  const result = await tenantQuery<StockReceiptLineRow>(
     `SELECT ${LINE_COLUMNS}
      FROM crm_stock_receipt_lines
      WHERE receipt_id = $1
@@ -64,9 +67,9 @@ async function resolveWarehouse(
   warehouseName?: string,
 ): Promise<{ warehouseId: string | null; warehouseName: string }> {
   if (warehouseId?.trim()) {
-    const row = await pool.query<{ id: string; name: string }>(
-      `SELECT id, name FROM crm_warehouses WHERE id = $1 AND deleted_at IS NULL`,
-      [warehouseId],
+    const row = await tenantQuery<{ id: string; name: string }>(
+      `SELECT id, name FROM crm_warehouses WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
+      [warehouseId, getTenantIdOrDefault()],
     )
     if (row.rows[0]) {
       return { warehouseId: row.rows[0].id, warehouseName: row.rows[0].name }
@@ -74,7 +77,7 @@ async function resolveWarehouse(
   }
   const name = warehouseName?.trim() || ''
   if (!name) {
-    const def = await pool.query<{ id: string; name: string }>(
+    const def = await tenantQuery<{ id: string; name: string }>(
       `SELECT id, name FROM crm_warehouses
        WHERE deleted_at IS NULL AND is_default = true
        LIMIT 1`,
@@ -82,7 +85,7 @@ async function resolveWarehouse(
     if (def.rows[0]) return { warehouseId: def.rows[0].id, warehouseName: def.rows[0].name }
     return { warehouseId: null, warehouseName: 'Bodega central' }
   }
-  const byName = await pool.query<{ id: string; name: string }>(
+  const byName = await tenantQuery<{ id: string; name: string }>(
     `SELECT id, name FROM crm_warehouses
      WHERE deleted_at IS NULL AND lower(trim(name)) = lower($1)
      LIMIT 1`,
@@ -98,14 +101,14 @@ async function resolvePurchaseSnapshot(purchaseId?: string) {
   if (!purchaseId?.trim()) {
     return { purchaseId: null, purchaseReference: '', supplierName: '' }
   }
-  const row = await pool.query<{
+  const row = await tenantQuery<{
     id: string
     reference: string
     supplier_name: string
   }>(
     `SELECT id, reference, supplier_name
-     FROM crm_purchases WHERE id = $1 AND deleted_at IS NULL`,
-    [purchaseId],
+     FROM crm_purchases WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
+    [purchaseId, getTenantIdOrDefault()],
   )
   const p = row.rows[0]
   if (!p) return { purchaseId: null, purchaseReference: '', supplierName: '' }
@@ -161,6 +164,7 @@ export async function listStockReceipts(
   } else {
     conditions.push('deleted_at IS NULL')
   }
+  idx = pushTenantCondition(conditions, values, idx)
   if (params.status) {
     conditions.push(`status = $${idx++}`)
     values.push(params.status)
@@ -174,7 +178,7 @@ export async function listStockReceipts(
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
-  const countResult = await pool.query<{ count: string }>(
+  const countResult = await tenantQuery<{ count: string }>(
     `SELECT count(*)::text AS count FROM crm_stock_receipts ${where}`,
     values,
   )
@@ -182,7 +186,7 @@ export async function listStockReceipts(
   const offset = paginationOffset(params.page, params.pageSize)
   values.push(params.pageSize, offset)
 
-  const result = await pool.query<StockReceiptRow>(
+  const result = await tenantQuery<StockReceiptRow>(
     `SELECT ${RECEIPT_COLUMNS}
      FROM crm_stock_receipts
      ${where}
@@ -195,7 +199,7 @@ export async function listStockReceipts(
 }
 
 export async function getStockReceiptById(id: string): Promise<StockReceiptDetail> {
-  const result = await pool.query<StockReceiptRow>(
+  const result = await tenantQuery<StockReceiptRow>(
     `SELECT ${RECEIPT_COLUMNS}
      FROM crm_stock_receipts
      WHERE id = $1`,
@@ -220,16 +224,17 @@ export async function createStockReceipt(
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       try {
         await client.query('BEGIN')
+    await setTenantLocal(client)
         const number = await allocateNextStockReceiptNumber(client)
         const result = await client.query<StockReceiptRow>(
           `INSERT INTO crm_stock_receipts (
             number, status, external_reference, purchase_id, purchase_reference,
             supplier_name, warehouse_id, warehouse_name, product_summary, line_count,
-            owner_name, created_by_id, created_by_name, updated_by_id, updated_by_name
+            owner_name, created_by_id, created_by_name, updated_by_id, updated_by_name, tenant_id
           ) VALUES (
             $1, 'Borrador', $2, $3, $4,
             $5, $6, $7, $8, $9,
-            $10, $11, $12, $11, $12
+            $10, $11, $12, $11, $12, $13
           )
           RETURNING ${RECEIPT_COLUMNS}`,
           [
@@ -245,6 +250,7 @@ export async function createStockReceipt(
             input.ownerName?.trim() || actor.userName,
             actor.userId,
             actor.userName,
+            getTenantIdOrDefault(),
           ],
         )
         const row = result.rows[0]!
@@ -300,6 +306,7 @@ export async function updateStockReceipt(
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    await setTenantLocal(client)
     const result = await client.query<StockReceiptRow>(
       `UPDATE crm_stock_receipts SET
         external_reference = COALESCE($2, external_reference),
@@ -315,7 +322,7 @@ export async function updateStockReceipt(
         updated_by_id = $12,
         updated_by_name = $13,
         updated_at = now()
-      WHERE id = $1 AND deleted_at IS NULL
+      WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(14)}
       RETURNING ${RECEIPT_COLUMNS}`,
       [
         id,
@@ -331,6 +338,7 @@ export async function updateStockReceipt(
         input.ownerName?.trim() || null,
         actor.userId,
         actor.userName,
+        getTenantIdOrDefault(),
       ],
     )
     const row = result.rows[0]
@@ -422,8 +430,8 @@ async function applyStockForReceipt(
         `INSERT INTO crm_inventory_positions (
           product_id, product_name, sku, warehouse_id, warehouse_name,
           quantity_on_hand, quantity_reserved, quantity_available, min_stock, status,
-          last_movement_at
-        ) VALUES ($1, $2, $3, $4, $5, 0, 0, 0, 0, 'Sin stock', now())
+          last_movement_at, tenant_id
+        ) VALUES ($1, $2, $3, $4, $5, 0, 0, 0, 0, 'Sin stock', now(), $6)
         RETURNING id`,
         [
           product?.id ?? line.product_id,
@@ -431,6 +439,7 @@ async function applyStockForReceipt(
           sku,
           receipt.warehouse_id,
           receipt.warehouse_name,
+          getTenantIdOrDefault(),
         ],
       )
       position = await client.query(
@@ -509,6 +518,7 @@ export async function confirmStockReceipt(
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    await setTenantLocal(client)
     const receiptRow = await client.query<StockReceiptRow>(
       `SELECT ${RECEIPT_COLUMNS} FROM crm_stock_receipts WHERE id = $1 FOR UPDATE`,
       [id],
@@ -544,12 +554,12 @@ export async function archiveStockReceipt(
   id: string,
   actor: AuditActor,
 ): Promise<StockReceiptListItem> {
-  const result = await pool.query<StockReceiptRow>(
+  const result = await tenantQuery<StockReceiptRow>(
     `UPDATE crm_stock_receipts
      SET deleted_at = now(), updated_by_id = $2, updated_by_name = $3, updated_at = now()
-     WHERE id = $1 AND deleted_at IS NULL
+     WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(4)}
      RETURNING ${RECEIPT_COLUMNS}`,
-    [id, actor.userId, actor.userName],
+    [id, actor.userId, actor.userName, getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   if (!row) throw notFound('Ingreso no encontrado o ya archivado')
@@ -560,7 +570,7 @@ export async function restoreStockReceipt(
   id: string,
   actor: AuditActor,
 ): Promise<StockReceiptListItem> {
-  const result = await pool.query<StockReceiptRow>(
+  const result = await tenantQuery<StockReceiptRow>(
     `UPDATE crm_stock_receipts
      SET deleted_at = NULL, updated_by_id = $2, updated_by_name = $3, updated_at = now()
      WHERE id = $1
@@ -672,6 +682,7 @@ export async function permanentlyDeleteStockReceipt(
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    await setTenantLocal(client)
 
     const found = await client.query<StockReceiptRow>(
       `SELECT ${RECEIPT_COLUMNS}

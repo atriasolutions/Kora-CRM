@@ -83,15 +83,15 @@ function toIsoDate(value: string): string {
   return ''
 }
 
+function fieldBaseName(id: string): string {
+  const dot = id.lastIndexOf('.')
+  return dot >= 0 ? id.slice(dot + 1) : id
+}
+
 function labelFromId(id: string): string {
-  const known: Record<string, string> = {
-    id: 'ID',
-    createdByName: 'Creado por',
-    createdAtDate: 'Fecha creación',
-    updatedByName: 'Modificado por',
-    updatedAtDate: 'Fecha última modificación',
-  }
-  if (known[id]) return known[id]!
+  if (REPORT_FIELD_LABELS[id]) return REPORT_FIELD_LABELS[id]!
+  const base = fieldBaseName(id)
+  if (REPORT_FIELD_LABELS[base]) return REPORT_FIELD_LABELS[base]!
   const withSpaces = id
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
     .replace(/_/g, ' ')
@@ -115,27 +115,148 @@ const LOOKUP_ID_TO_DISPLAY: Record<string, string[]> = {
   destinationWarehouseId: ['destinationWarehouse', 'warehouse'],
 }
 
-/** Etiqueta única en español para el campo de relación que permanece visible. */
+/** Etiquetas en español para columnas y filtros de reportes. */
 const REPORT_FIELD_LABELS: Record<string, string> = {
+  id: 'ID',
+  name: 'Nombre',
+  subtitle: 'Subtítulo',
+  email: 'Correo electrónico',
+  phone: 'Teléfono',
+  mobilePhone: 'Teléfono móvil',
+  role: 'Cargo',
+  rut: 'RUT',
+  streetAddress: 'Dirección',
+  region: 'Región',
+  commune: 'Comuna',
+  city: 'Ciudad',
+  linkedIn: 'LinkedIn',
+  source: 'Origen',
+  initialNote: 'Nota inicial',
+  ownerName: 'Propietario',
+  owner: 'Propietario',
+  lastContactLabel: 'Último contacto',
+  lastOutreachAt: 'Fecha último intento',
+  lastOutreachChannel: 'Canal último intento',
+  lastOutreachResult: 'Resultado último intento',
+  lastOutreachLabel: 'Etiqueta último intento',
+  reachabilityStatus: 'Contactabilidad',
+  outreachAttemptCount: 'Cantidad de intentos',
   company: 'Empresa',
   companyName: 'Empresa',
-  supplier: 'Proveedor',
+  companyId: 'ID empresa',
   contactName: 'Contacto',
   contact: 'Contacto',
-  code: 'Cotización',
+  contactId: 'ID contacto',
+  status: 'Estado',
+  industry: 'Industria',
+  headquartersStreet: 'Dirección sede',
+  employees: 'Empleados',
+  lifecycle: 'Ciclo de vida',
+  operationalStatus: 'Estado operacional',
+  lastActivity: 'Última actividad',
+  customerKind: 'Tipo de cliente',
+  stage: 'Etapa',
+  amount: 'Monto',
+  amountNum: 'Monto (número)',
+  weightedAmount: 'Monto ponderado',
+  probability: 'Probabilidad',
+  closeDate: 'Fecha cierre',
+  type: 'Tipo',
+  priority: 'Prioridad',
+  outcome: 'Resultado',
+  forecast: 'Pronóstico',
+  contactEmail: 'Email contacto',
+  contactPhone: 'Teléfono contacto',
+  description: 'Descripción',
+  decisionMaker: 'Decisor',
+  competitors: 'Competidores',
+  budget: 'Presupuesto',
+  buyingProcess: 'Proceso de compra',
+  lossReason: 'Motivo pérdida',
+  primaryQuoteId: 'Cotización principal',
+  title: 'Título',
+  typeLabel: 'Etiqueta tipo',
+  relatedType: 'Tipo relacionado',
+  relatedId: 'ID relacionado',
+  relatedName: 'Registro relacionado',
+  due: 'Vencimiento',
+  assignee: 'Asignado a',
+  reminder: 'Recordatorio',
+  scheduledAt: 'Programada para',
+  reminderAt: 'Recordatorio en',
+  sku: 'SKU',
+  category: 'Categoría',
+  productType: 'Tipo de producto',
+  unitOfMeasure: 'Unidad de medida',
+  billingPeriod: 'Periodo de facturación',
+  price: 'Precio',
+  priceNum: 'Precio (número)',
+  priceCurrency: 'Moneda precio',
+  costPrice: 'Costo',
+  costPriceNum: 'Costo (número)',
+  stock: 'Stock',
+  stockNum: 'Stock (número)',
+  barcode: 'Código de barras',
+  number: 'Número',
+  client: 'Cliente',
+  clientName: 'Cliente',
+  issueDate: 'Fecha emisión',
+  dueDate: 'Fecha vencimiento',
+  quoteId: 'ID cotización',
+  paymentMethod: 'Forma de pago',
+  siiNumber: 'Folio SII',
+  progress: 'Avance',
+  progressNum: 'Avance (número)',
+  deadline: 'Fecha límite',
+  manager: 'Responsable',
+  journeyStage: 'Etapa del flujo',
+  health: 'Salud',
+  startDate: 'Fecha inicio',
+  endDate: 'Fecha término',
+  opportunityId: 'ID oportunidad',
   opportunityName: 'Oportunidad',
   opportunity: 'Oportunidad',
+  acceptedQuoteId: 'Cotización aceptada',
+  code: 'Código',
+  validUntil: 'Válida hasta',
+  reference: 'Referencia',
+  supplier: 'Proveedor',
+  supplierId: 'ID proveedor',
+  productSummary: 'Resumen productos',
+  orderDate: 'Fecha orden',
+  externalReference: 'Referencia externa',
+  purchaseId: 'ID compra',
   purchaseReference: 'Compra',
   purchase: 'Compra',
+  confirmedAt: 'Fecha confirmación',
+  warehouse: 'Bodega',
+  lineCount: 'Cantidad de líneas',
   productName: 'Producto',
   product: 'Producto',
-  relatedName: 'Registro relacionado',
-  owner: 'Propietario',
-  ownerName: 'Propietario',
-  assignee: 'Asignado a',
-  warehouse: 'Bodega',
+  productId: 'ID producto',
   location: 'Ubicación / bodega',
+  quantity: 'Cantidad',
+  quantityNum: 'Cantidad (número)',
+  reservedQtyNum: 'Cantidad reservada',
+  availableQtyNum: 'Cantidad disponible',
+  onHandQtyNum: 'Cantidad en mano',
+  minStock: 'Stock mínimo',
+  minStockNum: 'Stock mínimo (número)',
+  lastMovement: 'Último movimiento',
+  when: 'Cuándo',
+  createdAtDate: 'Fecha creación',
+  updatedAtDate: 'Fecha modificación',
+  createdByName: 'Creado por',
+  updatedByName: 'Modificado por',
 }
+
+const HIDDEN_REPORT_FIELDS = new Set([
+  'avatarUrl',
+  'logoUrl',
+  'imageUrl',
+  'createdById',
+  'updatedById',
+])
 
 /** Campo principal del join → etiqueta corta (sin «Empresa · Nombre»). */
 const JOIN_PRIMARY_DISPLAY: Record<string, string> = {
@@ -192,12 +313,10 @@ const LOOKUP_DISPLAY_FIELD_BASES = new Set([
   'customer',
 ])
 
-function fieldBaseName(id: string): string {
-  const dot = id.lastIndexOf('.')
-  return dot >= 0 ? id.slice(dot + 1) : id
-}
-
 function shouldHideReportField(id: string, allKeys: string[]): boolean {
+  if (HIDDEN_REPORT_FIELDS.has(id) || HIDDEN_REPORT_FIELDS.has(fieldBaseName(id))) {
+    return true
+  }
   if (id === 'companyName' && allKeys.includes('company')) return true
   if (id === 'contact' && allKeys.includes('contactName')) return true
 
@@ -492,6 +611,7 @@ function buildLookupOptions(
 function buildFromSeeds(
   seeds: Array<Record<string, unknown>>,
   dateFieldIds: string[] = [],
+  sourceId?: ReportDataSourceId,
 ): SourceDef {
   const rows: ReportTableRow[] = seeds.map((raw) => {
     const r: ReportTableRow = {}
@@ -513,8 +633,9 @@ function buildFromSeeds(
     return r
   })
 
+  const templateKeys = sourceId ? (SOURCE_FIELD_TEMPLATES[sourceId] ?? []) : []
   const allKeys = Array.from(
-    new Set(rows.flatMap((r) => Object.keys(r))),
+    new Set([...templateKeys, ...rows.flatMap((r) => Object.keys(r))]),
   )
 
   // Orden: ID + auditoría + resto ordenado por label
@@ -542,12 +663,16 @@ function buildFromSeeds(
 function buildContactos(): SourceDef {
   return buildFromSeeds(
     getAllKnownContacts() as unknown as Array<Record<string, unknown>>,
+    ['lastOutreachAt'],
+    'contactos',
   )
 }
 
 function buildEmpresas(): SourceDef {
   return buildFromSeeds(
     getAllKnownCompanies() as unknown as Array<Record<string, unknown>>,
+    [],
+    'empresas',
   )
 }
 
@@ -555,6 +680,7 @@ function buildOportunidades(): SourceDef {
   return buildFromSeeds(
     getAllKnownOpportunities() as unknown as Array<Record<string, unknown>>,
     ['closeDate'],
+    'oportunidades',
   )
 }
 
@@ -562,12 +688,15 @@ function buildActividades(): SourceDef {
   return buildFromSeeds(
     getRegistryActivities() as unknown as Array<Record<string, unknown>>,
     ['due', 'scheduledAt', 'reminderAt'],
+    'actividades',
   )
 }
 
 function buildProductos(): SourceDef {
   return buildFromSeeds(
     getAllKnownProducts() as unknown as Array<Record<string, unknown>>,
+    [],
+    'productos',
   )
 }
 
@@ -575,6 +704,7 @@ function buildFacturas(): SourceDef {
   return buildFromSeeds(
     getAllKnownInvoices() as unknown as Array<Record<string, unknown>>,
     ['issueDate', 'dueDate'],
+    'facturas',
   )
 }
 
@@ -582,6 +712,7 @@ function buildProyectos(): SourceDef {
   return buildFromSeeds(
     getAllKnownProjects() as unknown as Array<Record<string, unknown>>,
     ['deadline', 'startDate'],
+    'proyectos',
   )
 }
 
@@ -589,6 +720,7 @@ function buildCotizaciones(): SourceDef {
   return buildFromSeeds(
     getAllKnownQuotes() as unknown as Array<Record<string, unknown>>,
     ['validUntil', 'issueDate'],
+    'cotizaciones',
   )
 }
 
@@ -596,13 +728,15 @@ function buildCompras(): SourceDef {
   return buildFromSeeds(
     getAllRegistryPurchases() as unknown as Array<Record<string, unknown>>,
     ['orderDate'],
+    'compras',
   )
 }
 
 function buildIngresos(): SourceDef {
   return buildFromSeeds(
     getAllRegistryStockReceipts() as unknown as Array<Record<string, unknown>>,
-    ['createdAt', 'confirmedAt'],
+    ['confirmedAt'],
+    'ingresos',
   )
 }
 
@@ -610,64 +744,113 @@ function buildInventario(): SourceDef {
   return buildFromSeeds(
     getAllKnownInventory() as unknown as Array<Record<string, unknown>>,
     [],
+    'inventario',
   )
 }
 
-/** Campos estables por fuente (alineados con el backend) cuando no hay filas en memoria. */
+/** Campos estables por fuente (alineados con el backend) aunque no haya filas en memoria. */
 const SOURCE_FIELD_TEMPLATES: Record<ReportDataSourceId, string[]> = {
   contactos: [
     'id',
     'name',
+    'subtitle',
     'email',
     'phone',
+    'mobilePhone',
+    'role',
+    'rut',
+    'streetAddress',
+    'region',
+    'commune',
     'company',
     'companyId',
     'status',
+    'source',
+    'linkedIn',
+    'initialNote',
     'ownerName',
-    'lastContact',
-    'createdAt',
-    'updatedAt',
+    'lastContactLabel',
+    'lastOutreachAt',
+    'lastOutreachChannel',
+    'lastOutreachResult',
+    'lastOutreachLabel',
+    'reachabilityStatus',
+    'outreachAttemptCount',
     'createdByName',
+    'createdAtDate',
     'updatedByName',
+    'updatedAtDate',
   ],
   empresas: [
     'id',
     'name',
+    'rut',
     'industry',
+    'headquartersStreet',
     'city',
+    'employees',
     'owner',
     'lifecycle',
     'operationalStatus',
     'lastActivity',
-    'createdAt',
-    'updatedAt',
     'createdByName',
+    'createdAtDate',
     'updatedByName',
+    'updatedAtDate',
   ],
   oportunidades: [
     'id',
     'name',
+    'customerKind',
     'company',
     'companyId',
+    'contactId',
+    'contactName',
     'stage',
     'amount',
+    'weightedAmount',
     'probability',
     'closeDate',
     'owner',
-    'createdAt',
-    'updatedAt',
+    'type',
+    'priority',
+    'outcome',
+    'forecast',
+    'source',
+    'contactEmail',
+    'contactPhone',
+    'description',
+    'decisionMaker',
+    'competitors',
+    'budget',
+    'buyingProcess',
+    'lossReason',
+    'primaryQuoteId',
+    'lastActivity',
+    'createdByName',
+    'createdAtDate',
+    'updatedByName',
+    'updatedAtDate',
   ],
   actividades: [
     'id',
     'title',
     'type',
+    'typeLabel',
     'status',
     'priority',
     'due',
+    'scheduledAt',
+    'reminderAt',
+    'reminder',
+    'relatedType',
     'relatedName',
-    'owner',
-    'createdAt',
-    'updatedAt',
+    'companyName',
+    'assignee',
+    'createdByName',
+    'createdAtDate',
+    'updatedByName',
+    'updatedAtDate',
   ],
   productos: [
     'id',
@@ -675,64 +858,120 @@ const SOURCE_FIELD_TEMPLATES: Record<ReportDataSourceId, string[]> = {
     'sku',
     'category',
     'productType',
+    'unitOfMeasure',
+    'billingPeriod',
     'price',
+    'priceNum',
+    'priceCurrency',
+    'costPrice',
+    'costPriceNum',
+    'stock',
+    'stockNum',
+    'barcode',
     'status',
-    'createdAt',
-    'updatedAt',
+    'owner',
+    'createdByName',
+    'createdAtDate',
+    'updatedByName',
+    'updatedAtDate',
   ],
   facturas: [
     'id',
     'number',
+    'client',
+    'customerKind',
+    'contactName',
     'companyName',
     'amount',
+    'amountNum',
     'status',
     'issueDate',
     'dueDate',
-    'createdAt',
-    'updatedAt',
+    'owner',
+    'quoteId',
+    'paymentMethod',
+    'siiNumber',
+    'createdByName',
+    'createdAtDate',
+    'updatedByName',
+    'updatedAtDate',
   ],
   proyectos: [
     'id',
     'name',
+    'client',
+    'customerKind',
     'companyName',
+    'contactName',
     'status',
-    'owner',
+    'journeyStage',
+    'health',
+    'priority',
+    'progress',
+    'progressNum',
+    'budget',
+    'manager',
     'startDate',
-    'endDate',
-    'createdAt',
-    'updatedAt',
+    'deadline',
+    'opportunityId',
+    'acceptedQuoteId',
+    'createdByName',
+    'createdAtDate',
+    'updatedByName',
+    'updatedAtDate',
   ],
   cotizaciones: [
     'id',
     'code',
     'title',
     'companyName',
+    'contactName',
     'amount',
     'status',
+    'validUntil',
+    'issueDate',
+    'owner',
+    'customerKind',
     'opportunityId',
-    'createdAt',
-    'updatedAt',
+    'opportunityName',
+    'createdByName',
+    'createdAtDate',
+    'updatedByName',
+    'updatedAtDate',
   ],
   compras: [
     'id',
     'reference',
     'supplier',
     'supplierId',
+    'productSummary',
     'amount',
+    'amountNum',
     'status',
     'orderDate',
-    'createdAt',
-    'updatedAt',
+    'owner',
+    'createdByName',
+    'createdAtDate',
+    'updatedByName',
+    'updatedAtDate',
   ],
   ingresos: [
     'id',
     'number',
     'status',
+    'externalReference',
     'purchaseId',
+    'purchaseReference',
+    'supplier',
+    'warehouse',
     'productSummary',
+    'lineCount',
     'confirmedAt',
-    'createdAt',
-    'updatedAt',
+    'owner',
+    'createdByName',
+    'createdAtDate',
+    'updatedByName',
+    'updatedAtDate',
   ],
   inventario: [
     'id',
@@ -740,9 +979,16 @@ const SOURCE_FIELD_TEMPLATES: Record<ReportDataSourceId, string[]> = {
     'sku',
     'location',
     'quantity',
+    'quantityNum',
+    'reservedQtyNum',
+    'availableQtyNum',
+    'onHandQtyNum',
+    'minStock',
+    'minStockNum',
     'status',
-    'createdAt',
-    'updatedAt',
+    'lastMovement',
+    'createdAtDate',
+    'updatedAtDate',
   ],
 }
 

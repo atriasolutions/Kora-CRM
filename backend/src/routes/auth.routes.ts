@@ -1,7 +1,14 @@
 import { Router } from 'express'
 
+import { env } from '../config/env.js'
 import { getAuditActor } from '../middleware/audit-actor.js'
 import * as authRepo from '../repositories/auth.repository.js'
+import {
+  getTenantBySlug,
+  getTenantById,
+  listMembershipsForEmail,
+  resolveTenantSlugFromHost,
+} from '../repositories/tenants.repository.js'
 import * as onboarding from '../services/user-onboarding.service.js'
 import {
   handleEnrollmentConfirm,
@@ -13,20 +20,60 @@ import {
   handleVerifyTwoFactorLogin,
 } from './two-factor.handlers.js'
 import { getClientIp } from '../utils/client-request.js'
+import { readAuthToken } from '../middleware/auth-token.js'
 import {
   activateAccountSchema,
   forgotPasswordSchema,
+  identifySchema,
   loginSchema,
   resetPasswordSchema,
+  switchTenantSchema,
   verifyTokenQuerySchema,
 } from '../validators/auth.validator.js'
 
 export const authRouter = Router()
 
+authRouter.get('/tenant-by-host', async (req, res, next) => {
+  try {
+    const host = String(req.query.host ?? req.header('host') ?? '')
+    const slug =
+      resolveTenantSlugFromHost(host, env.platformDomain) ??
+      env.defaultTenantSlug
+    const tenant = await getTenantBySlug(slug)
+    if (!tenant) {
+      res.status(404).json({ error: 'Empresa no encontrada' })
+      return
+    }
+    res.json({ data: tenant })
+  } catch (e) {
+    next(e)
+  }
+})
+
+authRouter.post('/identify', async (req, res, next) => {
+  try {
+    const body = identifySchema.parse(req.body)
+    const memberships = await listMembershipsForEmail(body.email)
+    res.json({ data: { memberships } })
+  } catch (e) {
+    next(e)
+  }
+})
+
 authRouter.post('/login', async (req, res, next) => {
   try {
     const body = loginSchema.parse(req.body)
-    const step = await authRepo.loginWithEmailPassword(body.email, body.password, {
+    const host = req.header('x-forwarded-host') ?? req.header('host') ?? ''
+    const hostSlug = resolveTenantSlugFromHost(host, env.platformDomain)
+    let tenantId = body.tenantId
+    if (!tenantId && hostSlug) {
+      tenantId = (await getTenantBySlug(hostSlug))?.id
+    }
+    const step = await authRepo.loginWithEmailPassword(
+      body.email,
+      body.password,
+      tenantId,
+      {
       userAgent: req.header('user-agent') ?? undefined,
       ipAddress: getClientIp(req),
     })
@@ -36,6 +83,7 @@ authRouter.post('/login', async (req, res, next) => {
           token: step.result.token,
           user: step.result.user,
           profile: step.result.profile,
+          tenantId: step.result.tenantId,
         },
       })
       return
@@ -46,6 +94,7 @@ authRouter.post('/login', async (req, res, next) => {
           requiresTwoFactor: true,
           challengeId: step.challengeId,
           user: step.user,
+          tenantId: step.tenantId,
         },
       })
       return
@@ -55,6 +104,7 @@ authRouter.post('/login', async (req, res, next) => {
         requiresTwoFactorEnrollment: true,
         enrollmentToken: step.enrollmentToken,
         user: step.user,
+        tenantId: step.tenantId,
       },
     })
   } catch (e) {
@@ -103,6 +153,37 @@ authRouter.post('/2fa/disable', async (req, res, next) => {
   }
 })
 
+authRouter.post('/switch-tenant', async (req, res, next) => {
+  try {
+    const token = readAuthToken(req)
+    if (!token) {
+      res.status(401).json({ error: { message: 'Sesión requerida' } })
+      return
+    }
+    const actor = getAuditActor(req)
+    const body = switchTenantSchema.parse(req.body)
+    const result = await authRepo.switchTenantSession(
+      actor.userId,
+      body.tenantId,
+      token,
+      {
+        userAgent: req.header('user-agent') ?? undefined,
+        ipAddress: getClientIp(req),
+      },
+    )
+    res.json({
+      data: {
+        token: result.token,
+        user: result.user,
+        profile: result.profile,
+        tenantId: result.tenantId,
+      },
+    })
+  } catch (e) {
+    next(e)
+  }
+})
+
 authRouter.post('/logout', async (req, res, next) => {
   try {
     const token =
@@ -118,8 +199,16 @@ authRouter.post('/logout', async (req, res, next) => {
 authRouter.get('/me', async (req, res, next) => {
   try {
     const actor = getAuditActor(req)
-    const result = await authRepo.getUserByIdForAuth(actor.userId)
-    res.json({ data: result })
+    const result = await authRepo.getUserByIdForAuth(actor.userId, actor.tenantId)
+    const tenant = await getTenantById(result.tenantId)
+    res.json({
+      data: {
+        user: result.user,
+        profile: result.profile,
+        tenantId: result.tenantId,
+        tenantSlug: tenant?.slug ?? '',
+      },
+    })
   } catch (e) {
     next(e)
   }
@@ -128,7 +217,7 @@ authRouter.get('/me', async (req, res, next) => {
 authRouter.get('/permissions', async (req, res, next) => {
   try {
     const actor = getAuditActor(req)
-    const result = await authRepo.getUserByIdForAuth(actor.userId)
+    const result = await authRepo.getUserByIdForAuth(actor.userId, actor.tenantId)
     res.json({ data: result.profile.permissions })
   } catch (e) {
     next(e)

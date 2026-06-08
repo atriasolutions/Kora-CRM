@@ -18,13 +18,19 @@ export function apiBaseURL(): string {
   return typeof raw === 'string' && raw.length > 0 ? raw.replace(/\/$/, '') : ''
 }
 
+export type FetchJSONInit = RequestInit & {
+  /** Si es false, no adjunta token de sesión (endpoints públicos). Default: true. */
+  auth?: boolean
+}
+
 export async function fetchJSON<T>(
   path: string,
-  init?: RequestInit,
+  init?: FetchJSONInit,
 ): Promise<T> {
+  const { auth = true, ...requestInit } = init ?? {}
   const base = apiBaseURL()
   const url = `${base}${path.startsWith('/') ? path : `/${path}`}`
-  const session = loadAuthSession()
+  const session = auth ? loadAuthSession() : null
   const authHeaders: Record<string, string> = {}
   if (session?.token) {
     authHeaders.Authorization = `Bearer ${session.token}`
@@ -34,12 +40,12 @@ export async function fetchJSON<T>(
   let res: Response
   try {
     res = await fetch(url, {
-      credentials: 'include',
-      ...init,
+      credentials: auth ? 'include' : 'same-origin',
+      ...requestInit,
       headers: {
         Accept: 'application/json',
         ...authHeaders,
-        ...init?.headers,
+        ...requestInit.headers,
       },
     })
   } catch {

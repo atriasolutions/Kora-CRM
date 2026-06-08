@@ -1,4 +1,6 @@
-import { pool } from '../db/pool.js'
+import { tenantQuery } from '../db/tenant-query.js'
+import { tenantWhereParam } from '../lib/tenant-sql.js'
+import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import type {
   CreateNotificationInput,
   Notification,
@@ -37,7 +39,7 @@ function mapNotification(row: NotificationRow): Notification {
 async function ensureNotificationsTable(): Promise<void> {
   if (!ensureTablePromise) {
     ensureTablePromise = (async () => {
-      await pool.query(`
+      await tenantQuery(`
         CREATE TABLE IF NOT EXISTS crm_notifications (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           tenant_id UUID,
@@ -52,12 +54,12 @@ async function ensureNotificationsTable(): Promise<void> {
           read_at TIMESTAMPTZ
         )
       `)
-      await pool.query(`
+      await tenantQuery(`
         CREATE INDEX IF NOT EXISTS crm_notifications_user_unread_idx
           ON crm_notifications (user_id)
           WHERE read_at IS NULL
       `)
-      await pool.query(`
+      await tenantQuery(`
         CREATE INDEX IF NOT EXISTS crm_notifications_user_created_idx
           ON crm_notifications (user_id, created_at DESC)
       `)
@@ -73,17 +75,17 @@ export async function createNotification(
   input: CreateNotificationInput,
 ): Promise<Notification> {
   await ensureNotificationsTable()
-  const result = await pool.query<NotificationRow>(
+  const result = await tenantQuery<NotificationRow>(
     `INSERT INTO crm_notifications (
       tenant_id,
       user_id, type, title, message, href, entity_type, entity_id
     ) VALUES (
-      NULL,
-      $1, $2, $3, $4, $5, $6, $7
+      $1, $2, $3, $4, $5, $6, $7, $8
     )
     RETURNING
       id, user_id, type, title, message, href, entity_type, entity_id, created_at, read_at`,
     [
+      getTenantIdOrDefault(),
       input.userId,
       input.type,
       input.title,
@@ -105,52 +107,55 @@ export async function listNotifications(args: {
   await ensureNotificationsTable()
   const limit = args.limit ?? 20
   const unreadOnly = args.unreadOnly === true
-  const result = await pool.query<NotificationRow>(
+  const result = await tenantQuery<NotificationRow>(
     `SELECT
       id, user_id, type, title, message, href, entity_type, entity_id, created_at, read_at
      FROM crm_notifications
-     WHERE user_id = $1
+     WHERE user_id = $1 AND ${tenantWhereParam(3)}
        ${unreadOnly ? 'AND read_at IS NULL' : ''}
      ORDER BY created_at DESC
      LIMIT $2`,
-    [args.userId, limit],
+    [args.userId, limit, getTenantIdOrDefault()],
   )
   return result.rows.map(mapNotification)
 }
 
 export async function countUnreadNotifications(userId: string): Promise<number> {
   await ensureNotificationsTable()
-  const result = await pool.query<{ count: string }>(
+  const result = await tenantQuery<{ count: string }>(
     `SELECT count(*)::text AS count
      FROM crm_notifications
-     WHERE user_id = $1 AND read_at IS NULL`,
-    [userId],
+     WHERE user_id = $1 AND read_at IS NULL AND ${tenantWhereParam(2)}`,
+    [userId, getTenantIdOrDefault()],
   )
   return Number.parseInt(result.rows[0]?.count ?? '0', 10)
 }
 
 export async function markNotificationRead(userId: string, notificationId: string) {
   await ensureNotificationsTable()
-  await pool.query(
+  await tenantQuery(
     `UPDATE crm_notifications
      SET read_at = now()
-     WHERE id = $1 AND user_id = $2 AND read_at IS NULL`,
-    [notificationId, userId],
+     WHERE id = $1 AND user_id = $2 AND read_at IS NULL AND ${tenantWhereParam(3)}`,
+    [notificationId, userId, getTenantIdOrDefault()],
   )
 }
 
 export async function markAllNotificationsRead(userId: string) {
   await ensureNotificationsTable()
-  await pool.query(
+  await tenantQuery(
     `UPDATE crm_notifications
      SET read_at = now()
-     WHERE user_id = $1 AND read_at IS NULL`,
-    [userId],
+     WHERE user_id = $1 AND read_at IS NULL AND ${tenantWhereParam(2)}`,
+    [userId, getTenantIdOrDefault()],
   )
 }
 
 export async function deleteAllNotifications(userId: string): Promise<void> {
   await ensureNotificationsTable()
-  await pool.query(`DELETE FROM crm_notifications WHERE user_id = $1`, [userId])
+  await tenantQuery(`DELETE FROM crm_notifications WHERE user_id = $1 AND ${tenantWhereParam(2)}`, [
+    userId,
+    getTenantIdOrDefault(),
+  ])
 }
 

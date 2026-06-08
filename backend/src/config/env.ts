@@ -34,9 +34,41 @@ export const env = {
   mailEnabled: process.env.MAIL_ENABLED !== 'false',
   /** Opcional: fuerza destinatario (solo si usas API con dominio demo). */
   mailOverrideTo: (process.env.MAIL_OVERRIDE_TO ?? '').trim(),
+  /** Destino de solicitudes «Prueba gratis» desde la landing pública. */
+  marketingLeadTo: (
+    process.env.MARKETING_LEAD_TO ??
+    process.env.MAIL_OVERRIDE_TO ??
+    'contacto@atriasolutions.cl'
+  ).trim(),
   /** Clave para cifrar secretos TOTP (mín. 16 caracteres; en producción usar valor fuerte). */
   totpEncryptionKey:
     process.env.TOTP_ENCRYPTION_KEY ??
     'kora-dev-totp-key-change-in-production',
   totpIssuer: process.env.TOTP_ISSUER ?? 'Kora CRM',
+  platformDomain: (process.env.PLATFORM_DOMAIN ?? 'koracrm.cl').trim().toLowerCase(),
+  /** Tenant por defecto en desarrollo sin subdominio. */
+  defaultTenantSlug: (process.env.DEFAULT_TENANT_SLUG ?? 'atriasolutions').trim().toLowerCase(),
+  /** Responsable comercial de leads «Prueba gratis» (tenant Atria). */
+  marketingLeadOwnerName: (
+    process.env.MARKETING_LEAD_OWNER_NAME ?? 'Nicolas Gutierrez'
+  ).trim(),
+  /** Email del responsable comercial (prioritario sobre nombre). */
+  marketingLeadOwnerEmail: (
+    process.env.MARKETING_LEAD_OWNER_EMAIL ?? 'ngutierrez@atriasolutions.cl'
+  ).trim(),
+  /** UUID opcional del responsable comercial (prioritario sobre email). */
+  marketingLeadOwnerUserId: (process.env.MARKETING_LEAD_OWNER_USER_ID ?? '').trim(),
+  /** Origen en contactos creados desde la landing (valor de CONTACT_SOURCE_OPTIONS). */
+  marketingLeadSource: (process.env.MARKETING_LEAD_SOURCE ?? 'Formulario web').trim(),
+  /** Crea tenant trial + usuario admin + mail al solicitante del formulario demo. */
+  marketingAutoProvisionTrial: process.env.MARKETING_AUTO_PROVISION_TRIAL !== 'false',
+  /** Días de vigencia del tenant trial. */
+  marketingTrialDays: Number.parseInt(process.env.MARKETING_TRIAL_DAYS ?? '14', 10),
+  /** Cifrado AES de certificados SII (.p12) en reposo. */
+  siiCredentialsEncryptionKey:
+    process.env.SII_CREDENTIALS_ENCRYPTION_KEY ??
+    process.env.TOTP_ENCRYPTION_KEY ??
+    'kora-dev-sii-key-change-in-production',
+  /** Ambiente SII por defecto: certification | production */
+  siiDefaultEnv: (process.env.SII_ENV ?? 'certification') as 'certification' | 'production',
 }

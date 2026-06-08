@@ -656,7 +656,7 @@ export function ContactFormSelect({
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
         className={cn(
-          'flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm outline-none',
+          'flex h-9 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm shadow-sm outline-none',
           'focus-visible:ring-2 focus-visible:ring-ring',
         )}
       >

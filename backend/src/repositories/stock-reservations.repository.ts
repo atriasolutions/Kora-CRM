@@ -1,5 +1,6 @@
 import type { PoolClient } from 'pg'
 
+import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import {
   acquireSkuStockLock,
   acquireSkuStockLocksOrdered,
@@ -275,8 +276,8 @@ async function applyReservationToPosition(
   await client.query(
     `INSERT INTO crm_stock_reservations (
       inventory_position_id, product_id, product_name, sku, qty,
-      quote_id, quote_code, quote_line_id, status
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active')`,
+      quote_id, quote_code, quote_line_id, status, tenant_id
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active', $9)`,
     [
       pos.id,
       pos.product_id,
@@ -286,6 +287,7 @@ async function applyReservationToPosition(
       quoteId,
       quoteCode,
       quoteLineId,
+      getTenantIdOrDefault(),
     ],
   )
 

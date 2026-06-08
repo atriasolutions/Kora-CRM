@@ -3,6 +3,7 @@ import { PageScrollArea } from '@/components/layout/PageScrollArea'
 import { useSearchParams } from 'react-router-dom'
 
 import { OrganizationSettingsPanel } from '@/components/settings/OrganizationSettingsPanel'
+import { SiiInvoicingSettingsPanel } from '@/components/settings/SiiInvoicingSettingsPanel'
 import { ProductCategoriesSettingsPanel } from '@/components/settings/ProductCategoriesSettingsPanel'
 import { TaxCurrencySettingsPanel } from '@/components/settings/TaxCurrencySettingsPanel'
 import { SettingsNav } from '@/components/settings/SettingsNav'
@@ -19,6 +20,8 @@ function SettingsSectionPanel({ sectionId }: { sectionId: SettingsSectionId }) {
   switch (sectionId) {
     case 'empresa':
       return <OrganizationSettingsPanel />
+    case 'facturacion-sii':
+      return <SiiInvoicingSettingsPanel />
     case 'bodegas':
       return <WarehousesSettingsPanel />
     case 'categorias':

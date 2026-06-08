@@ -201,11 +201,18 @@ export async function verifyUserTotpOrBackup(
   const row = await getTotpUserRow(userId)
   if (!isTotpConfigured(row)) return false
 
-  const secret = decryptSecretFromStorage(row.totp_secret_encrypted!)
-  if (await verifyTotpCode(secret, code)) return true
+  const trimmed = code.replace(/\s/g, '')
+  const norm = trimmed.toUpperCase()
 
-  const norm = code.replace(/\s/g, '').toUpperCase()
-  if (norm.length < 8) return false
+  // Código TOTP (6 dígitos)
+  if (/^\d{6}$/.test(norm)) {
+    const secret = decryptSecretFromStorage(row.totp_secret_encrypted!)
+    if (await verifyTotpCode(secret, norm)) return true
+  }
+
+  // Código de respaldo (8 caracteres hex, con o sin guión)
+  const backupNorm = norm.replace(/-/g, '')
+  if (backupNorm.length < 8) return false
 
   const hashes = await pool.query<{ id: string; code_hash: string }>(
     `SELECT id, code_hash FROM crm_user_totp_backup_codes
@@ -213,7 +220,7 @@ export async function verifyUserTotpOrBackup(
     [userId],
   )
   for (const bc of hashes.rows) {
-    if (verifyBackupCodeHash(norm, bc.code_hash)) {
+    if (verifyBackupCodeHash(backupNorm, bc.code_hash)) {
       await pool.query(
         `UPDATE crm_user_totp_backup_codes SET used_at = now() WHERE id = $1`,
         [bc.id],

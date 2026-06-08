@@ -4,7 +4,8 @@ import { useNavigate } from 'react-router-dom'
 
 import { KanbanColumnMore } from '@/components/list/KanbanColumnMore'
 import { LargeDatasetBanner } from '@/components/list/LargeDatasetBanner'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { EntityAvatarImage } from '@/components/shared/EntityAvatarImage'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -176,7 +177,7 @@ export function ContactsKanbanView({
                       >
                         <div className="flex items-start gap-3">
                           <Avatar className="size-9 border border-border">
-                            <AvatarImage src={contact.avatarUrl} alt={contact.name} />
+                            <EntityAvatarImage src={contact.avatarUrl} alt={contact.name} />
                             <AvatarFallback className="text-xs">
                               {initials(contact.name)}
                             </AvatarFallback>

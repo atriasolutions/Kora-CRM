@@ -11,48 +11,49 @@ import * as purchasesRepo from '../repositories/purchases.repository.js'
 import * as stockReceiptsRepo from '../repositories/stock-receipts.repository.js'
 import * as inventoryRepo from '../repositories/inventory.repository.js'
 import { filterReportRows } from '../lib/report-filter-engine.js'
+import { reportFieldLabel } from '../lib/report-field-labels.js'
 import type { ReportDataSourceId } from '../types/report-table.js'
 
 const MAX_ROWS = 5000
 
 type ReportTableRow = Record<string, string>
 
-function str(value: unknown): string {
-  if (value == null) return ''
-  return String(value)
+const SKIP_REPORT_KEYS = new Set([
+  'avatarUrl',
+  'logoUrl',
+  'imageUrl',
+  'createdById',
+  'updatedById',
+  'teamMembers',
+])
+
+function toIsoDate(value: string): string {
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+  if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) return trimmed.slice(0, 10)
+  return ''
 }
 
-function mapContact(row: Record<string, unknown>): ReportTableRow {
-  return {
-    id: str(row.id),
-    name: str(row.name),
-    email: str(row.email),
-    phone: str(row.phone),
-    company: str(row.company),
-    companyId: str(row.companyId),
-    status: str(row.status),
-    ownerName: str(row.ownerName),
-    lastContact: str(row.lastContact),
-    createdAt: str(row.createdAt),
-    updatedAt: str(row.updatedAt),
-    createdByName: str(row.createdByName),
-    updatedByName: str(row.updatedByName),
+function listItemToReportRow(item: object): ReportTableRow {
+  const out: ReportTableRow = {}
+  for (const [key, value] of Object.entries(item as Record<string, unknown>)) {
+    if (SKIP_REPORT_KEYS.has(key)) continue
+    if (value == null) {
+      out[key] = ''
+      continue
+    }
+    if (typeof value === 'object') continue
+    out[key] = String(value)
   }
-}
 
-function mapCompany(row: Record<string, unknown>): ReportTableRow {
-  return {
-    id: str(row.id),
-    name: str(row.name),
-    industry: str(row.industry),
-    city: str(row.city),
-    owner: str(row.owner),
-    lifecycle: str(row.lifecycle),
-    operationalStatus: str(row.operationalStatus),
-    lastActivity: str(row.lastActivity),
-    createdAt: str(row.createdAt),
-    updatedAt: str(row.updatedAt),
+  if (out.createdAt) {
+    out.createdAtDate = toIsoDate(out.createdAt)
   }
+  if (out.updatedAt) {
+    out.updatedAtDate = toIsoDate(out.updatedAt)
+  }
+
+  return out
 }
 
 async function loadRows(sourceId: ReportDataSourceId): Promise<ReportTableRow[]> {
@@ -64,7 +65,7 @@ async function loadRows(sourceId: ReportDataSourceId): Promise<ReportTableRow[]>
         pageSize,
         archivedOnly: false,
       })
-      return items.map((r) => mapContact(r as unknown as Record<string, unknown>))
+      return items.map((r) => listItemToReportRow(r))
     }
     case 'empresas': {
       const { items } = await companiesRepo.listCompanies({
@@ -72,7 +73,7 @@ async function loadRows(sourceId: ReportDataSourceId): Promise<ReportTableRow[]>
         pageSize,
         archivedOnly: false,
       })
-      return items.map((r) => mapCompany(r as unknown as Record<string, unknown>))
+      return items.map((r) => listItemToReportRow(r))
     }
     case 'oportunidades': {
       const { items } = await opportunitiesRepo.listOpportunities({
@@ -80,20 +81,7 @@ async function loadRows(sourceId: ReportDataSourceId): Promise<ReportTableRow[]>
         pageSize,
         archivedOnly: false,
       })
-      return items.map((r) => {
-        const row = r as unknown as Record<string, unknown>
-        return {
-          id: str(row.id),
-          name: str(row.name),
-          company: str(row.company),
-          companyId: str(row.companyId),
-          stage: str(row.stage),
-          amount: str(row.amount),
-          probability: str(row.probability),
-          closeDate: str(row.closeDate),
-          owner: str(row.owner),
-        }
-      })
+      return items.map((r) => listItemToReportRow(r))
     }
     case 'actividades': {
       const { items } = await activitiesRepo.listActivities({
@@ -101,32 +89,11 @@ async function loadRows(sourceId: ReportDataSourceId): Promise<ReportTableRow[]>
         pageSize,
         archivedOnly: false,
       })
-      return items.map((r) => {
-        const row = r as unknown as Record<string, unknown>
-        return {
-          id: str(row.id),
-          title: str(row.title),
-          type: str(row.type),
-          status: str(row.status),
-          when: str(row.when),
-          assignee: str(row.assignee),
-          relatedName: str(row.relatedName),
-        }
-      })
+      return items.map((r) => listItemToReportRow(r))
     }
     case 'productos': {
       const { items } = await productsRepo.listProducts({ page: 1, pageSize })
-      return items.map((r) => {
-        const row = r as unknown as Record<string, unknown>
-        return {
-          id: str(row.id),
-          name: str(row.name),
-          sku: str(row.sku),
-          category: str(row.category),
-          price: str(row.price),
-          status: str(row.status),
-        }
-      })
+      return items.map((r) => listItemToReportRow(r))
     }
     case 'facturas': {
       const { items } = await invoicesRepo.listInvoices({
@@ -134,19 +101,7 @@ async function loadRows(sourceId: ReportDataSourceId): Promise<ReportTableRow[]>
         pageSize,
         archivedOnly: false,
       })
-      return items.map((r) => {
-        const row = r as unknown as Record<string, unknown>
-        return {
-          id: str(row.id),
-          number: str(row.number),
-          clientName: str(row.clientName),
-          amount: str(row.amount),
-          status: str(row.status),
-          issueDate: str(row.issueDate),
-          dueDate: str(row.dueDate),
-          quoteId: str(row.quoteId),
-        }
-      })
+      return items.map((r) => listItemToReportRow(r))
     }
     case 'proyectos': {
       const { items } = await projectsRepo.listProjects({
@@ -154,17 +109,7 @@ async function loadRows(sourceId: ReportDataSourceId): Promise<ReportTableRow[]>
         pageSize,
         archivedOnly: false,
       })
-      return items.map((r) => {
-        const row = r as unknown as Record<string, unknown>
-        return {
-          id: str(row.id),
-          name: str(row.name),
-          client: str(row.client),
-          status: str(row.status),
-          progress: str(row.progress),
-          deadline: str(row.deadline),
-        }
-      })
+      return items.map((r) => listItemToReportRow(r))
     }
     case 'cotizaciones': {
       const { items } = await quotesRepo.listQuotes({
@@ -172,18 +117,7 @@ async function loadRows(sourceId: ReportDataSourceId): Promise<ReportTableRow[]>
         pageSize,
         archivedOnly: false,
       })
-      return items.map((r) => {
-        const row = r as unknown as Record<string, unknown>
-        return {
-          id: str(row.id),
-          code: str(row.code),
-          title: str(row.title),
-          companyName: str(row.companyName),
-          amount: str(row.amount),
-          status: str(row.status),
-          opportunityId: str(row.opportunityId),
-        }
-      })
+      return items.map((r) => listItemToReportRow(r))
     }
     case 'compras': {
       const { items } = await purchasesRepo.listPurchases({
@@ -191,18 +125,7 @@ async function loadRows(sourceId: ReportDataSourceId): Promise<ReportTableRow[]>
         pageSize,
         archivedOnly: false,
       })
-      return items.map((r) => {
-        const row = r as unknown as Record<string, unknown>
-        return {
-          id: str(row.id),
-          reference: str(row.reference),
-          supplier: str(row.supplier),
-          supplierId: str(row.supplierId),
-          amount: str(row.amount),
-          status: str(row.status),
-          orderDate: str(row.orderDate),
-        }
-      })
+      return items.map((r) => listItemToReportRow(r))
     }
     case 'ingresos': {
       const { items } = await stockReceiptsRepo.listStockReceipts({
@@ -210,47 +133,15 @@ async function loadRows(sourceId: ReportDataSourceId): Promise<ReportTableRow[]>
         pageSize,
         archivedOnly: false,
       })
-      return items.map((r) => {
-        const row = r as unknown as Record<string, unknown>
-        return {
-          id: str(row.id),
-          number: str(row.number),
-          status: str(row.status),
-          purchaseId: str(row.purchaseId),
-          productSummary: str(row.productSummary),
-          confirmedAt: str(row.confirmedAt),
-        }
-      })
+      return items.map((r) => listItemToReportRow(r))
     }
     case 'inventario': {
       const { items } = await inventoryRepo.listInventory({ page: 1, pageSize })
-      return items.map((r) => {
-        const row = r as unknown as Record<string, unknown>
-        return {
-          id: str(row.id),
-          productName: str(row.productName),
-          sku: str(row.sku),
-          location: str(row.location),
-          quantity: str(row.quantity),
-          status: str(row.status),
-        }
-      })
+      return items.map((r) => listItemToReportRow(r))
     }
     default:
       return []
   }
-}
-
-const FIELD_LABELS: Record<string, string> = {
-  id: 'ID',
-  name: 'Nombre',
-  email: 'Email',
-  phone: 'Teléfono',
-  company: 'Empresa',
-  status: 'Estado',
-  amount: 'Monto',
-  reference: 'Referencia',
-  number: 'Número',
 }
 
 export async function executeReportTable(
@@ -267,11 +158,11 @@ export async function executeReportTable(
   const columnIds =
     config.columnIds?.length > 0
       ? config.columnIds
-      : Object.keys(allRows[0] ?? {}).slice(0, 8)
+      : Object.keys(allRows[0] ?? {}).slice(0, 10)
 
   const columns = columnIds.map((id) => ({
     id,
-    label: FIELD_LABELS[id] ?? id,
+    label: reportFieldLabel(id),
     type: 'text' as const,
   }))
 

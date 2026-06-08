@@ -1,4 +1,5 @@
 import type { ProductListItem } from '../types/product.js'
+import { formatProductPriceLabel } from '../lib/product-price-display.js'
 import { imageUrlForList } from '../utils/entity-image.js'
 import { normalizeProductCurrency } from '../types/currency.js'
 import { formatForeignAmount } from './currency.mapper.js'
@@ -69,10 +70,12 @@ export function mapProductRow(row: ProductRow): ProductListItem {
       : centsToNum(row.price_cents)
   const costPriceNum = centsToNum(row.cost_price_cents)
   const unit = row.unit_of_measure?.trim() || 'ud'
+  const billingPeriod = row.billing_period?.trim() || undefined
   const priceLabel =
     priceCurrency === 'CLP'
       ? formatClp(row.price_cents)
       : formatForeignAmount(priceNum, priceCurrency)
+  const showPriceSuffix = !row.track_inventory || stockNum < 0
 
   return {
     id: row.id,
@@ -81,8 +84,13 @@ export function mapProductRow(row: ProductRow): ProductListItem {
     category: row.category_name ?? 'Sin categoría',
     productType: row.product_type ?? 'Producto',
     unitOfMeasure: unit,
-    billingPeriod: row.billing_period?.trim() || undefined,
-    price: priceLabel + (unit && stockNum < 0 ? `/${unit}` : ''),
+    billingPeriod,
+    price: formatProductPriceLabel({
+      priceLabel,
+      unitOfMeasure: unit,
+      billingPeriod,
+      includeSuffix: showPriceSuffix,
+    }),
     priceNum,
     priceCurrency,
     costPrice: row.cost_price_cents != null ? formatClp(row.cost_price_cents) : '—',

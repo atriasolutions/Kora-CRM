@@ -1,4 +1,6 @@
-import { pool } from '../db/pool.js'
+import { tenantQuery } from '../db/tenant-query.js'
+import { tenantWhereParam } from '../lib/tenant-sql.js'
+import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import {
   mapEntityNoteRow,
   type EntityNoteRow,
@@ -12,7 +14,7 @@ import { notFound } from '../middleware/errors.js'
 import type { AuditActor } from '../types/audit.js'
 
 export async function ensureEntityNotesTable(): Promise<void> {
-  await pool.query(`
+  await tenantQuery(`
     CREATE TABLE IF NOT EXISTS crm_entity_notes (
       id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       entity_type     VARCHAR(64) NOT NULL,
@@ -25,7 +27,7 @@ export async function ensureEntityNotesTable(): Promise<void> {
     )
   `)
 
-  await pool.query(`
+  await tenantQuery(`
     DO $$
     BEGIN
       IF EXISTS (
@@ -75,7 +77,7 @@ export async function ensureEntityNotesTable(): Promise<void> {
     END $$;
   `)
 
-  await pool.query(`
+  await tenantQuery(`
     CREATE INDEX IF NOT EXISTS idx_crm_entity_notes_entity
       ON crm_entity_notes (entity_type, entity_id, created_at DESC)
   `)
@@ -85,13 +87,13 @@ export async function listEntityNotes(
   entityType: string,
   entityId: string,
 ): Promise<EntityNoteDto[]> {
-  const result = await pool.query<EntityNoteRow>(
+  const result = await tenantQuery<EntityNoteRow>(
     `SELECT id, entity_type, entity_id, body, mentions,
             author_user_id, author_name, created_at
      FROM crm_entity_notes
-     WHERE entity_type = $1 AND entity_id = $2::uuid
+     WHERE entity_type = $1 AND entity_id = $2::uuid AND ${tenantWhereParam(3)}
      ORDER BY created_at DESC`,
-    [entityType, entityId],
+    [entityType, entityId, getTenantIdOrDefault()],
   )
   return result.rows.map(mapEntityNoteRow)
 }
@@ -101,11 +103,11 @@ export async function createEntityNote(
   actor: AuditActor,
 ): Promise<EntityNoteDto> {
   const mentions: EntityNoteMentionDto[] = input.mentions ?? []
-  const result = await pool.query<EntityNoteRow>(
+  const result = await tenantQuery<EntityNoteRow>(
     `INSERT INTO crm_entity_notes (
       entity_type, entity_id, body, mentions,
-      author_user_id, author_name
-    ) VALUES ($1, $2::uuid, $3, $4::jsonb, $5, $6)
+      author_user_id, author_name, tenant_id
+    ) VALUES ($1, $2::uuid, $3, $4::jsonb, $5, $6, $7)
     RETURNING id, entity_type, entity_id, body, mentions,
               author_user_id, author_name, created_at`,
     [
@@ -115,6 +117,7 @@ export async function createEntityNote(
       JSON.stringify(mentions),
       actor.userId,
       actor.userName,
+      getTenantIdOrDefault(),
     ],
   )
   const row = result.rows[0]
@@ -125,17 +128,17 @@ export async function createEntityNote(
 export async function getEntityNoteEntityType(
   id: string,
 ): Promise<string | null> {
-  const result = await pool.query<{ entity_type: string }>(
-    `SELECT entity_type FROM crm_entity_notes WHERE id = $1::uuid`,
-    [id],
+  const result = await tenantQuery<{ entity_type: string }>(
+    `SELECT entity_type FROM crm_entity_notes WHERE id = $1::uuid AND ${tenantWhereParam(2)}`,
+    [id, getTenantIdOrDefault()],
   )
   return result.rows[0]?.entity_type ?? null
 }
 
 export async function deleteEntityNote(id: string): Promise<void> {
-  const result = await pool.query(
-    `DELETE FROM crm_entity_notes WHERE id = $1::uuid`,
-    [id],
+  const result = await tenantQuery(
+    `DELETE FROM crm_entity_notes WHERE id = $1::uuid AND ${tenantWhereParam(2)}`,
+    [id, getTenantIdOrDefault()],
   )
   if ((result.rowCount ?? 0) === 0) throw notFound('Nota no encontrada')
 }

@@ -9,7 +9,7 @@ import {
 import { apiBaseURL } from '@/api/client'
 import type { NotificationItem, NotificationType } from '@/types/notification'
 import { isApiEnabled } from '@/api/config'
-import { loadAuthSession } from '@/lib/auth-session'
+import { useAuth } from '@/hooks/use-auth'
 import {
   dispatchActivitiesUpdated,
   dispatchInventoryUpdated,
@@ -17,6 +17,7 @@ import {
 import { toast } from '@/lib/toast'
 
 const LOCAL_NOTIFICATIONS_KEY = 'kora-crm-local-notifications'
+const NOTIFICATIONS_POLL_MS = 10_000
 
 function notificationsWebSocketUrl(token: string): string {
   const apiBase = apiBaseURL()
@@ -31,6 +32,46 @@ function notificationsWebSocketUrl(token: string): string {
   }
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   return `${proto}//${window.location.host}/ws?token=${encodeURIComponent(token)}`
+}
+
+function normalizeWsNotification(raw: unknown): NotificationItem | null {
+  if (!raw || typeof raw !== 'object') return null
+  const row = raw as Record<string, unknown>
+  const id = typeof row.id === 'string' ? row.id : ''
+  if (!id) return null
+  const type = row.type
+  if (typeof type !== 'string') return null
+  return {
+    id,
+    type: type as NotificationType,
+    title: typeof row.title === 'string' ? row.title : '',
+    message: typeof row.message === 'string' ? row.message : '',
+    href: typeof row.href === 'string' ? row.href : undefined,
+    entityType:
+      typeof row.entityType === 'string'
+        ? row.entityType
+        : typeof row.entity_type === 'string'
+          ? row.entity_type
+          : undefined,
+    entityId:
+      typeof row.entityId === 'string'
+        ? row.entityId
+        : typeof row.entity_id === 'string'
+          ? row.entity_id
+          : undefined,
+    createdAt:
+      typeof row.createdAt === 'string'
+        ? row.createdAt
+        : typeof row.created_at === 'string'
+          ? row.created_at
+          : new Date().toISOString(),
+    readAt:
+      typeof row.readAt === 'string'
+        ? row.readAt
+        : typeof row.read_at === 'string'
+          ? row.read_at
+          : undefined,
+  }
 }
 
 type NotificationsContextValue = {
@@ -54,6 +95,8 @@ const NotificationsContext = createContext<NotificationsContextValue | null>(nul
 
 export function NotificationsProvider({ children }: { children: React.ReactNode }) {
   const useApi = isApiEnabled()
+  const { session } = useAuth()
+  const authToken = session?.token
   const [unreadCount, setUnreadCount] = useState(0)
   const [items, setItems] = useState<NotificationItem[]>([])
   const wsRef = useRef<WebSocket | null>(null)
@@ -198,72 +241,136 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     mergeNotifications(res.items)
   }, [mergeNotifications])
 
+  const applyIncomingNotification = useCallback((data: NotificationItem) => {
+    setItems((prev) => {
+      const next = [data, ...prev.filter((n) => n.id !== data.id)].slice(0, 100)
+      setUnreadCount(next.filter((n) => !n.readAt).length)
+      persistLocalNotificationsRef.current(next)
+      return next
+    })
+  }, [])
+
+  const applyIncomingNotificationRef = useRef(applyIncomingNotification)
+  applyIncomingNotificationRef.current = applyIncomingNotification
+
   useEffect(() => {
-    if (!useApi) return
+    if (!useApi || !authToken) return
 
     void loadInitial().catch(() => {
       // sin toast: solo afecta UI si no hay backend
     })
-  }, [useApi, loadInitial])
+  }, [useApi, authToken, loadInitial])
+
+  const loadInitialRef = useRef(loadInitial)
+  loadInitialRef.current = loadInitial
 
   useEffect(() => {
-    if (!useApi) return
+    if (!useApi || !authToken) return
 
-    const session = loadAuthSession()
-    const token = session?.token
-    if (!token) return
+    const poll = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      void loadInitialRef.current().catch(() => {
+        // sin toast
+      })
+    }, NOTIFICATIONS_POLL_MS)
+
+    return () => window.clearInterval(poll)
+  }, [useApi, authToken])
+
+  useEffect(() => {
+    if (!useApi || !authToken) return
 
     let cancelled = false
+    let reconnectTimer: number | null = null
+    let reconnectAttempt = 0
     let ws: WebSocket | null = null
 
-    const timer = window.setTimeout(() => {
-      if (cancelled) return
-      if (wsRef.current?.readyState === WebSocket.OPEN) return
-
-      ws = new WebSocket(notificationsWebSocketUrl(token))
-      wsRef.current = ws
-
-      ws.onmessage = (ev) => {
-        try {
-          const msg = JSON.parse(String(ev.data)) as {
-            type: string
-            data?: NotificationItem
-          }
-          if (msg.type === 'activities:updated') {
-            dispatchActivitiesUpdated()
-            return
-          }
-          if (msg.type === 'inventory:updated') {
-            dispatchInventoryUpdated()
-            return
-          }
-          if (msg.type !== 'notification' || !msg.data) return
-          const data = msg.data
-          setItems((prev) => {
-            const next = [data, ...prev.filter((n) => n.id !== data.id)].slice(0, 100)
-            setUnreadCount(next.filter((n) => !n.readAt).length)
-            persistLocalNotificationsRef.current(next)
-            return next
-          })
-        } catch {
-          // ignore
+    const handleWsMessage = (ev: MessageEvent) => {
+      try {
+        const msg = JSON.parse(String(ev.data)) as {
+          type: string
+          data?: unknown
         }
-      }
-
-      ws.onclose = () => {
-        if (wsRef.current === ws) wsRef.current = null
-      }
-      ws.onerror = () => {
+        if (msg.type === 'activities:updated') {
+          dispatchActivitiesUpdated()
+          return
+        }
+        if (msg.type === 'inventory:updated') {
+          dispatchInventoryUpdated()
+          return
+        }
+        if (msg.type !== 'notification') return
+        const data = normalizeWsNotification(msg.data)
+        if (!data) return
+        applyIncomingNotificationRef.current(data)
+      } catch {
         // ignore
       }
-    }, 0)
+    }
+
+    const scheduleReconnect = (authFailed: boolean) => {
+      if (cancelled || authFailed) return
+      const delay = Math.min(1000 * 2 ** reconnectAttempt, 30_000)
+      reconnectAttempt += 1
+      reconnectTimer = window.setTimeout(connect, delay)
+    }
+
+    const connect = () => {
+      if (cancelled) return
+      const current = wsRef.current
+      if (
+        current &&
+        (current.readyState === WebSocket.OPEN || current.readyState === WebSocket.CONNECTING)
+      ) {
+        return
+      }
+
+      ws = new WebSocket(notificationsWebSocketUrl(authToken))
+      wsRef.current = ws
+
+      ws.onopen = () => {
+        reconnectAttempt = 0
+        void loadInitialRef.current().catch(() => {
+          // recuperar notificaciones perdidas mientras el socket estaba caído
+        })
+      }
+
+      ws.onmessage = handleWsMessage
+
+      ws.onclose = (event) => {
+        if (wsRef.current === ws) wsRef.current = null
+        scheduleReconnect(event.code === 4401)
+      }
+
+      ws.onerror = () => {
+        ws?.close()
+      }
+    }
+
+    const refreshOnFocus = () => {
+      if (document.visibilityState === 'hidden') return
+      if (wsRef.current?.readyState !== WebSocket.OPEN) {
+        reconnectAttempt = 0
+        connect()
+      }
+      void loadInitialRef.current().catch(() => {
+        // sin toast
+      })
+    }
+
+    connect()
+    window.addEventListener('focus', refreshOnFocus)
+    document.addEventListener('visibilitychange', refreshOnFocus)
 
     return () => {
       cancelled = true
-      window.clearTimeout(timer)
+      window.removeEventListener('focus', refreshOnFocus)
+      document.removeEventListener('visibilitychange', refreshOnFocus)
+      if (reconnectTimer !== null) window.clearTimeout(reconnectTimer)
       if (ws) {
         ws.onclose = null
         ws.onerror = null
+        ws.onmessage = null
         try {
           ws.close()
         } catch {
@@ -272,7 +379,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       }
       if (wsRef.current === ws) wsRef.current = null
     }
-  }, [useApi])
+  }, [useApi, authToken])
 
   const value = useMemo<NotificationsContextValue>(
     () => ({ unreadCount, items, markRead, markAllRead, clearAll, addLocalNotification }),

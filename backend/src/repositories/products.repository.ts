@@ -1,6 +1,9 @@
 import type { PoolClient } from 'pg'
 
 import { pool } from '../db/pool.js'
+import { setTenantLocal, tenantQuery } from '../db/tenant-query.js'
+import { pushTenantCondition, tenantWhereParam } from '../lib/tenant-sql.js'
+import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import { deriveInventoryStatus } from '../mappers/inventory.mapper.js'
 import { mapProductDetail, mapProductRow, type ProductRow } from '../mappers/product.mapper.js'
 import { maybeNotifyRecordOwnerChange } from '../lib/owner-assignment.js'
@@ -51,14 +54,14 @@ export type ListProductsParams = {
 async function resolveCategoryId(categoryName?: string): Promise<string | null> {
   const name = categoryName?.trim()
   if (!name) return null
-  const existing = await pool.query<{ id: string }>(
+  const existing = await tenantQuery<{ id: string }>(
     `SELECT id FROM crm_product_categories WHERE lower(trim(name)) = lower($1) AND active = true LIMIT 1`,
     [name],
   )
   if (existing.rows[0]) return existing.rows[0].id
-  const inserted = await pool.query<{ id: string }>(
-    `INSERT INTO crm_product_categories (name, active) VALUES ($1, true) RETURNING id`,
-    [name],
+  const inserted = await tenantQuery<{ id: string }>(
+    `INSERT INTO crm_product_categories (name, active, tenant_id) VALUES ($1, true, $2) RETURNING id`,
+    [name, getTenantIdOrDefault()],
   )
   return inserted.rows[0]?.id ?? null
 }
@@ -124,8 +127,8 @@ async function ensureInventoryPositionForNewProduct(
     `INSERT INTO crm_inventory_positions (
       product_id, product_name, sku, warehouse_id, warehouse_name,
       quantity_on_hand, quantity_reserved, quantity_available, min_stock, status,
-      last_movement_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, 0, $7, $8, $9, now())
+      last_movement_at, tenant_id
+    ) VALUES ($1, $2, $3, $4, $5, $6, 0, $7, $8, $9, now(), $10)
     RETURNING id`,
     [
       params.productId,
@@ -137,6 +140,7 @@ async function ensureInventoryPositionForNewProduct(
       available,
       minStock,
       status,
+      getTenantIdOrDefault(),
     ],
   )
   const positionId = inserted.rows[0]!.id
@@ -170,6 +174,7 @@ export async function listProducts(
   const values: unknown[] = []
   let idx = 1
 
+  idx = pushTenantCondition(conditions, values, idx, 'p')
   if (params.archivedOnly) {
     conditions.push('p.archived_at IS NOT NULL')
   } else {
@@ -189,7 +194,7 @@ export async function listProducts(
 
   const where = `WHERE ${conditions.join(' AND ')}`
 
-  const countResult = await pool.query<{ count: string }>(
+  const countResult = await tenantQuery<{ count: string }>(
     `SELECT count(*)::text AS count ${FROM_JOIN} ${where}`,
     values,
   )
@@ -198,7 +203,7 @@ export async function listProducts(
   const offset = paginationOffset(params.page, params.pageSize)
   values.push(params.pageSize, offset)
 
-  const result = await pool.query<ProductRow>(
+  const result = await tenantQuery<ProductRow>(
     `SELECT ${SELECT_COLUMNS}
      ${FROM_JOIN}
      ${where}
@@ -211,11 +216,11 @@ export async function listProducts(
 }
 
 export async function getProductById(id: string): Promise<ProductListItem> {
-  const result = await pool.query<ProductRow>(
+  const result = await tenantQuery<ProductRow>(
     `SELECT ${SELECT_COLUMNS}
      ${FROM_JOIN}
-     WHERE p.id = $1 AND p.deleted_at IS NULL`,
-    [id],
+     WHERE p.id = $1 AND p.deleted_at IS NULL AND ${tenantWhereParam(2, 'p')}`,
+    [id, getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   if (!row) throw notFound('Producto no encontrado')
@@ -230,16 +235,16 @@ async function assertSkuAvailable(
   const trimmed = sku.trim()
   if (!trimmed) return
 
-  const db = client ?? pool
-  const result = await db.query<{ id: string; name: string }>(
-    `SELECT id, name
+  const sql = `SELECT id, name
      FROM crm_products
      WHERE lower(trim(sku)) = lower($1)
        AND deleted_at IS NULL
        ${excludeProductId ? 'AND id <> $2' : ''}
-     LIMIT 1`,
-    excludeProductId ? [trimmed, excludeProductId] : [trimmed],
-  )
+     LIMIT 1`
+  const params = excludeProductId ? [trimmed, excludeProductId] : [trimmed]
+  const result = client
+    ? await client.query<{ id: string; name: string }>(sql, params)
+    : await tenantQuery<{ id: string; name: string }>(sql, params)
   const row = result.rows[0]
   if (row) {
     throw badRequest(
@@ -265,6 +270,7 @@ export async function createProduct(
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    await setTenantLocal(client)
 
     // Si algún "eliminación permanente" anterior terminó haciendo solo soft-delete,
     // la fila queda en BD y bloquea el UNIQUE(sku). Limpiamos esas filas ya
@@ -284,12 +290,12 @@ export async function createProduct(
         name, sku, category_id, product_type, unit_of_measure, billing_period,
         price_cents, price_currency, price_amount, cost_price_cents, stock_qty, status, track_inventory,
         min_stock, max_stock, barcode, image_url,
-        created_by_id, created_by_name, owner_name, updated_by_id, updated_by_name
+        created_by_id, created_by_name, owner_name, updated_by_id, updated_by_name, tenant_id
       ) VALUES (
         $1, $2, $3, $4, $5, $6,
         $7, $8, $9, $10, $11, $12, $13,
         $14, $15, $16, $17,
-        $18, $19, $20, $18, $19
+        $18, $19, $20, $18, $19, $21
       ) RETURNING id`,
       [
         input.name.trim(),
@@ -312,6 +318,7 @@ export async function createProduct(
         actor.userId,
         actor.userName,
         input.ownerName?.trim() || actor.userName,
+        getTenantIdOrDefault(),
       ],
     )
     const productId = result.rows[0]!.id
@@ -440,7 +447,7 @@ export async function updateProduct(
   values.push(id)
 
   try {
-    await pool.query(
+    await tenantQuery(
       `UPDATE crm_products SET ${sets.join(', ')}, updated_at = now()
        WHERE id = $${idx} AND deleted_at IS NULL`,
       values,
@@ -472,12 +479,12 @@ export async function archiveProduct(
   id: string,
   actor: AuditActor,
 ): Promise<ProductListItem> {
-  const result = await pool.query(
+  const result = await tenantQuery(
     `UPDATE crm_products
      SET archived_at = now(), updated_by_id = $2, updated_by_name = $3, updated_at = now()
-     WHERE id = $1 AND deleted_at IS NULL AND archived_at IS NULL
+     WHERE id = $1 AND deleted_at IS NULL AND archived_at IS NULL AND ${tenantWhereParam(4)}
      RETURNING id`,
-    [id, actor.userId, actor.userName],
+    [id, actor.userId, actor.userName, getTenantIdOrDefault()],
   )
   if (result.rowCount === 0) throw notFound('Producto no encontrado')
   return getProductById(id)
@@ -487,23 +494,23 @@ export async function restoreProduct(
   id: string,
   actor: AuditActor,
 ): Promise<ProductListItem> {
-  const result = await pool.query(
+  const result = await tenantQuery(
     `UPDATE crm_products
      SET archived_at = NULL, updated_by_id = $2, updated_by_name = $3, updated_at = now()
-     WHERE id = $1 AND deleted_at IS NULL
+     WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(4)}
      RETURNING id`,
-    [id, actor.userId, actor.userName],
+    [id, actor.userId, actor.userName, getTenantIdOrDefault()],
   )
   if (result.rowCount === 0) throw notFound('Producto archivado no encontrado')
   return getProductById(id)
 }
 
 export async function softDeleteProduct(id: string, actor: AuditActor): Promise<void> {
-  const result = await pool.query(
+  const result = await tenantQuery(
     `UPDATE crm_products
      SET deleted_at = now(), updated_by_id = $2, updated_by_name = $3, updated_at = now()
-     WHERE id = $1 AND deleted_at IS NULL`,
-    [id, actor.userId, actor.userName],
+     WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(4)}`,
+    [id, actor.userId, actor.userName, getTenantIdOrDefault()],
   )
   if (result.rowCount === 0) throw notFound('Producto no encontrado')
 }
@@ -516,6 +523,7 @@ export async function permanentlyDeleteProduct(id: string): Promise<void> {
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    await setTenantLocal(client)
 
     const productResult = await client.query<{ sku: string }>(
       `SELECT sku

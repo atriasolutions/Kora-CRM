@@ -4,7 +4,8 @@ import { useNavigate } from 'react-router-dom'
 
 import { LargeDatasetBanner } from '@/components/list/LargeDatasetBanner'
 import { SegmentsListPagination } from '@/components/list/SegmentsListPagination'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { EntityAvatarImage } from '@/components/shared/EntityAvatarImage'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { companySegments, countSegmentMatches, filterCompanies } from '@/data/companies-views.mock'
@@ -205,7 +206,7 @@ function SegmentCompanyRow({
         className="group flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/30"
       >
         <Avatar className="size-10 shrink-0 rounded-lg border border-border">
-          <AvatarImage src={company.logoUrl} alt={company.name} />
+          <EntityAvatarImage src={company.logoUrl} alt={company.name} />
           <AvatarFallback className="rounded-lg text-xs">
             {initialsFromLabel(company.name)}
           </AvatarFallback>

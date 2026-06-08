@@ -5,7 +5,13 @@ import {
   getPeriodRanges,
   type DashboardPeriod,
 } from '../lib/dashboard-period.js'
-import { pool } from '../db/pool.js'
+import { tenantQuery } from '../db/tenant-query.js'
+import { getTenantIdOrDefault } from '../lib/tenant-context.js'
+
+function dashTenantFilter(tableAlias?: string): string {
+  const col = tableAlias ? `${tableAlias}.tenant_id` : 'tenant_id'
+  return `${col} = '${getTenantIdOrDefault()}'`
+}
 import type {
   DashboardFunnelStage,
   DashboardKpi,
@@ -89,22 +95,24 @@ async function loadRevenueExpenseSeries(
     const chartEnd = toDateParam(new Date(endYear, 11, 31))
 
     const [revenueRows, expenseRows] = await Promise.all([
-      pool.query<{ year: number; total: string }>(
+      tenantQuery<{ year: number; total: string }>(
         `SELECT extract(year from issue_date)::int AS year,
                 coalesce(sum(amount_cents), 0)::text AS total
          FROM crm_invoices
          WHERE deleted_at IS NULL AND archived_at IS NULL
            AND lower(trim(status::text)) = 'pagada'
            AND issue_date >= $1::date AND issue_date <= $2::date
+           AND ${dashTenantFilter()}
          GROUP BY 1 ORDER BY 1`,
         [chartStart, chartEnd],
       ),
-      pool.query<{ year: number; total: string }>(
+      tenantQuery<{ year: number; total: string }>(
         `SELECT extract(year from order_date)::int AS year,
                 coalesce(sum(amount_cents), 0)::text AS total
          FROM crm_purchases
          WHERE deleted_at IS NULL AND archived_at IS NULL
            AND order_date >= $1::date AND order_date <= $2::date
+           AND ${dashTenantFilter()}
          GROUP BY 1 ORDER BY 1`,
         [chartStart, chartEnd],
       ),
@@ -133,22 +141,24 @@ async function loadRevenueExpenseSeries(
     const chartEnd = toDateParam(new Date(period.year, 11, 31))
 
     const [revenueRows, expenseRows] = await Promise.all([
-      pool.query<{ month: Date; total: string }>(
+      tenantQuery<{ month: Date; total: string }>(
         `SELECT date_trunc('month', issue_date)::date AS month,
                 coalesce(sum(amount_cents), 0)::text AS total
          FROM crm_invoices
          WHERE deleted_at IS NULL AND archived_at IS NULL
            AND lower(trim(status::text)) = 'pagada'
            AND issue_date >= $1::date AND issue_date <= $2::date
+           AND ${dashTenantFilter()}
          GROUP BY 1 ORDER BY 1`,
         [chartStart, chartEnd],
       ),
-      pool.query<{ month: Date; total: string }>(
+      tenantQuery<{ month: Date; total: string }>(
         `SELECT date_trunc('month', order_date)::date AS month,
                 coalesce(sum(amount_cents), 0)::text AS total
          FROM crm_purchases
          WHERE deleted_at IS NULL AND archived_at IS NULL
            AND order_date >= $1::date AND order_date <= $2::date
+           AND ${dashTenantFilter()}
          GROUP BY 1 ORDER BY 1`,
         [chartStart, chartEnd],
       ),
@@ -175,22 +185,24 @@ async function loadRevenueExpenseSeries(
   const chartEnd = toDateParam(windowEnd)
 
   const [revenueRows, expenseRows] = await Promise.all([
-    pool.query<{ month: Date; total: string }>(
+    tenantQuery<{ month: Date; total: string }>(
       `SELECT date_trunc('month', issue_date)::date AS month,
               coalesce(sum(amount_cents), 0)::text AS total
        FROM crm_invoices
        WHERE deleted_at IS NULL AND archived_at IS NULL
          AND lower(trim(status::text)) = 'pagada'
          AND issue_date >= $1::date AND issue_date <= $2::date
+           AND ${dashTenantFilter()}
        GROUP BY 1 ORDER BY 1`,
       [chartStart, chartEnd],
     ),
-    pool.query<{ month: Date; total: string }>(
+    tenantQuery<{ month: Date; total: string }>(
       `SELECT date_trunc('month', order_date)::date AS month,
               coalesce(sum(amount_cents), 0)::text AS total
        FROM crm_purchases
        WHERE deleted_at IS NULL AND archived_at IS NULL
          AND order_date >= $1::date AND order_date <= $2::date
+           AND ${dashTenantFilter()}
        GROUP BY 1 ORDER BY 1`,
       [chartStart, chartEnd],
     ),
@@ -246,7 +258,7 @@ export async function getDashboardSnapshot(
     projectRows,
     revenueExpenseSeries,
   ] = await Promise.all([
-    pool.query<{ current: string; previous: string }>(
+    tenantQuery<{ current: string; previous: string }>(
       `SELECT
         count(*) FILTER (
           WHERE deleted_at IS NULL AND archived_at IS NULL
@@ -256,10 +268,11 @@ export async function getDashboardSnapshot(
           WHERE deleted_at IS NULL AND archived_at IS NULL
             AND created_at >= $3 AND created_at <= $4
         )::text AS previous
-       FROM crm_opportunities`,
+       FROM crm_opportunities
+       WHERE ${dashTenantFilter()}`,
       [rangeStart, rangeEnd, prevRangeStart, prevRangeEnd],
     ),
-    pool.query<{ current: string; previous: string }>(
+    tenantQuery<{ current: string; previous: string }>(
       `SELECT
         count(*) FILTER (
           WHERE deleted_at IS NULL AND archived_at IS NULL
@@ -271,10 +284,11 @@ export async function getDashboardSnapshot(
             AND lower(trim(status::text)) = 'cliente'
             AND created_at >= $3 AND created_at <= $4
         )::text AS previous
-       FROM crm_contacts`,
+       FROM crm_contacts
+       WHERE ${dashTenantFilter()}`,
       [rangeStart, rangeEnd, prevRangeStart, prevRangeEnd],
     ),
-    pool.query<{ current: string; previous: string }>(
+    tenantQuery<{ current: string; previous: string }>(
       `SELECT
         count(*) FILTER (
           WHERE deleted_at IS NULL AND created_at >= $1 AND created_at <= $2
@@ -282,10 +296,11 @@ export async function getDashboardSnapshot(
         count(*) FILTER (
           WHERE deleted_at IS NULL AND created_at >= $3 AND created_at <= $4
         )::text AS previous
-       FROM crm_activities`,
+       FROM crm_activities
+       WHERE ${dashTenantFilter()}`,
       [rangeStart, rangeEnd, prevRangeStart, prevRangeEnd],
     ),
-    pool.query<{ current: string; previous: string }>(
+    tenantQuery<{ current: string; previous: string }>(
       `SELECT
         coalesce(sum(amount_cents) FILTER (
           WHERE deleted_at IS NULL AND archived_at IS NULL
@@ -297,18 +312,20 @@ export async function getDashboardSnapshot(
             AND lower(trim(status::text)) = 'pagada'
             AND issue_date >= $3::date AND issue_date <= $4::date
         ), 0)::text AS previous
-       FROM crm_invoices`,
+       FROM crm_invoices
+       WHERE ${dashTenantFilter()}`,
       [rangeStartIso, rangeEndIso, prevStartIso, prevEndIso],
     ),
-    pool.query<{ stage: string; count: string }>(
+    tenantQuery<{ stage: string; count: string }>(
       `SELECT trim(stage::text) AS stage, count(*)::text AS count
        FROM crm_opportunities
        WHERE deleted_at IS NULL AND archived_at IS NULL
          AND created_at >= $1 AND created_at <= $2
+         AND ${dashTenantFilter()}
        GROUP BY trim(stage::text)`,
       [rangeStart, rangeEnd],
     ),
-    pool.query<{
+    tenantQuery<{
       id: string
       title: string
       company_name: string | null
@@ -319,10 +336,11 @@ export async function getDashboardSnapshot(
        FROM crm_activities
        WHERE deleted_at IS NULL
          AND status IN ('Pendiente', 'En curso')
+         AND ${dashTenantFilter()}
        ORDER BY scheduled_at ASC NULLS LAST, created_at ASC
        LIMIT 4`,
     ),
-    pool.query<{
+    tenantQuery<{
       id: string
       name: string
       company_name: string | null
@@ -333,25 +351,28 @@ export async function getDashboardSnapshot(
        FROM crm_opportunities
        WHERE deleted_at IS NULL AND archived_at IS NULL
          AND created_at >= $1 AND created_at <= $2
+         AND ${dashTenantFilter()}
        ORDER BY updated_at DESC
        LIMIT 4`,
       [rangeStart, rangeEnd],
     ),
-    pool.query<{ source: string; total: string }>(
+    tenantQuery<{ source: string; total: string }>(
       `SELECT coalesce(nullif(trim(source), ''), 'Sin origen') AS source,
               coalesce(sum(amount_cents), 0)::text AS total
        FROM crm_opportunities
        WHERE deleted_at IS NULL AND archived_at IS NULL
          AND created_at >= $1 AND created_at <= $2
+         AND ${dashTenantFilter()}
        GROUP BY 1
        ORDER BY sum(amount_cents) DESC
        LIMIT 6`,
       [rangeStart, rangeEnd],
     ),
-    pool.query<{ id: string; name: string; progress_pct: number | null }>(
+    tenantQuery<{ id: string; name: string; progress_pct: number | null }>(
       `SELECT id, name, progress_pct
        FROM crm_projects
        WHERE deleted_at IS NULL AND archived_at IS NULL
+         AND ${dashTenantFilter()}
        ORDER BY updated_at DESC
        LIMIT 4`,
     ),

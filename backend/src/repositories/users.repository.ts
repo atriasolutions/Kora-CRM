@@ -1,4 +1,6 @@
-import { pool } from '../db/pool.js'
+import { platformQuery, tenantQuery } from '../db/tenant-query.js'
+import { pushTenantCondition, tenantWhereParam } from '../lib/tenant-sql.js'
+import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import { mapUserDetail, mapUserRow, type UserRow } from '../mappers/user.mapper.js'
 import {
   assertUserEmailAvailable,
@@ -42,6 +44,7 @@ export async function listUsers(
   const values: unknown[] = []
   let idx = 1
 
+  idx = pushTenantCondition(conditions, values, idx, 'u')
   if (params.status) {
     conditions.push(`u.status = $${idx++}`)
     values.push(params.status)
@@ -56,7 +59,7 @@ export async function listUsers(
 
   const where = `WHERE ${conditions.join(' AND ')}`
 
-  const countResult = await pool.query<{ count: string }>(
+  const countResult = await tenantQuery<{ count: string }>(
     `SELECT count(*)::text AS count
      FROM crm_users u
      LEFT JOIN crm_access_profiles p ON p.id = u.profile_id
@@ -68,7 +71,7 @@ export async function listUsers(
   const offset = paginationOffset(params.page, params.pageSize)
   values.push(params.pageSize, offset)
 
-  const result = await pool.query<UserRow>(
+  const result = await tenantQuery<UserRow>(
     `SELECT ${SELECT_LIST_COLUMNS}
      FROM crm_users u
      LEFT JOIN crm_access_profiles p ON p.id = u.profile_id
@@ -83,7 +86,7 @@ export async function listUsers(
 
 /** Directorio mínimo para asignar responsables (sin permiso al módulo Usuarios). */
 export async function listUsersForAssignee(): Promise<UserListItem[]> {
-  const result = await pool.query<UserRow>(
+  const result = await tenantQuery<UserRow>(
     `SELECT ${SELECT_LIST_COLUMNS}
      FROM crm_users u
      LEFT JOIN crm_access_profiles p ON p.id = u.profile_id
@@ -94,9 +97,9 @@ export async function listUsersForAssignee(): Promise<UserListItem[]> {
 }
 
 export async function getUserById(id: string): Promise<UserDetail> {
-  const result = await pool.query<UserRow>(
-    `SELECT ${SELECT_COLUMNS} FROM crm_users WHERE id = $1 AND deleted_at IS NULL`,
-    [id],
+  const result = await tenantQuery<UserRow>(
+    `SELECT ${SELECT_COLUMNS} FROM crm_users WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
+    [id, getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   if (!row) throw notFound('Usuario no encontrado')
@@ -127,15 +130,17 @@ export async function createUser(
   let result
   try {
     result = password
-    ? await pool.query<{ id: string }>(
+    ? await tenantQuery<{ id: string }>(
         `INSERT INTO crm_users (
           email, name, password_hash, role, profile_id, status, avatar_url,
           phone, department, job_title, timezone, language, bio,
-          created_by_id, created_by_name, updated_by_id, updated_by_name
+          created_by_id, created_by_name, updated_by_id, updated_by_name,
+          tenant_id
         ) VALUES (
           lower($1), $2, crypt($3, gen_salt('bf')), $4, $5, $6, $7,
           $8, $9, $10, $11, $12, $13,
-          $14, $15, $14, $15
+          $14, $15, $14, $15,
+          $16
         ) RETURNING id`,
         [
           input.email.trim(),
@@ -153,17 +158,20 @@ export async function createUser(
           input.bio?.trim() || null,
           actor.userId,
           actor.userName,
+          getTenantIdOrDefault(),
         ],
       )
-    : await pool.query<{ id: string }>(
+    : await tenantQuery<{ id: string }>(
         `INSERT INTO crm_users (
           email, name, password_hash, role, profile_id, status, avatar_url,
           phone, department, job_title, timezone, language, bio,
-          created_by_id, created_by_name, updated_by_id, updated_by_name
+          created_by_id, created_by_name, updated_by_id, updated_by_name,
+          tenant_id
         ) VALUES (
           lower($1), $2, NULL, $3, $4, $5, $6,
           $7, $8, $9, $10, $11, $12,
-          $13, $14, $13, $14
+          $13, $14, $13, $14,
+          $15
         ) RETURNING id`,
         [
           input.email.trim(),
@@ -180,6 +188,7 @@ export async function createUser(
           input.bio?.trim() || null,
           actor.userId,
           actor.userName,
+          getTenantIdOrDefault(),
         ],
       )
   } catch (error) {
@@ -192,6 +201,16 @@ export async function createUser(
   }
 
   const userId = result.rows[0]!.id
+  const tenantId = getTenantIdOrDefault()
+  const membershipStatus = status === 'Activo' ? 'active' : 'invited'
+  await platformQuery(
+    `INSERT INTO crm_tenant_memberships (tenant_id, user_id, profile_id, status, is_default)
+     VALUES ($1, $2, $3, $4::crm_membership_status, true)
+     ON CONFLICT (tenant_id, user_id) DO UPDATE SET
+       profile_id = EXCLUDED.profile_id,
+       status = EXCLUDED.status`,
+    [tenantId, userId, input.profileId, membershipStatus],
+  )
   if (!password && sendInvite) {
     await sendAccountSetupInvite(userId)
   }
@@ -288,7 +307,7 @@ export async function updateUser(
   values.push(id)
 
   try {
-    await pool.query(
+    await tenantQuery(
       `UPDATE crm_users SET ${sets.join(', ')}, updated_at = now()
        WHERE id = $${idx} AND deleted_at IS NULL`,
       values,
@@ -308,15 +327,24 @@ export async function updateUser(
     await reconcileUserDenormalizedNames(id)
   }
 
+  if (input.status === 'Activo') {
+    await platformQuery(
+      `UPDATE crm_tenant_memberships
+       SET status = 'active'::crm_membership_status
+       WHERE user_id = $1 AND status = 'invited'::crm_membership_status`,
+      [id],
+    )
+  }
+
   return getUserById(id)
 }
 
 export async function softDeleteUser(id: string, actor: AuditActor): Promise<void> {
-  const result = await pool.query(
+  const result = await tenantQuery(
     `UPDATE crm_users
      SET deleted_at = now(), deleted_by_id = $2, updated_by_id = $2, updated_by_name = $3, updated_at = now()
-     WHERE id = $1 AND deleted_at IS NULL`,
-    [id, actor.userId, actor.userName],
+     WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(4)}`,
+    [id, actor.userId, actor.userName, getTenantIdOrDefault()],
   )
   if (result.rowCount === 0) throw notFound('Usuario no encontrado')
 }

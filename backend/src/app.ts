@@ -1,7 +1,7 @@
 import cors from 'cors'
 import express from 'express'
 
-import { env } from './config/env.js'
+import { isAllowedCorsOrigin } from './lib/cors-origins.js'
 import { checkDatabaseConnection } from './db/pool.js'
 import { authSessionMiddleware } from './middleware/auth-session.js'
 import { errorHandler } from './middleware/errors.js'
@@ -12,7 +12,13 @@ export function createApp() {
 
   app.use(
     cors({
-      origin: env.corsOrigin,
+      origin(origin, callback) {
+        if (isAllowedCorsOrigin(origin)) {
+          callback(null, true)
+          return
+        }
+        callback(null, false)
+      },
       credentials: true,
     }),
   )

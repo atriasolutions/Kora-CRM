@@ -20,6 +20,8 @@ export function defaultOrganizationSettings(): OrganizationSettings {
     email: 'compras@kora.cl',
     logoUrl: '',
     defaultVatPercent: 19,
+    invoicingMode: 'manual',
+    economicActivityCode: null,
   }
 }
 
@@ -63,5 +65,12 @@ export function validateOrganizationSettings(
   const commune = values.commune.trim()
   if (region && !commune) return 'Selecciona una comuna para la región indicada.'
   if (commune && !region) return 'Selecciona una región para la comuna indicada.'
+  if (values.invoicingMode === 'sii') {
+    if (!values.giro.trim()) return 'El giro es obligatorio para facturación SII.'
+    if (!values.commune.trim()) return 'La comuna es obligatoria para facturación SII.'
+    if (values.economicActivityCode == null || values.economicActivityCode <= 0) {
+      return 'Indica el código de actividad económica SII.'
+    }
+  }
   return null
 }

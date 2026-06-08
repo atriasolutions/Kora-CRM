@@ -12,6 +12,9 @@ import {
 } from '../lib/relation-snapshots.js'
 import { withStockTransaction } from '../lib/inventory-stock-lock.js'
 import { pool } from '../db/pool.js'
+import { setTenantLocal, tenantQuery } from '../db/tenant-query.js'
+import { pushTenantCondition, tenantWhereParam } from '../lib/tenant-sql.js'
+import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import {
   mapQuoteDetail,
   mapQuoteRow,
@@ -73,7 +76,7 @@ export type ListQuotesParams = {
 }
 
 async function loadQuoteLineItems(quoteId: string): Promise<QuoteLineRow[]> {
-  const result = await pool.query<QuoteLineRow>(
+  const result = await tenantQuery<QuoteLineRow>(
     `SELECT ${LINE_COLUMNS}
      FROM crm_quote_line_items
      WHERE quote_id = $1
@@ -86,7 +89,7 @@ async function loadQuoteLineItems(quoteId: string): Promise<QuoteLineRow[]> {
 async function nextQuoteCode(): Promise<string> {
   const year = new Date().getFullYear()
   const prefix = `COT-${year}-`
-  const result = await pool.query<{ code: string }>(
+  const result = await tenantQuery<{ code: string }>(
     `SELECT code FROM crm_quotes
      WHERE code LIKE $1
      ORDER BY code DESC
@@ -183,6 +186,7 @@ export async function listQuotes(
   } else {
     conditions.push('archived_at IS NULL')
   }
+  idx = pushTenantCondition(conditions, values, idx)
   if (params.status) {
     conditions.push(`status = $${idx++}`)
     values.push(params.status)
@@ -217,7 +221,7 @@ export async function listQuotes(
 
   const where = `WHERE ${conditions.join(' AND ')}`
 
-  const countResult = await pool.query<{ count: string }>(
+  const countResult = await tenantQuery<{ count: string }>(
     `SELECT count(*)::text AS count FROM crm_quotes ${where}`,
     values,
   )
@@ -226,7 +230,7 @@ export async function listQuotes(
   const offset = paginationOffset(params.page, params.pageSize)
   values.push(params.pageSize, offset)
 
-  const result = await pool.query<QuoteRow>(
+  const result = await tenantQuery<QuoteRow>(
     `SELECT ${QUOTE_COLUMNS}
      FROM crm_quotes
      ${where}
@@ -239,11 +243,11 @@ export async function listQuotes(
 }
 
 export async function getQuoteById(id: string): Promise<QuoteDetail> {
-  const result = await pool.query<QuoteRow>(
+  const result = await tenantQuery<QuoteRow>(
     `SELECT ${QUOTE_COLUMNS}
      FROM crm_quotes
-     WHERE id = $1 AND deleted_at IS NULL`,
-    [id],
+     WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
+    [id, getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   if (!row) throw notFound('Cotización no encontrada')
@@ -271,7 +275,7 @@ export async function createQuote(
   })
 
   if (input.opportunityId && opp.opportunityId) {
-    const oppRow = await pool.query<{
+    const oppRow = await tenantQuery<{
       company_id: string | null
       company_name: string
       contact_id: string | null
@@ -303,6 +307,7 @@ export async function createQuote(
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    await setTenantLocal(client)
 
     const result = await client.query<QuoteRow>(
       `INSERT INTO crm_quotes (
@@ -312,7 +317,7 @@ export async function createQuote(
         owner_name, customer_kind,
         payment_terms, delivery_terms, terms,
         exchange_rate_uf, exchange_rate_usd, exchange_rate_eur, exchange_rate_date,
-        created_by_id, created_by_name, updated_by_id, updated_by_name
+        created_by_id, created_by_name, updated_by_id, updated_by_name, tenant_id
       ) VALUES (
         $1, $2, $3, $4,
         $5, $6, $7, $8,
@@ -320,7 +325,7 @@ export async function createQuote(
         $13, $14,
         $15, $16, $17,
         $18, $19, $20, $21,
-        $22, $23, $22, $23
+        $22, $23, $22, $23, $24
       )
       RETURNING ${QUOTE_COLUMNS}`,
       [
@@ -347,6 +352,7 @@ export async function createQuote(
         exchangeRates.exchangeRateDate,
         actor.userId,
         actor.userName,
+        getTenantIdOrDefault(),
       ],
     )
 
@@ -399,7 +405,7 @@ export async function updateQuote(
     contactId = resolved.contactId
     contactName = resolved.contactName
   } else {
-    const row = await pool.query<{ contact_name: string }>(
+    const row = await tenantQuery<{ contact_name: string }>(
       `SELECT contact_name FROM crm_quotes WHERE id = $1`,
       [id],
     )
@@ -463,7 +469,7 @@ export async function updateQuote(
         updated_by_id = $23,
         updated_by_name = $24,
         updated_at = now()
-      WHERE id = $1 AND deleted_at IS NULL
+      WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(25)}
       RETURNING ${QUOTE_COLUMNS}`,
       [
         id,
@@ -490,6 +496,7 @@ export async function updateQuote(
         exchangeRates?.exchangeRateDate ?? null,
         actor.userId,
         actor.userName,
+        getTenantIdOrDefault(),
       ],
     )
     const row = result.rows[0]
@@ -556,11 +563,11 @@ export async function softDeleteQuote(
   id: string,
   actor: AuditActor,
 ): Promise<void> {
-  const result = await pool.query(
+  const result = await tenantQuery(
     `UPDATE crm_quotes
      SET deleted_at = now(), updated_by_id = $2, updated_by_name = $3, updated_at = now()
-     WHERE id = $1 AND deleted_at IS NULL`,
-    [id, actor.userId, actor.userName],
+     WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(4)}`,
+    [id, actor.userId, actor.userName, getTenantIdOrDefault()],
   )
   if (result.rowCount === 0) throw notFound('Cotización no encontrada')
   await purgeEntityNotesAndFiles('cotizacion', id)
@@ -570,12 +577,12 @@ export async function archiveQuote(
   id: string,
   actor: AuditActor,
 ): Promise<QuoteDetail> {
-  const result = await pool.query<QuoteRow>(
+  const result = await tenantQuery<QuoteRow>(
     `UPDATE crm_quotes
      SET archived_at = now(), updated_by_id = $2, updated_by_name = $3, updated_at = now()
-     WHERE id = $1 AND deleted_at IS NULL AND archived_at IS NULL
+     WHERE id = $1 AND deleted_at IS NULL AND archived_at IS NULL AND ${tenantWhereParam(4)}
      RETURNING ${QUOTE_COLUMNS}`,
-    [id, actor.userId, actor.userName],
+    [id, actor.userId, actor.userName, getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   if (!row) throw notFound('Cotización no encontrada o ya archivada')
@@ -586,12 +593,12 @@ export async function restoreQuote(
   id: string,
   actor: AuditActor,
 ): Promise<QuoteDetail> {
-  const result = await pool.query<QuoteRow>(
+  const result = await tenantQuery<QuoteRow>(
     `UPDATE crm_quotes
      SET archived_at = NULL, updated_by_id = $2, updated_by_name = $3, updated_at = now()
-     WHERE id = $1 AND deleted_at IS NULL
+     WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(4)}
      RETURNING ${QUOTE_COLUMNS}`,
-    [id, actor.userId, actor.userName],
+    [id, actor.userId, actor.userName, getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   if (!row) throw notFound('Cotización no encontrada')

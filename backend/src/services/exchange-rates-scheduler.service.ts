@@ -1,4 +1,6 @@
 import { chileDateTimeParts } from '../lib/currency-conversion.js'
+import { runWithTenantAsync } from '../lib/tenant-context.js'
+import { ATRIA_TENANT_ID } from '../types/tenant.js'
 import { syncExchangeRatesForDate } from './exchange-rates.service.js'
 
 const CHECK_INTERVAL_MS = 60_000
@@ -12,7 +14,9 @@ export async function runDailyExchangeRateSync(): Promise<void> {
   const { date } = chileDateTimeParts()
   if (lastSyncedDate === date) return
 
-  const snapshot = await syncExchangeRatesForDate(date)
+  const snapshot = await runWithTenantAsync({ tenantId: ATRIA_TENANT_ID }, () =>
+    syncExchangeRatesForDate(date),
+  )
   lastSyncedDate = snapshot.rateDate
   console.log(
     `[exchange-rates] Tasas ${snapshot.rateDate}: UF=${snapshot.ufClp} USD=${snapshot.usdClp} EUR=${snapshot.eurClp}`,

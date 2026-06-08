@@ -16,6 +16,18 @@ export function imageUrlForList(url: string | null | undefined): string | undefi
   return trimmed
 }
 
+/** URL liviana para listados cuando la imagen está en BD (data URL → endpoint autenticado). */
+export function entityImageUrlForList(
+  apiPath: string,
+  stored: string | null | undefined,
+): string {
+  const trimmed = stored?.trim()
+  if (!trimmed || isGeneratedImageUrl(trimmed)) return ''
+  const direct = imageUrlForList(trimmed)
+  if (direct) return direct
+  return apiPath
+}
+
 const MAX_DETAIL_DATA_URL_LENGTH = 4_000_000
 
 /** En ficha sí devolvemos data URLs subidas por el usuario (avatares/logos). */

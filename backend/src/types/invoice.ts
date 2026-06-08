@@ -21,6 +21,8 @@ export type InvoicePaymentDto = {
   status: 'Confirmado' | 'Pendiente' | 'Rechazado'
 }
 
+export type DteStatus = 'draft' | 'signed' | 'submitted' | 'accepted' | 'rejected'
+
 export type InvoiceListItem = {
   id: string
   number: string
@@ -39,6 +41,10 @@ export type InvoiceListItem = {
   quoteId?: string
   paymentMethod: string
   siiNumber?: string
+  dteType?: number
+  siiTrackId?: string
+  dteStatus?: DteStatus
+  siiEmittedAt?: string
   createdAt: string
   createdById: string
   createdByName: string

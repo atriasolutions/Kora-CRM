@@ -54,6 +54,8 @@ import {
   type InvoiceJourneyStage,
 } from '@/lib/invoice-journey'
 import { INVOICE_EMITTED_STATUS } from '@/lib/invoice-sii'
+import { emitInvoiceToSiiApi } from '@/api/sii'
+import { useOrganizationSettings } from '@/hooks/use-organization-settings'
 import { apiActionErrorMessage } from '@/api/errors'
 import { isApiEnabled } from '@/api/config'
 import { handleInvoiceStatusStockChange } from '@/lib/stock-service'
@@ -73,6 +75,8 @@ export function InvoiceDetailPage() {
   const navigate = useNavigate()
   const { invoiceId } = useParams<{ invoiceId: string }>()
   const { canEdit, canDelete } = useModulePermissions('facturacion')
+  const { settings: orgSettings } = useOrganizationSettings()
+  const invoicingMode = orgSettings.invoicingMode ?? 'manual'
   const { archiveInvoice, isArchived, patchInvoiceStatus, updateInvoiceFromDetail } =
     useInvoicesRegistry()
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null)
@@ -93,9 +97,28 @@ export function InvoiceDetailPage() {
     useState<ContactActivityType>('llamada')
   const [stockMessage, setStockMessage] = useState<string | null>(null)
   const [emitSiiOpen, setEmitSiiOpen] = useState(false)
+  const [emittingSii, setEmittingSii] = useState(false)
   const [pendingEmitStage, setPendingEmitStage] = useState<InvoiceJourneyStage | null>(
     null,
   )
+
+  const handleEmitToSii = useCallback(async () => {
+    if (!invoice || !canEdit) return
+    setEmittingSii(true)
+    try {
+      const result = await emitInvoiceToSiiApi(invoice.id)
+      await reload()
+      toast.success(
+        result.trackId
+          ? `Factura emitida al SII. Folio ${result.siiNumber} · Track ${result.trackId}`
+          : `Factura emitida. Folio SII ${result.siiNumber}`,
+      )
+    } catch (err) {
+      toast.error(apiActionErrorMessage(err, 'No se pudo emitir al SII.'))
+    } finally {
+      setEmittingSii(false)
+    }
+  }, [canEdit, invoice, reload])
 
   const openRegisterActivity = useCallback(
     (presetType: ContactActivityType = 'llamada') => {
@@ -199,6 +222,10 @@ export function InvoiceDetailPage() {
         stage === INVOICE_EMITTED_STATUS &&
         invoice.status !== INVOICE_EMITTED_STATUS
       ) {
+        if (invoicingMode === 'sii') {
+          void handleEmitToSii()
+          return
+        }
         setPendingEmitStage(stage)
         setEmitSiiOpen(true)
         return
@@ -206,7 +233,7 @@ export function InvoiceDetailPage() {
 
       applyStageChange(stage)
     },
-    [applyStageChange, canEdit, invoice],
+    [applyStageChange, canEdit, handleEmitToSii, invoice, invoicingMode],
   )
 
   const handleInvoiceSaved = useCallback(
@@ -425,7 +452,12 @@ export function InvoiceDetailPage() {
         {tab === 'detalle' ? (
           <div className="space-y-4">
             <InvoiceDetailSidebar invoice={invoice} />
-              <InvoiceSiiFolioCard invoice={invoice} />
+              <InvoiceSiiFolioCard
+                invoice={invoice}
+                invoicingMode={invoicingMode}
+                onEmitToSii={invoicingMode === 'sii' ? handleEmitToSii : undefined}
+                emittingSii={emittingSii}
+              />
               <Card className="shadow-sm">
                 <CardHeader>
                   <CardTitle className="text-base font-semibold">Descripción</CardTitle>

@@ -129,6 +129,14 @@ export async function activateUserAccount(params: {
       [params.userId, params.questionId, params.answerNormalized],
     )
 
+    await client.query(
+      `UPDATE crm_tenant_memberships
+       SET status = 'active'::crm_membership_status
+       WHERE user_id = $1
+         AND status = 'invited'::crm_membership_status`,
+      [params.userId],
+    )
+
     await client.query('COMMIT')
   } catch (e) {
     await client.query('ROLLBACK')

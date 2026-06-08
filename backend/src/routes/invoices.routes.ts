@@ -138,3 +138,23 @@ invoicesRouter.delete(
     }
   },
 )
+
+invoicesRouter.post(
+  '/:id/emit-sii',
+  requirePermission('facturacion', 'edit'),
+  async (req, res, next) => {
+    try {
+      const { emitSiiSchema } = await import('../validators/sii.validator.js')
+      const { emitInvoiceToSii } = await import('../services/sii-emit.service.js')
+      const body = emitSiiSchema.parse(req.body ?? {})
+      const data = await emitInvoiceToSii(
+        routeParam(req),
+        getAuditActor(req),
+        body.env ?? 'certification',
+      )
+      res.status(201).json({ data })
+    } catch (e) {
+      next(e)
+    }
+  },
+)

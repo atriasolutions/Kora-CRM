@@ -11,6 +11,7 @@ import {
   listCompaniesQuerySchema,
   updateCompanySchema,
 } from '../validators/company.validator.js'
+import { sendStoredEntityImage } from '../utils/serve-entity-image.js'
 
 export const companiesRouter = Router()
 
@@ -36,6 +37,19 @@ companiesRouter.get(
           totalPages: Math.ceil(result.total / query.pageSize) || 1,
         },
       })
+    } catch (e) {
+      next(e)
+    }
+  },
+)
+
+companiesRouter.get(
+  '/:id/logo',
+  requirePermission('empresas', 'view'),
+  async (req, res, next) => {
+    try {
+      const stored = await companiesRepo.getCompanyLogoStored(routeParam(req))
+      sendStoredEntityImage(res, stored)
     } catch (e) {
       next(e)
     }

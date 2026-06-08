@@ -61,12 +61,61 @@ export const BILLING_PERIOD_OPTIONS = [
 
 export type BillingPeriod = (typeof BILLING_PERIOD_OPTIONS)[number]
 
+/** Sufijo corto para precio / periodo de cobro. */
+export function billingPeriodPriceSuffix(
+  billingPeriod?: string | null,
+): string | null {
+  const bp = billingPeriod?.trim()
+  if (!bp || bp === 'Único' || bp === 'A medida' || bp === 'Por unidad') return null
+  if (bp === 'Por hora') return 'hora'
+  if (bp === 'Diario') return 'día'
+  if (bp === 'Mensual') return 'mes'
+  if (bp === 'Anual') return 'año'
+  return bp.toLowerCase()
+}
+
+export function stripPriceSuffix(price: string): string {
+  const trimmed = price.trim()
+  if (!trimmed) return ''
+  const slashIdx = trimmed.lastIndexOf('/')
+  if (slashIdx <= 0) return trimmed
+  return trimmed.slice(0, slashIdx).trim()
+}
+
+/** Precio de catálogo con /periodo de cobro (prioritario) o /unidad de venta si aplica. */
+export function formatProductPriceDisplay(params: {
+  price: string
+  unitOfMeasure?: string
+  customUnit?: string
+  billingPeriod?: string | null
+  includeSuffix?: boolean
+}): string {
+  const base = stripPriceSuffix(params.price)
+  if (!base) return ''
+  if (params.includeSuffix === false) return base
+
+  const periodSuffix = billingPeriodPriceSuffix(params.billingPeriod)
+  if (periodSuffix) return `${base}/${periodSuffix}`
+
+  const bp = params.billingPeriod?.trim()
+  if (bp === 'Por unidad' || !bp) {
+    const u =
+      params.unitOfMeasure === 'otra'
+        ? params.customUnit?.trim() || 'u.'
+        : params.unitOfMeasure?.trim() || 'ud'
+    if (bp === 'Por unidad' || params.unitOfMeasure) return `${base}/${u}`
+  }
+
+  return base
+}
+
 export function formatPriceWithUnit(price: string, unit: string, customUnit?: string): string {
-  const u = unit === 'otra' ? (customUnit?.trim() || 'u.') : unit
-  if (!price.trim()) return ''
-  if (/medida/i.test(price)) return price
-  if (price.includes('/')) return price
-  return `${price}/${u}`
+  return formatProductPriceDisplay({
+    price,
+    unitOfMeasure: unit,
+    customUnit,
+    billingPeriod: 'Por unidad',
+  })
 }
 
 export function unitLabel(unit: string, customUnit?: string): string {

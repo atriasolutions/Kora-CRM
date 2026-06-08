@@ -33,6 +33,11 @@ export type InvoiceRow = {
   owner_name: string | null
   payment_method: string | null
   sii_number: string | null
+  dte_type: number | null
+  sii_track_id: string | null
+  dte_status: string | null
+  dte_xml: string | null
+  sii_emitted_at: Date | string | null
   exchange_rate_date: Date | string | null
   exchange_rate_uf: string | number | null
   exchange_rate_usd: string | number | null
@@ -138,6 +143,10 @@ export function mapInvoiceRow(row: InvoiceRow): InvoiceListItem {
     quoteId: row.quote_id ?? undefined,
     paymentMethod: row.payment_method ?? 'Transferencia',
     siiNumber: row.sii_number ?? undefined,
+    dteType: row.dte_type ?? undefined,
+    siiTrackId: row.sii_track_id ?? undefined,
+    dteStatus: (row.dte_status as InvoiceListItem['dteStatus']) ?? undefined,
+    siiEmittedAt: row.sii_emitted_at ? toIsoString(row.sii_emitted_at) : undefined,
     createdAt: toIsoString(row.created_at),
     createdById: row.created_by_id ?? '',
     createdByName: row.created_by_name ?? '',

@@ -45,13 +45,15 @@ import {
   type InvoiceFilters,
 } from '@/lib/invoice-filters'
 import { INVOICE_ARCHIVE_RETENTION_DAYS } from '@/lib/invoice-archive'
+import { withResolvedInvoiceListStatus } from '@/lib/invoice-display'
 import {
   invoiceMatchesListScope,
   loadInvoiceRecentIds,
   sortInvoicesByRecentlyViewed,
   type InvoiceListScope,
 } from '@/lib/invoice-list-scope'
-import { withResolvedInvoiceListStatus } from '@/lib/invoice-display'
+import { SiiDocumentsPanel } from '@/components/invoices/SiiDocumentsPanel'
+import { useOrganizationSettings } from '@/hooks/use-organization-settings'
 
 export function InvoicesPage() {
   const navigate = useNavigate()
@@ -67,6 +69,7 @@ export function InvoicesPage() {
     isArchived,
     reloadFromApi,
   } = useInvoicesRegistry()
+  const { settings: orgSettings } = useOrganizationSettings()
 
   const [view, setView] = useState<InvoicesViewId>('lista')
   const [listScope, setListScope] = useState<InvoiceListScope>('all')
@@ -225,6 +228,11 @@ export function InvoicesPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      {orgSettings.invoicingMode === 'sii' ? (
+        <div className="mb-4 px-4 sm:px-6">
+          <SiiDocumentsPanel />
+        </div>
+      ) : null}
       <ListPageLayout
         header={
           <InvoicesModuleHeader

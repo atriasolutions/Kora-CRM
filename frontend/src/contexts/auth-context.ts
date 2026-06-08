@@ -7,8 +7,8 @@ import type { AccessProfile } from '@/types/access-profile'
 export type LoginOutcome =
   | { status: 'ok' }
   | { status: 'error'; message: string }
-  | { status: 'verify'; challengeId: string; userEmail: string }
-  | { status: 'enroll'; enrollmentToken: string; userEmail: string }
+  | { status: 'verify'; challengeId: string; userEmail: string; tenantId: string }
+  | { status: 'enroll'; enrollmentToken: string; userEmail: string; tenantId: string }
 
 export type AuthContextValue = {
   session: AuthSession | null
@@ -16,12 +16,17 @@ export type AuthContextValue = {
   profile: AccessProfile | null
   isAuthenticated: boolean
   isReady: boolean
-  login: (email: string, password: string) => Promise<LoginOutcome>
-  completeTwoFactorLogin: (challengeId: string, code: string) => Promise<LoginOutcome>
+  login: (email: string, password: string, tenantId?: string) => Promise<LoginOutcome>
+  completeTwoFactorLogin: (
+    challengeId: string,
+    code: string,
+    tenantId?: string,
+  ) => Promise<LoginOutcome>
   completeEnrollmentLogin: (
     enrollmentToken: string,
     code: string,
     setupId?: string,
+    tenantId?: string,
   ) => Promise<LoginOutcome & { backupCodes?: string[] }>
   logout: () => Promise<void>
   /** Recarga permisos desde la API (p. ej. tras editar el perfil de acceso). */

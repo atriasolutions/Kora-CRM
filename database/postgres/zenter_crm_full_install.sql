@@ -267,9 +267,12 @@ CREATE TABLE IF NOT EXISTS crm_warehouses (
   active      BOOLEAN NOT NULL DEFAULT true,
   deleted_at  TIMESTAMPTZ,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE (code)
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS crm_warehouses_tenant_code_active_uidx
+  ON crm_warehouses (tenant_id, code)
+  WHERE deleted_at IS NULL AND tenant_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS crm_product_categories (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),

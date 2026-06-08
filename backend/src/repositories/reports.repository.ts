@@ -1,4 +1,7 @@
 import { pool } from '../db/pool.js'
+import { setTenantLocal, tenantQuery } from '../db/tenant-query.js'
+import { tenantWhereParam } from '../lib/tenant-sql.js'
+import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import {
   buildTableConfigStorage,
   dbReportType,
@@ -23,15 +26,19 @@ const REPORT_COLUMNS = `
 `
 
 export async function getReportsTree(): Promise<ReportsTreeData> {
-  const foldersResult = await pool.query<ReportFolderRow>(
+  const foldersResult = await tenantQuery<ReportFolderRow>(
     `SELECT ${FOLDER_COLUMNS}
      FROM crm_report_folders
+     WHERE ${tenantWhereParam(1)}
      ORDER BY sort_order ASC, name ASC`,
+    [getTenantIdOrDefault()],
   )
-  const reportsResult = await pool.query<ReportRow>(
+  const reportsResult = await tenantQuery<ReportRow>(
     `SELECT ${REPORT_COLUMNS}
      FROM crm_reports
+     WHERE ${tenantWhereParam(1)}
      ORDER BY name ASC`,
+    [getTenantIdOrDefault()],
   )
   return {
     folders: foldersResult.rows.map(mapReportFolderRow),
@@ -40,9 +47,9 @@ export async function getReportsTree(): Promise<ReportsTreeData> {
 }
 
 export async function getReportById(id: string): Promise<ReportItem> {
-  const result = await pool.query<ReportRow>(
-    `SELECT ${REPORT_COLUMNS} FROM crm_reports WHERE id = $1`,
-    [id],
+  const result = await tenantQuery<ReportRow>(
+    `SELECT ${REPORT_COLUMNS} FROM crm_reports WHERE id = $1 AND ${tenantWhereParam(2)}`,
+    [id, getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   if (!row) throw notFound('Reporte no encontrado')
@@ -50,19 +57,19 @@ export async function getReportById(id: string): Promise<ReportItem> {
 }
 
 async function folderExists(id: string): Promise<boolean> {
-  const result = await pool.query<{ id: string }>(
-    `SELECT id FROM crm_report_folders WHERE id = $1`,
-    [id],
+  const result = await tenantQuery<{ id: string }>(
+    `SELECT id FROM crm_report_folders WHERE id = $1 AND ${tenantWhereParam(2)}`,
+    [id, getTenantIdOrDefault()],
   )
   return Boolean(result.rows[0])
 }
 
 async function folderHasChildren(folderId: string): Promise<boolean> {
-  const subfolders = await pool.query<{ count: string }>(
+  const subfolders = await tenantQuery<{ count: string }>(
     `SELECT count(*)::text AS count FROM crm_report_folders WHERE parent_id = $1`,
     [folderId],
   )
-  const reports = await pool.query<{ count: string }>(
+  const reports = await tenantQuery<{ count: string }>(
     `SELECT count(*)::text AS count FROM crm_reports WHERE folder_id = $1`,
     [folderId],
   )
@@ -79,7 +86,7 @@ export async function createReportFolder(
     throw badRequest('La carpeta padre no existe')
   }
 
-  const sortResult = await pool.query<{ max: number | null }>(
+  const sortResult = await tenantQuery<{ max: number | null }>(
     `SELECT COALESCE(MAX(sort_order), -1) + 1 AS max
      FROM crm_report_folders
      WHERE parent_id IS NOT DISTINCT FROM $1`,
@@ -87,11 +94,11 @@ export async function createReportFolder(
   )
   const sortOrder = sortResult.rows[0]?.max ?? 0
 
-  const result = await pool.query<ReportFolderRow>(
-    `INSERT INTO crm_report_folders (name, parent_id, sort_order)
-     VALUES ($1, $2, $3)
+  const result = await tenantQuery<ReportFolderRow>(
+    `INSERT INTO crm_report_folders (name, parent_id, sort_order, tenant_id)
+     VALUES ($1, $2, $3, $4)
      RETURNING ${FOLDER_COLUMNS}`,
-    [input.name.trim(), input.parentId, sortOrder],
+    [input.name.trim(), input.parentId, sortOrder, getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   if (!row) throw badRequest('No se pudo crear la carpeta')
@@ -103,7 +110,7 @@ export async function updateReportFolder(
   name: string,
 ): Promise<ReportFolder> {
   if (!name.trim()) throw badRequest('El nombre de la carpeta es obligatorio')
-  const result = await pool.query<ReportFolderRow>(
+  const result = await tenantQuery<ReportFolderRow>(
     `UPDATE crm_report_folders
      SET name = $2
      WHERE id = $1
@@ -127,7 +134,7 @@ export async function deleteReportFolder(
       error: 'La carpeta no está vacía. Elimina o mueve su contenido primero.',
     }
   }
-  await pool.query(`DELETE FROM crm_report_folders WHERE id = $1`, [id])
+  await tenantQuery(`DELETE FROM crm_report_folders WHERE id = $1`, [id])
   return { ok: true }
 }
 
@@ -147,11 +154,11 @@ export async function createReport(
     tableConfig: input.tableConfig,
   })
 
-  const result = await pool.query<ReportRow>(
+  const result = await tenantQuery<ReportRow>(
     `INSERT INTO crm_reports (
       folder_id, name, report_type, author_name, schedule, description,
-      template_id, table_config, author_user_id
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      template_id, table_config, author_user_id, tenant_id
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     RETURNING ${REPORT_COLUMNS}`,
     [
       input.folderId,
@@ -163,6 +170,7 @@ export async function createReport(
       templateId,
       tableConfig ? JSON.stringify(tableConfig) : null,
       actor.userId,
+      getTenantIdOrDefault(),
     ],
   )
   const row = result.rows[0]
@@ -173,7 +181,7 @@ export async function createReport(
 export async function updateReport(
   id: string,
   input: Partial<ReportItemInput>,
-  actor: AuditActor,
+  _actor: AuditActor,
 ): Promise<ReportItem> {
   const existing = await getReportById(id)
   const templateId = input.templateId ?? existing.templateId ?? 'tabla-dinamica'
@@ -184,7 +192,7 @@ export async function updateReport(
     tableConfig: input.tableConfig ?? existing.tableConfig,
   })
 
-  const result = await pool.query<ReportRow>(
+  const result = await tenantQuery<ReportRow>(
     `UPDATE crm_reports SET
       folder_id = COALESCE($2, folder_id),
       name = COALESCE($3, name),
@@ -209,7 +217,6 @@ export async function updateReport(
       input.tableConfig !== undefined || input.templateId !== undefined
         ? JSON.stringify(tableConfig)
         : null,
-      actor.userId,
     ],
   )
   const row = result.rows[0]
@@ -229,7 +236,7 @@ export async function updateReportTableConfig(
     tableConfig,
   })
 
-  const result = await pool.query<ReportRow>(
+  const result = await tenantQuery<ReportRow>(
     `UPDATE crm_reports SET
       template_id = 'tabla-dinamica',
       report_type = 'table',
@@ -248,6 +255,7 @@ export async function deleteReport(id: string): Promise<void> {
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    await setTenantLocal(client)
     await client.query(`DELETE FROM crm_report_runs WHERE report_id = $1`, [id])
     const result = await client.query(`DELETE FROM crm_reports WHERE id = $1`, [id])
     if ((result.rowCount ?? 0) === 0) {
@@ -267,13 +275,13 @@ export async function recordReportRun(
   actor: AuditActor,
 ): Promise<ReportItem> {
   const now = new Date()
-  await pool.query(
+  await tenantQuery(
     `INSERT INTO crm_report_runs (report_id, run_at, result_meta)
      VALUES ($1, $2, $3)`,
     [id, now, JSON.stringify({ triggeredBy: actor.userName })],
   )
 
-  const result = await pool.query<ReportRow>(
+  const result = await tenantQuery<ReportRow>(
     `UPDATE crm_reports
      SET last_run_at = $2, updated_at = now()
      WHERE id = $1

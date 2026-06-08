@@ -5,12 +5,14 @@ const totpCodeSchema = z.string().min(6).max(16)
 export const verifyTwoFactorLoginSchema = z.object({
   challengeId: z.string().uuid(),
   code: totpCodeSchema,
+  tenantId: z.string().uuid().optional(),
 })
 
 export const enrollmentConfirmSchema = z.object({
   enrollmentToken: z.string().uuid(),
   code: totpCodeSchema,
   setupId: z.string().uuid().optional(),
+  tenantId: z.string().uuid().optional(),
 })
 
 export const totpConfirmSetupSchema = z.object({

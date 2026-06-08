@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { getUserApi } from '@/api/users'
 
 import { AppBrand } from '@/components/layout/AppBrand'
+import { TenantSwitcher } from '@/components/auth/TenantSwitcher'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
@@ -37,7 +38,6 @@ import { useAuth } from '@/hooks/use-auth'
 import { useUsersRegistry } from '@/hooks/use-users-registry'
 import { useShellLayout } from '@/contexts/shell-layout'
 import { formatChileDateTimeLabel } from '@/lib/chile-timezone'
-import { getLoginPath } from '@/lib/auth-routes'
 import { getCurrentUser } from '@/lib/current-user'
 import { getUserDetailPath } from '@/lib/user-routes'
 import { cn } from '@/lib/utils'
@@ -92,8 +92,7 @@ export function TopBar() {
   const [clearing, setClearing] = useState(false)
 
   const handleLogout = () => {
-    logout()
-    navigate(getLoginPath(), { replace: true })
+    void logout()
   }
 
   const handleMyProfile = () => {
@@ -403,6 +402,7 @@ export function TopBar() {
               <UserRound aria-hidden className="size-4" />
               Mi perfil
             </DropdownMenuItem>
+            <TenantSwitcher />
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onSelect={handleLogout}

@@ -1,4 +1,6 @@
-import { pool } from '../db/pool.js'
+import { tenantQuery } from '../db/tenant-query.js'
+import { pushTenantCondition, tenantWhereParam } from '../lib/tenant-sql.js'
+import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import { mapCompanyDetail, mapCompanyRow, type CompanyRow } from '../mappers/company.mapper.js'
 import { notFound } from '../middleware/errors.js'
 import type { AuditActor } from '../types/audit.js'
@@ -40,6 +42,7 @@ export async function listCompanies(
   if (!params.includeDeleted) {
     conditions.push('deleted_at IS NULL')
   }
+  idx = pushTenantCondition(conditions, values, idx)
   if (params.archivedOnly) {
     conditions.push('archived_at IS NOT NULL')
   } else {
@@ -59,7 +62,7 @@ export async function listCompanies(
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
 
-  const countResult = await pool.query<{ count: string }>(
+  const countResult = await tenantQuery<{ count: string }>(
     `SELECT count(*)::text AS count FROM crm_companies ${where}`,
     values,
   )
@@ -68,7 +71,7 @@ export async function listCompanies(
   const offset = paginationOffset(params.page, params.pageSize)
   values.push(params.pageSize, offset)
 
-  const result = await pool.query<CompanyRow>(
+  const result = await tenantQuery<CompanyRow>(
     `SELECT ${SELECT_COLUMNS}
      FROM crm_companies
      ${where}
@@ -84,24 +87,33 @@ export async function listCompanies(
 }
 
 export async function getCompanyById(id: string): Promise<CompanyListItem> {
-  const result = await pool.query<CompanyRow>(
+  const result = await tenantQuery<CompanyRow>(
     `SELECT ${SELECT_COLUMNS}
      FROM crm_companies
-     WHERE id = $1 AND deleted_at IS NULL`,
-    [id],
+     WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
+    [id, getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   if (!row) throw notFound('Empresa no encontrada')
   return mapCompanyDetail(row)
 }
 
+export async function getCompanyLogoStored(id: string): Promise<string | null> {
+  const result = await tenantQuery<{ logo_url: string | null }>(
+    `SELECT logo_url FROM crm_companies
+     WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
+    [id, getTenantIdOrDefault()],
+  )
+  return result.rows[0]?.logo_url?.trim() ?? null
+}
+
 /** Resuelve id+nombre aunque la empresa esté eliminada (conserva FK en contactos). */
 export async function getCompanyLinkById(
   id: string,
 ): Promise<{ id: string; name: string } | null> {
-  const result = await pool.query<{ id: string; name: string }>(
-    `SELECT id, name FROM crm_companies WHERE id = $1`,
-    [id],
+  const result = await tenantQuery<{ id: string; name: string }>(
+    `SELECT id, name FROM crm_companies WHERE id = $1 AND ${tenantWhereParam(2)}`,
+    [id, getTenantIdOrDefault()],
   )
   return result.rows[0] ?? null
 }
@@ -112,12 +124,13 @@ export async function findActiveCompanyIdByName(
 ): Promise<string | null> {
   const trimmed = name.trim()
   if (!trimmed) return null
-  const result = await pool.query<{ id: string }>(
+  const result = await tenantQuery<{ id: string }>(
     `SELECT id FROM crm_companies
      WHERE deleted_at IS NULL AND archived_at IS NULL
        AND lower(trim(name)) = lower($1)
+       AND ${tenantWhereParam(2)}
      LIMIT 2`,
-    [trimmed],
+    [trimmed, getTenantIdOrDefault()],
   )
   if (result.rows.length !== 1) return null
   return result.rows[0]!.id
@@ -129,15 +142,17 @@ export async function createCompany(
 ): Promise<CompanyListItem> {
   await assertUniqueCompanyTaxId(input.rut)
 
-  const result = await pool.query<CompanyRow>(
+  const result = await tenantQuery<CompanyRow>(
     `INSERT INTO crm_companies (
       name, logo_url, rut, headquarters_street, industry, city, employees,
       owner_name, lifecycle, operational_status,
-      created_by_id, created_by_name, updated_by_id, updated_by_name
+      created_by_id, created_by_name, updated_by_id, updated_by_name,
+      tenant_id
     ) VALUES (
       $1, $2, $3, $4, $5, $6, $7,
       $8, $9, $10,
-      $11, $12, $11, $12
+      $11, $12, $11, $12,
+      $13
     )
     RETURNING ${SELECT_COLUMNS}`,
     [
@@ -153,6 +168,7 @@ export async function createCompany(
       input.operationalStatus ?? 'Activa',
       actor.userId,
       actor.userName,
+      getTenantIdOrDefault(),
     ],
   )
   return mapCompanyRow(result.rows[0]!)
@@ -169,7 +185,7 @@ export async function updateCompany(
   const nextRut = input.rut !== undefined ? input.rut : existing.rut
   await assertUniqueCompanyTaxId(nextRut, id)
 
-  const result = await pool.query<CompanyRow>(
+  const result = await tenantQuery<CompanyRow>(
     `UPDATE crm_companies SET
       name = $2,
       logo_url = $3,
@@ -184,7 +200,7 @@ export async function updateCompany(
       updated_by_id = $12,
       updated_by_name = $13,
       updated_at = now()
-    WHERE id = $1 AND deleted_at IS NULL
+    WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(14)}
     RETURNING ${SELECT_COLUMNS}`,
     [
       id,
@@ -200,6 +216,7 @@ export async function updateCompany(
       input.operationalStatus ?? existing.operationalStatus,
       actor.userId,
       actor.userName,
+      getTenantIdOrDefault(),
     ],
   )
   const row = result.rows[0]
@@ -225,12 +242,12 @@ export async function softDeleteCompany(
   id: string,
   actor: AuditActor,
 ): Promise<void> {
-  const result = await pool.query(
+  const result = await tenantQuery(
     `UPDATE crm_companies
      SET deleted_at = now(), deleted_by_id = $2, updated_at = now(),
          updated_by_id = $2, updated_by_name = $3
-     WHERE id = $1 AND deleted_at IS NULL`,
-    [id, actor.userId, actor.userName],
+     WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(4)}`,
+    [id, actor.userId, actor.userName, getTenantIdOrDefault()],
   )
   if (result.rowCount === 0) {
     throw notFound('Empresa no encontrada')
@@ -242,13 +259,13 @@ export async function archiveCompany(
   id: string,
   actor: AuditActor,
 ): Promise<CompanyListItem> {
-  const result = await pool.query<CompanyRow>(
+  const result = await tenantQuery<CompanyRow>(
     `UPDATE crm_companies
      SET archived_at = now(), archived_by_id = $2,
          updated_by_id = $2, updated_by_name = $3, updated_at = now()
-     WHERE id = $1 AND deleted_at IS NULL AND archived_at IS NULL
+     WHERE id = $1 AND deleted_at IS NULL AND archived_at IS NULL AND ${tenantWhereParam(4)}
      RETURNING ${SELECT_COLUMNS}`,
-    [id, actor.userId, actor.userName],
+    [id, actor.userId, actor.userName, getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   if (!row) throw notFound('Empresa no encontrada o ya archivada')
@@ -259,13 +276,13 @@ export async function restoreCompany(
   id: string,
   actor: AuditActor,
 ): Promise<CompanyListItem> {
-  const result = await pool.query<CompanyRow>(
+  const result = await tenantQuery<CompanyRow>(
     `UPDATE crm_companies
      SET archived_at = NULL, archived_by_id = NULL,
          updated_by_id = $2, updated_by_name = $3, updated_at = now()
-     WHERE id = $1 AND deleted_at IS NULL
+     WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(4)}
      RETURNING ${SELECT_COLUMNS}`,
-    [id, actor.userId, actor.userName],
+    [id, actor.userId, actor.userName, getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   if (!row) throw notFound('Empresa no encontrada')

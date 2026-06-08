@@ -1,4 +1,6 @@
-import { pool } from '../db/pool.js'
+import { tenantQuery } from '../db/tenant-query.js'
+import { tenantWhereParam } from '../lib/tenant-sql.js'
+import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import type { MentionKind, MentionSearchItem } from '../types/mentions.js'
 
 const ACTIVE_NOT_ARCHIVED = `deleted_at IS NULL AND archived_at IS NULL`
@@ -56,8 +58,13 @@ async function searchKind(
   pattern: string | null,
   limit: number,
 ): Promise<MentionSearchItem[]> {
-  const params = pattern ? [pattern, limit] : [limit]
-  const result = await pool.query<Row>(sql, params)
+  const tenantSql = sql.includes('tenant_id')
+    ? sql
+    : sql.replace(/LIMIT \$\d+/, (m) => `AND tenant_id = ${pattern ? '$3' : '$2'} ${m}`)
+  const params = pattern
+    ? [pattern, limit, getTenantIdOrDefault()]
+    : [limit, getTenantIdOrDefault()]
+  const result = await tenantQuery<Row>(tenantSql, params)
   return result.rows.map(mapRow)
 }
 
@@ -257,10 +264,10 @@ export async function getUserNamesByIds(
   const unique = [...new Set(userIds.filter(Boolean))]
   if (unique.length === 0) return new Map()
 
-  const result = await pool.query<{ id: string; name: string }>(
+  const result = await tenantQuery<{ id: string; name: string }>(
     `SELECT id::text, name FROM crm_users
-     WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL`,
-    [unique],
+     WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
+    [unique, getTenantIdOrDefault()],
   )
   return new Map(result.rows.map((row) => [row.id, row.name]))
 }

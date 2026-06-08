@@ -8,6 +8,7 @@ import { contactsRouter } from './contacts.routes.js'
 import { dashboardRouter } from './dashboard.routes.js'
 import { inventoryRouter } from './inventory.routes.js'
 import { invoicesRouter } from './invoices.routes.js'
+import { siiRouter } from './sii.routes.js'
 import { opportunitiesRouter } from './opportunities.routes.js'
 import { purchasesRouter } from './purchases.routes.js'
 import { reportsRouter } from './reports.routes.js'
@@ -26,9 +27,11 @@ import { entityFilesRouter } from './entity-files.routes.js'
 import { entityNotesRouter } from './entity-notes.routes.js'
 import { mentionsRouter } from './mentions.routes.js'
 import { notificationsRouter } from './notifications.routes.js'
+import { marketingRouter } from './marketing.routes.js'
 
 export const apiRouter = Router()
 
+apiRouter.use('/marketing', marketingRouter)
 apiRouter.use('/auth', authRouter)
 apiRouter.use('/dashboard', dashboardRouter)
 apiRouter.use('/activities', activitiesRouter)
@@ -47,6 +50,7 @@ apiRouter.use('/stock-receipts', stockReceiptsRouter)
 apiRouter.use('/inventory', inventoryRouter)
 apiRouter.use('/quotes', quotesRouter)
 apiRouter.use('/invoices', invoicesRouter)
+apiRouter.use('/sii', siiRouter)
 apiRouter.use('/projects', projectsRouter)
 apiRouter.use('/reports', reportsRouter)
 apiRouter.use('/search', searchRouter)

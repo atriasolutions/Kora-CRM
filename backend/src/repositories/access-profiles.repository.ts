@@ -1,4 +1,6 @@
-import { pool } from '../db/pool.js'
+import { tenantQuery } from '../db/tenant-query.js'
+import { tenantWhereParam } from '../lib/tenant-sql.js'
+import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import {
   mapAccessProfile,
   mapAccessProfileListRow,
@@ -21,7 +23,7 @@ const PROFILE_SELECT = `
 `
 
 async function loadPermissions(profileId: string): Promise<PermissionRow[]> {
-  const result = await pool.query<PermissionRow>(
+  const result = await tenantQuery<PermissionRow>(
     `SELECT module_id, can_menu, can_view, can_create, can_edit, can_delete
      FROM crm_access_profile_permissions
      WHERE profile_id = $1
@@ -35,11 +37,11 @@ async function upsertPermissions(
   profileId: string,
   permissions: MenuModulePermission[],
 ): Promise<void> {
-  await pool.query(`DELETE FROM crm_access_profile_permissions WHERE profile_id = $1`, [
+  await tenantQuery(`DELETE FROM crm_access_profile_permissions WHERE profile_id = $1`, [
     profileId,
   ])
   for (const perm of permissions) {
-    await pool.query(
+    await tenantQuery(
       `INSERT INTO crm_access_profile_permissions (
         profile_id, module_id, can_menu, can_view, can_create, can_edit, can_delete
       ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
@@ -57,16 +59,17 @@ async function upsertPermissions(
 }
 
 export async function listAccessProfiles(): Promise<AccessProfileListItem[]> {
-  const result = await pool.query<AccessProfileRow>(
-    `SELECT ${PROFILE_SELECT} FROM crm_access_profiles p ORDER BY p.name ASC`,
+  const result = await tenantQuery<AccessProfileRow>(
+    `SELECT ${PROFILE_SELECT} FROM crm_access_profiles p WHERE ${tenantWhereParam(1, 'p')} ORDER BY p.name ASC`,
+    [getTenantIdOrDefault()],
   )
   return result.rows.map(mapAccessProfileListRow)
 }
 
 export async function getAccessProfileById(id: string): Promise<AccessProfile> {
-  const result = await pool.query<AccessProfileRow>(
-    `SELECT ${PROFILE_SELECT} FROM crm_access_profiles p WHERE p.id = $1`,
-    [id],
+  const result = await tenantQuery<AccessProfileRow>(
+    `SELECT ${PROFILE_SELECT} FROM crm_access_profiles p WHERE p.id = $1 AND ${tenantWhereParam(2, 'p')}`,
+    [id, getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   if (!row) throw notFound('Perfil no encontrado')
@@ -80,10 +83,10 @@ export async function createAccessProfile(
   if (!input.name?.trim()) throw badRequest('El nombre es obligatorio')
   if (!input.permissions?.length) throw badRequest('Los permisos son obligatorios')
 
-  const result = await pool.query<{ id: string }>(
-    `INSERT INTO crm_access_profiles (name, description, is_system, updated_at)
-     VALUES ($1, $2, false, now()) RETURNING id`,
-    [input.name.trim(), input.description?.trim() ?? ''],
+  const result = await tenantQuery<{ id: string }>(
+    `INSERT INTO crm_access_profiles (name, description, is_system, updated_at, tenant_id)
+     VALUES ($1, $2, false, now(), $3) RETURNING id`,
+    [input.name.trim(), input.description?.trim() ?? '', getTenantIdOrDefault()],
   )
   const id = result.rows[0]!.id
   await upsertPermissions(id, input.permissions)
@@ -101,15 +104,15 @@ export async function updateAccessProfile(
   }
 
   if (input.name !== undefined) {
-    await pool.query(
-      `UPDATE crm_access_profiles SET name = $2, updated_at = now() WHERE id = $1`,
-      [id, input.name.trim()],
+    await tenantQuery(
+      `UPDATE crm_access_profiles SET name = $2, updated_at = now() WHERE id = $1 AND ${tenantWhereParam(3)}`,
+      [id, input.name.trim(), getTenantIdOrDefault()],
     )
   }
   if (input.description !== undefined) {
-    await pool.query(
-      `UPDATE crm_access_profiles SET description = $2, updated_at = now() WHERE id = $1`,
-      [id, input.description.trim()],
+    await tenantQuery(
+      `UPDATE crm_access_profiles SET description = $2, updated_at = now() WHERE id = $1 AND ${tenantWhereParam(3)}`,
+      [id, input.description.trim(), getTenantIdOrDefault()],
     )
   }
   if (input.permissions) {
@@ -128,7 +131,7 @@ export async function deleteAccessProfile(id: string): Promise<void> {
   if (profile.userCount > 0) {
     throw badRequest('No se puede eliminar un perfil con usuarios asignados')
   }
-  await pool.query(`DELETE FROM crm_access_profile_permissions WHERE profile_id = $1`, [id])
-  const result = await pool.query(`DELETE FROM crm_access_profiles WHERE id = $1`, [id])
+  await tenantQuery(`DELETE FROM crm_access_profile_permissions WHERE profile_id = $1`, [id])
+  const result = await tenantQuery(`DELETE FROM crm_access_profiles WHERE id = $1 AND ${tenantWhereParam(2)}`, [id, getTenantIdOrDefault()])
   if (result.rowCount === 0) throw notFound('Perfil no encontrado')
 }

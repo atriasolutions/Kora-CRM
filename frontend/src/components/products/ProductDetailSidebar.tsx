@@ -17,7 +17,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { ProductDetail } from '@/data/product-detail.mock'
 import { initialsFromLabel } from '@/lib/image-upload'
-import { unitLabel } from '@/lib/product-catalog'
+import { formatProductPriceDisplay, unitLabel } from '@/lib/product-catalog'
 import type { ProductFormValues } from '@/lib/product-form'
 
 type ProductDetailSidebarProps = {
@@ -111,7 +111,15 @@ export function ProductDetailSidebar({
       </ContactFormSection>
 
       <ContactFormSection title="Comercial" icon={DollarSign} className="bg-card">
-        <ProfileRow label="Precio de venta" value={product.price} />
+        <ProfileRow
+          label="Precio de venta"
+          value={formatProductPriceDisplay({
+            price: product.price,
+            unitOfMeasure: product.unitOfMeasure,
+            customUnit: product.customUnit,
+            billingPeriod: product.billingPeriod,
+          })}
+        />
         <ProfileRow label="Unidad de venta" value={uom} />
         <ProfileRow label="Periodo de cobro" value={product.billingPeriod} />
         <ProfileRow

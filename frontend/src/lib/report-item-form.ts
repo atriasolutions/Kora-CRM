@@ -1,3 +1,4 @@
+import { getCurrentUserName } from '@/lib/current-user'
 import { createDefaultReportTableConfig } from '@/types/report-table'
 import type { ReportItem } from '@/types/reports-tree'
 import type { ReportItemInput } from '@/contexts/reports-tree-context'
@@ -19,7 +20,7 @@ export function createDefaultReportFormValues(
     name: '',
     folderId,
     reportType: 'Tabla dinámica',
-    author: 'María López',
+    author: getCurrentUserName(),
     description: '',
     tableConfig: partial?.tableConfig ?? createDefaultReportTableConfig(),
     ...partial,

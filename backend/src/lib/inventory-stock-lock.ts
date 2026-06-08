@@ -1,5 +1,7 @@
 import type { Pool, PoolClient } from 'pg'
 
+import { setTenantLocal } from '../db/tenant-query.js'
+
 /** Namespace para pg_advisory_xact_lock (evita colisiones con otros módulos). */
 const LOCK_NAMESPACE = 0x5a43
 
@@ -83,6 +85,7 @@ export async function withStockTransaction<T>(
     const client = await pool.connect()
     try {
       await client.query('BEGIN')
+      await setTenantLocal(client)
       const result = await fn(client)
       await client.query('COMMIT')
       return result

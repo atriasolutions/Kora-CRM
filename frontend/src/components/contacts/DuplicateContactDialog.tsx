@@ -1,7 +1,8 @@
 import { Copy, Search } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { EntityAvatarImage } from '@/components/shared/EntityAvatarImage'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -109,7 +110,7 @@ export function DuplicateContactDialog({
                     )}
                   >
                     <Avatar className="size-9 border border-border">
-                      <AvatarImage src={contact.avatarUrl} alt={contact.name} />
+                      <EntityAvatarImage src={contact.avatarUrl} alt={contact.name} />
                       <AvatarFallback>{initials(contact.name)}</AvatarFallback>
                     </Avatar>
                     <div className="min-w-0 flex-1">

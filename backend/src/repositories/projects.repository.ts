@@ -5,6 +5,9 @@ import {
   resolveOpportunitySnapshot,
 } from '../lib/relation-snapshots.js'
 import { pool } from '../db/pool.js'
+import { setTenantLocal, tenantQuery } from '../db/tenant-query.js'
+import { pushTenantCondition, tenantWhereParam } from '../lib/tenant-sql.js'
+import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import {
   mapProjectDetail,
   mapProjectRow,
@@ -85,7 +88,7 @@ export function assertProjectTeamAccess(
 }
 
 async function loadProjectTeam(projectId: string): Promise<ProjectTeamRow[]> {
-  const result = await pool.query<ProjectTeamRow>(
+  const result = await tenantQuery<ProjectTeamRow>(
     `SELECT ${TEAM_COLUMNS}
      FROM crm_project_team_members
      WHERE project_id = $1
@@ -100,7 +103,7 @@ async function loadTeamsByProjectIds(
 ): Promise<Map<string, ProjectTeamRow[]>> {
   const map = new Map<string, ProjectTeamRow[]>()
   if (projectIds.length === 0) return map
-  const result = await pool.query<ProjectTeamRow>(
+  const result = await tenantQuery<ProjectTeamRow>(
     `SELECT ${TEAM_COLUMNS}
      FROM crm_project_team_members
      WHERE project_id = ANY($1::uuid[])
@@ -137,9 +140,9 @@ async function resolveQuoteSnapshot(
   quoteId?: string | null,
 ): Promise<{ acceptedQuoteId: string | null; quoteCode: string }> {
   if (!quoteId?.trim()) return { acceptedQuoteId: null, quoteCode: '' }
-  const result = await pool.query<{ id: string; code: string; opportunity_id: string | null }>(
-    `SELECT id, code, opportunity_id FROM crm_quotes WHERE id = $1 AND deleted_at IS NULL`,
-    [quoteId],
+  const result = await tenantQuery<{ id: string; code: string; opportunity_id: string | null }>(
+    `SELECT id, code, opportunity_id FROM crm_quotes WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
+    [quoteId, getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   if (!row) throw badRequest('Cotización no encontrada')
@@ -154,9 +157,9 @@ async function validateQuoteForOpportunity(
   if (!opportunityId) {
     throw badRequest('Selecciona una oportunidad antes de vincular una cotización.')
   }
-  const result = await pool.query<{ opportunity_id: string | null }>(
-    `SELECT opportunity_id FROM crm_quotes WHERE id = $1 AND deleted_at IS NULL`,
-    [acceptedQuoteId],
+  const result = await tenantQuery<{ opportunity_id: string | null }>(
+    `SELECT opportunity_id FROM crm_quotes WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
+    [acceptedQuoteId, getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   if (!row) throw badRequest('La cotización seleccionada no existe.')
@@ -180,9 +183,9 @@ async function resolveProjectClientFields(input: {
   if (kind === 'contacto') {
     const contactId = input.contactId?.trim()
     if (!contactId) throw badRequest('Selecciona un contacto (B2C).')
-    const result = await pool.query<{ name: string }>(
-      `SELECT name FROM crm_contacts WHERE id = $1 AND deleted_at IS NULL`,
-      [contactId],
+    const result = await tenantQuery<{ name: string }>(
+      `SELECT name FROM crm_contacts WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
+      [contactId, getTenantIdOrDefault()],
     )
     const name = result.rows[0]?.name?.trim()
     if (!name) throw badRequest('Contacto no encontrado')
@@ -219,7 +222,7 @@ async function resolveCompany(
   }
   const name = clientName?.trim() || ''
   if (!name) return { companyId: null, clientName: '' }
-  const byName = await pool.query<{ id: string; name: string }>(
+  const byName = await tenantQuery<{ id: string; name: string }>(
     `SELECT id, name FROM crm_companies
      WHERE deleted_at IS NULL AND lower(trim(name)) = lower($1)
      LIMIT 1`,
@@ -252,7 +255,7 @@ async function resolveCommercialLinks(input: {
   let clientName = input.client?.trim() || ''
 
   if (opp.opportunityId) {
-    const oppRow = await pool.query<{
+    const oppRow = await tenantQuery<{
       company_id: string | null
       company_name: string
     }>(
@@ -321,6 +324,7 @@ export async function listProjects(
   } else {
     conditions.push('archived_at IS NULL')
   }
+  idx = pushTenantCondition(conditions, values, idx)
   if (params.status) {
     conditions.push(`status = $${idx++}`)
     values.push(params.status)
@@ -368,7 +372,7 @@ export async function listProjects(
   }
 
   const where = `WHERE ${conditions.join(' AND ')}`
-  const countResult = await pool.query<{ count: string }>(
+  const countResult = await tenantQuery<{ count: string }>(
     `SELECT count(*)::text AS count FROM crm_projects ${where}`,
     values,
   )
@@ -376,7 +380,7 @@ export async function listProjects(
   const offset = paginationOffset(params.page, params.pageSize)
   values.push(params.pageSize, offset)
 
-  const result = await pool.query<ProjectRow>(
+  const result = await tenantQuery<ProjectRow>(
     `SELECT ${PROJECT_COLUMNS}
      FROM crm_projects
      ${where}
@@ -398,11 +402,11 @@ export async function listProjects(
 }
 
 export async function getProjectById(id: string): Promise<ProjectDetail> {
-  const result = await pool.query<ProjectRow>(
+  const result = await tenantQuery<ProjectRow>(
     `SELECT ${PROJECT_COLUMNS}
      FROM crm_projects
-     WHERE id = $1 AND deleted_at IS NULL`,
-    [id],
+     WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
+    [id, getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   if (!row) throw notFound('Proyecto no encontrado')
@@ -441,19 +445,20 @@ export async function createProject(
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    await setTenantLocal(client)
     const result = await client.query<ProjectRow>(
       `INSERT INTO crm_projects (
         name, client_name, customer_kind, company_id, contact_id,
         opportunity_id, opportunity_name,
         accepted_quote_id, quote_code, progress_pct, deadline, manager_name,
         journey_stage, status, priority, health, budget_cents, start_date,
-        created_by_id, created_by_name, updated_by_id, updated_by_name
+        created_by_id, created_by_name, updated_by_id, updated_by_name, tenant_id
       ) VALUES (
         $1, $2, $3, $4, $5,
         $6, $7,
         $8, $9, $10, $11, $12,
         $13, $14, $15, $16, $17, $18,
-        $19, $20, $19, $20
+        $19, $20, $19, $20, $21
       )
       RETURNING ${PROJECT_COLUMNS}`,
       [
@@ -477,6 +482,7 @@ export async function createProject(
         parseDateInput(input.startDate) ?? new Date().toISOString().slice(0, 10),
         actor.userId,
         actor.userName,
+        getTenantIdOrDefault(),
       ],
     )
     const row = result.rows[0]!
@@ -576,6 +582,7 @@ export async function updateProject(
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    await setTenantLocal(client)
     const result = await client.query<ProjectRow>(
       `UPDATE crm_projects SET
         name = COALESCE($2, name),
@@ -598,7 +605,7 @@ export async function updateProject(
         updated_by_id = $19,
         updated_by_name = $20,
         updated_at = now()
-      WHERE id = $1 AND deleted_at IS NULL
+      WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(21)}
       RETURNING ${PROJECT_COLUMNS}`,
       [
         id,
@@ -621,6 +628,7 @@ export async function updateProject(
         parseDateInput(input.startDate),
         actor.userId,
         actor.userName,
+        getTenantIdOrDefault(),
       ],
     )
     const row = result.rows[0]
@@ -682,12 +690,12 @@ export async function archiveProject(
   id: string,
   actor: AuditActor,
 ): Promise<ProjectListItem> {
-  const result = await pool.query<ProjectRow>(
+  const result = await tenantQuery<ProjectRow>(
     `UPDATE crm_projects
      SET archived_at = now(), updated_by_id = $2, updated_by_name = $3, updated_at = now()
-     WHERE id = $1 AND deleted_at IS NULL AND archived_at IS NULL
+     WHERE id = $1 AND deleted_at IS NULL AND archived_at IS NULL AND ${tenantWhereParam(4)}
      RETURNING ${PROJECT_COLUMNS}`,
-    [id, actor.userId, actor.userName],
+    [id, actor.userId, actor.userName, getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   if (!row) throw notFound('Proyecto no encontrado o ya archivado')
@@ -698,12 +706,12 @@ export async function restoreProject(
   id: string,
   actor: AuditActor,
 ): Promise<ProjectListItem> {
-  const result = await pool.query<ProjectRow>(
+  const result = await tenantQuery<ProjectRow>(
     `UPDATE crm_projects
      SET archived_at = NULL, updated_by_id = $2, updated_by_name = $3, updated_at = now()
-     WHERE id = $1 AND deleted_at IS NULL
+     WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(4)}
      RETURNING ${PROJECT_COLUMNS}`,
-    [id, actor.userId, actor.userName],
+    [id, actor.userId, actor.userName, getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   if (!row) throw notFound('Proyecto no encontrado')
@@ -715,6 +723,7 @@ export async function permanentlyDeleteProject(id: string): Promise<void> {
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    await setTenantLocal(client)
 
     const found = await client.query<{ id: string }>(
       `SELECT id

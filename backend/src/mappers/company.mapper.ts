@@ -1,5 +1,5 @@
 import type { CompanyListItem } from '../types/company.js'
-import { imageUrlForList } from '../utils/entity-image.js'
+import { entityImageUrlForList } from '../utils/entity-image.js'
 import { formatActivityLabel, toIsoString } from '../utils/format.js'
 
 export type CompanyRow = {
@@ -34,7 +34,7 @@ export function mapCompanyRow(row: CompanyRow): CompanyListItem {
   return {
     id: row.id,
     name: row.name,
-    logoUrl: imageUrlForList(row.logo_url) ?? '',
+    logoUrl: entityImageUrlForList(`/api/v1/companies/${row.id}/logo`, row.logo_url),
     rut: row.rut ?? '',
     headquartersStreet: row.headquarters_street ?? undefined,
     industry: row.industry ?? '',

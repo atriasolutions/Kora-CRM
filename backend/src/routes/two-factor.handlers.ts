@@ -5,6 +5,7 @@ import { assertCanManageUser2fa } from '../middleware/can-manage-user-2fa.js'
 import { badRequest } from '../middleware/errors.js'
 import { pool } from '../db/pool.js'
 import * as authRepo from '../repositories/auth.repository.js'
+import { getDefaultTenantIdForUser } from '../repositories/tenants.repository.js'
 import * as twoFactorRepo from '../repositories/two-factor.repository.js'
 import * as twoFactorAuth from '../services/two-factor-auth.service.js'
 import { getClientIp } from '../utils/client-request.js'
@@ -33,12 +34,19 @@ export async function handleVerifyTwoFactorLogin(
       body.challengeId,
       body.code,
     )
-    const result = await authRepo.createAuthSessionForUser(userId, loginClient(req))
+    const tenantId =
+      body.tenantId?.trim() || (await getDefaultTenantIdForUser(userId))
+    const result = await authRepo.createAuthSessionForUser(
+      userId,
+      tenantId,
+      loginClient(req),
+    )
     res.json({
       data: {
         token: result.token,
         user: result.user,
         profile: result.profile,
+        tenantId: result.tenantId,
       },
     })
   } catch (e) {
@@ -77,12 +85,19 @@ export async function handleEnrollmentConfirm(
       body.code,
       body.setupId,
     )
-    const result = await authRepo.createAuthSessionForUser(userId, loginClient(req))
+    const tenantId =
+      body.tenantId?.trim() || (await getDefaultTenantIdForUser(userId))
+    const result = await authRepo.createAuthSessionForUser(
+      userId,
+      tenantId,
+      loginClient(req),
+    )
     res.json({
       data: {
         token: result.token,
         user: result.user,
         profile: result.profile,
+        tenantId: result.tenantId,
         backupCodes,
       },
     })

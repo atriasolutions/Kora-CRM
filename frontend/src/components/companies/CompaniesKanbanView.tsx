@@ -4,7 +4,8 @@ import { useNavigate } from 'react-router-dom'
 
 import { KanbanColumnMore } from '@/components/list/KanbanColumnMore'
 import { LargeDatasetBanner } from '@/components/list/LargeDatasetBanner'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { EntityAvatarImage } from '@/components/shared/EntityAvatarImage'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -173,7 +174,7 @@ export function CompaniesKanbanView({
                       >
                         <div className="flex items-start gap-3">
                           <Avatar className="size-9 shrink-0 rounded-lg border border-border">
-                            <AvatarImage src={company.logoUrl} alt={company.name} />
+                            <EntityAvatarImage src={company.logoUrl} alt={company.name} />
                             <AvatarFallback className="rounded-lg text-xs">
                               {initialsFromLabel(company.name)}
                             </AvatarFallback>

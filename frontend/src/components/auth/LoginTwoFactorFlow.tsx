@@ -12,6 +12,7 @@ type LoginTwoFactorFlowProps = {
   challengeId?: string
   enrollmentToken?: string
   userEmail: string
+  tenantId?: string
   onSuccess: (backupCodes?: string[]) => void
   onBack: () => void
 }
@@ -21,6 +22,7 @@ export function LoginTwoFactorFlow({
   challengeId,
   enrollmentToken,
   userEmail,
+  tenantId,
   onSuccess,
   onBack,
 }: LoginTwoFactorFlowProps) {
@@ -55,13 +57,13 @@ export function LoginTwoFactorFlow({
     event.preventDefault()
     setError(null)
     if (code.length < 6) {
-      setError('Ingresa el código de 6 dígitos de tu app autenticadora.')
+      setError('Ingresa el código de 6 dígitos de tu app autenticadora o un código de respaldo.')
       return
     }
     setLoading(true)
     try {
       if (mode === 'verify' && challengeId) {
-        const result = await completeTwoFactorLogin(challengeId, code)
+        const result = await completeTwoFactorLogin(challengeId, code, tenantId)
         if (result.status === 'error') {
           setError(result.message)
           return
@@ -74,6 +76,7 @@ export function LoginTwoFactorFlow({
           enrollmentToken,
           code,
           setup?.setupId,
+          tenantId,
         )
         if (result.status === 'error') {
           setError(result.message)
@@ -100,7 +103,8 @@ export function LoginTwoFactorFlow({
         ) : (
           <>
             Ingresa el código de tu app autenticadora para{' '}
-            <strong className="font-medium text-foreground">{userEmail}</strong>.
+            <strong className="font-medium text-foreground">{userEmail}</strong>. También puedes
+            usar un código de respaldo de un solo uso.
           </>
         )}
       </p>
@@ -131,6 +135,7 @@ export function LoginTwoFactorFlow({
         onChange={setCode}
         disabled={loading || (mode === 'enroll' && setupLoading)}
         autoFocus={mode === 'verify'}
+        allowBackupCodes={mode === 'verify'}
       />
 
       {error ? (

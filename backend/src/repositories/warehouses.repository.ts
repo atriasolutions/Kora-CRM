@@ -1,6 +1,9 @@
 import type { PoolClient } from 'pg'
 
 import { pool } from '../db/pool.js'
+import { setTenantLocal, tenantQuery } from '../db/tenant-query.js'
+import { tenantWhereParam } from '../lib/tenant-sql.js'
+import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import { mapWarehouse, type WarehouseRow } from '../mappers/settings.mapper.js'
 import { badRequest, notFound } from '../middleware/errors.js'
 import type {
@@ -39,21 +42,22 @@ function assertWarehouseLocation(input: {
 }
 
 export async function listWarehouses(): Promise<Warehouse[]> {
-  const result = await pool.query<WarehouseRow>(
+  const result = await tenantQuery<WarehouseRow>(
     `SELECT ${SELECT_COLUMNS}
      FROM crm_warehouses
-     WHERE deleted_at IS NULL
+     WHERE deleted_at IS NULL AND ${tenantWhereParam(1)}
      ORDER BY is_default DESC, name ASC`,
+    [getTenantIdOrDefault()],
   )
   return result.rows.map(mapWarehouse)
 }
 
 export async function getWarehouseById(id: string): Promise<Warehouse> {
-  const result = await pool.query<WarehouseRow>(
+  const result = await tenantQuery<WarehouseRow>(
     `SELECT ${SELECT_COLUMNS}
      FROM crm_warehouses
-     WHERE id = $1 AND deleted_at IS NULL`,
-    [id],
+     WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
+    [id, getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   if (!row) throw notFound('Bodega no encontrada')
@@ -71,10 +75,10 @@ export async function createWarehouse(input: CreateWarehouseInput): Promise<Ware
   const name = input.name.trim()
   if (!name) throw badRequest('El nombre de la bodega es obligatorio')
 
-  const dup = await pool.query(
+  const dup = await tenantQuery(
     `SELECT 1 FROM crm_warehouses
-     WHERE deleted_at IS NULL AND lower(trim(name)) = lower($1)`,
-    [name],
+     WHERE deleted_at IS NULL AND lower(trim(name)) = lower($1) AND ${tenantWhereParam(2)}`,
+    [name, getTenantIdOrDefault()],
   )
   if (dup.rowCount) throw badRequest('Ya existe una bodega con ese nombre')
 
@@ -82,6 +86,7 @@ export async function createWarehouse(input: CreateWarehouseInput): Promise<Ware
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    await setTenantLocal(client)
 
     const countResult = await client.query<{ count: string }>(
       `SELECT count(*)::text AS count FROM crm_warehouses WHERE deleted_at IS NULL`,
@@ -94,8 +99,8 @@ export async function createWarehouse(input: CreateWarehouseInput): Promise<Ware
     }
 
     const result = await client.query<WarehouseRow>(
-      `INSERT INTO crm_warehouses (name, code, address, region, commune, is_default, active)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO crm_warehouses (name, code, address, region, commune, is_default, active, tenant_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING ${SELECT_COLUMNS}`,
       [
         name,
@@ -105,6 +110,7 @@ export async function createWarehouse(input: CreateWarehouseInput): Promise<Ware
         input.commune?.trim() || null,
         isDefault,
         input.active !== false,
+        getTenantIdOrDefault(),
       ],
     )
 
@@ -132,7 +138,7 @@ export async function updateWarehouse(
   if (input.name !== undefined) {
     const name = input.name.trim()
     if (!name) throw badRequest('El nombre de la bodega es obligatorio')
-    const dup = await pool.query(
+    const dup = await tenantQuery(
       `SELECT 1 FROM crm_warehouses
        WHERE deleted_at IS NULL AND id <> $1 AND lower(trim(name)) = lower($2)`,
       [id, name],
@@ -143,6 +149,7 @@ export async function updateWarehouse(
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    await setTenantLocal(client)
 
     if (input.isDefault === true) {
       await clearDefaultWarehouse(client)
@@ -219,7 +226,7 @@ export async function updateWarehouse(
 export async function deleteWarehouse(id: string): Promise<void> {
   await getWarehouseById(id)
 
-  const countResult = await pool.query<{ count: string }>(
+  const countResult = await tenantQuery<{ count: string }>(
     `SELECT count(*)::text AS count FROM crm_warehouses WHERE deleted_at IS NULL`,
   )
   const total = Number.parseInt(countResult.rows[0]?.count ?? '0', 10)
@@ -229,6 +236,7 @@ export async function deleteWarehouse(id: string): Promise<void> {
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    await setTenantLocal(client)
     await client.query(
       `UPDATE crm_warehouses SET deleted_at = now(), updated_at = now() WHERE id = $1`,
       [id],

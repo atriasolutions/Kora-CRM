@@ -5,6 +5,9 @@ import {
   type ComputedLine,
 } from '../lib/line-items.js'
 import { pool } from '../db/pool.js'
+import { setTenantLocal, tenantQuery } from '../db/tenant-query.js'
+import { pushTenantCondition, tenantWhereParam } from '../lib/tenant-sql.js'
+import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import {
   mapOpportunityDetail,
   mapOpportunityRow,
@@ -60,7 +63,7 @@ export type ListOpportunitiesParams = {
 async function loadLineItems(
   opportunityId: string,
 ): Promise<OpportunityLineRow[]> {
-  const result = await pool.query<OpportunityLineRow>(
+  const result = await tenantQuery<OpportunityLineRow>(
     `SELECT ${LINE_COLUMNS}
      FROM crm_opportunity_line_items
      WHERE opportunity_id = $1
@@ -117,6 +120,7 @@ export async function listOpportunities(
   } else {
     conditions.push('archived_at IS NULL')
   }
+  idx = pushTenantCondition(conditions, values, idx)
   if (params.stage) {
     conditions.push(`stage = $${idx++}`)
     values.push(params.stage)
@@ -149,7 +153,7 @@ export async function listOpportunities(
 
   const where = `WHERE ${conditions.join(' AND ')}`
 
-  const countResult = await pool.query<{ count: string }>(
+  const countResult = await tenantQuery<{ count: string }>(
     `SELECT count(*)::text AS count FROM crm_opportunities ${where}`,
     values,
   )
@@ -158,7 +162,7 @@ export async function listOpportunities(
   const offset = paginationOffset(params.page, params.pageSize)
   values.push(params.pageSize, offset)
 
-  const result = await pool.query<OpportunityRow>(
+  const result = await tenantQuery<OpportunityRow>(
     `SELECT ${OPP_COLUMNS}
      FROM crm_opportunities
      ${where}
@@ -171,11 +175,11 @@ export async function listOpportunities(
 }
 
 export async function getOpportunityById(id: string): Promise<OpportunityDetail> {
-  const result = await pool.query<OpportunityRow>(
+  const result = await tenantQuery<OpportunityRow>(
     `SELECT ${OPP_COLUMNS}
      FROM crm_opportunities
-     WHERE id = $1 AND deleted_at IS NULL`,
-    [id],
+     WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
+    [id, getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   if (!row) throw notFound('Oportunidad no encontrada')
@@ -205,6 +209,7 @@ export async function createOpportunity(
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    await setTenantLocal(client)
 
     const result = await client.query<OpportunityRow>(
       `INSERT INTO crm_opportunities (
@@ -213,14 +218,14 @@ export async function createOpportunity(
         owner_name, opp_type, priority, outcome, forecast, source,
         contact_email, contact_phone, description, decision_maker, competitors,
         budget_label, buying_process, loss_reason,
-        created_by_id, created_by_name, updated_by_id, updated_by_name
+        created_by_id, created_by_name, updated_by_id, updated_by_name, tenant_id
       ) VALUES (
         $1, $2, $3, $4, $5, $6,
         $7, $8, $9, $10, $11,
         $12, $13, $14, $15, $16, $17,
         $18, $19, $20, $21, $22,
         $23, $24, $25,
-        $26, $27, $26, $27
+        $26, $27, $26, $27, $28
       )
       RETURNING ${OPP_COLUMNS}`,
       [
@@ -251,6 +256,7 @@ export async function createOpportunity(
         input.lossReason?.trim() || null,
         actor.userId,
         actor.userName,
+        getTenantIdOrDefault(),
       ],
     )
 
@@ -319,6 +325,7 @@ export async function updateOpportunity(
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    await setTenantLocal(client)
 
     const detailFields = {
       contactEmail:
@@ -383,7 +390,7 @@ export async function updateOpportunity(
         updated_by_id = $27,
         updated_by_name = $28,
         updated_at = now()
-      WHERE id = $1 AND deleted_at IS NULL
+      WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(29)}
       RETURNING ${OPP_COLUMNS}`,
       [
         id,
@@ -414,6 +421,7 @@ export async function updateOpportunity(
         detailFields.lossReason,
         actor.userId,
         actor.userName,
+        getTenantIdOrDefault(),
       ],
     )
     const row = result.rows[0]
@@ -454,11 +462,11 @@ export async function softDeleteOpportunity(
   id: string,
   actor: AuditActor,
 ): Promise<void> {
-  const result = await pool.query(
+  const result = await tenantQuery(
     `UPDATE crm_opportunities
      SET deleted_at = now(), updated_by_id = $2, updated_by_name = $3, updated_at = now()
-     WHERE id = $1 AND deleted_at IS NULL`,
-    [id, actor.userId, actor.userName],
+     WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(4)}`,
+    [id, actor.userId, actor.userName, getTenantIdOrDefault()],
   )
   if (result.rowCount === 0) throw notFound('Oportunidad no encontrada')
   await purgeEntityNotesAndFiles('oportunidad', id)
@@ -468,12 +476,12 @@ export async function archiveOpportunity(
   id: string,
   actor: AuditActor,
 ): Promise<OpportunityDetail> {
-  const result = await pool.query<OpportunityRow>(
+  const result = await tenantQuery<OpportunityRow>(
     `UPDATE crm_opportunities
      SET archived_at = now(), updated_by_id = $2, updated_by_name = $3, updated_at = now()
-     WHERE id = $1 AND deleted_at IS NULL AND archived_at IS NULL
+     WHERE id = $1 AND deleted_at IS NULL AND archived_at IS NULL AND ${tenantWhereParam(4)}
      RETURNING ${OPP_COLUMNS}`,
-    [id, actor.userId, actor.userName],
+    [id, actor.userId, actor.userName, getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   if (!row) throw notFound('Oportunidad no encontrada o ya archivada')
@@ -484,12 +492,12 @@ export async function restoreOpportunity(
   id: string,
   actor: AuditActor,
 ): Promise<OpportunityDetail> {
-  const result = await pool.query<OpportunityRow>(
+  const result = await tenantQuery<OpportunityRow>(
     `UPDATE crm_opportunities
      SET archived_at = NULL, updated_by_id = $2, updated_by_name = $3, updated_at = now()
-     WHERE id = $1 AND deleted_at IS NULL
+     WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(4)}
      RETURNING ${OPP_COLUMNS}`,
-    [id, actor.userId, actor.userName],
+    [id, actor.userId, actor.userName, getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   if (!row) throw notFound('Oportunidad no encontrada')
@@ -513,6 +521,7 @@ export async function syncOpportunityFromQuoteData(
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    await setTenantLocal(client)
 
     const result = await client.query<OpportunityRow>(
       `UPDATE crm_opportunities SET
@@ -523,7 +532,7 @@ export async function syncOpportunityFromQuoteData(
         updated_by_id = $6,
         updated_by_name = $7,
         updated_at = now()
-      WHERE id = $1 AND deleted_at IS NULL
+      WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(8)}
       RETURNING ${OPP_COLUMNS}`,
       [
         opportunityId,
@@ -533,6 +542,7 @@ export async function syncOpportunityFromQuoteData(
         data.closeDate ? parseDateInput(data.closeDate) : null,
         actor.userId,
         actor.userName,
+        getTenantIdOrDefault(),
       ],
     )
     const row = result.rows[0]

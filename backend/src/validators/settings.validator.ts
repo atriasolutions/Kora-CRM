@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+export const invoicingModeSchema = z.enum(['manual', 'sii'])
+
 export const updateOrganizationSettingsSchema = z.object({
   legalName: z.string().max(255).optional(),
   tradeName: z.string().max(255).optional(),
@@ -14,6 +16,8 @@ export const updateOrganizationSettingsSchema = z.object({
   email: z.string().max(320).optional(),
   logoUrl: z.string().optional(),
   defaultVatPercent: z.number().min(0).max(100).optional(),
+  invoicingMode: invoicingModeSchema.optional(),
+  economicActivityCode: z.number().int().positive().max(99999999).nullable().optional(),
 })
 
 export const createWarehouseSchema = z.object({

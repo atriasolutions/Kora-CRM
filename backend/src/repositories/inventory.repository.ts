@@ -1,5 +1,8 @@
 import { acquireSkuStockLock } from '../lib/inventory-stock-lock.js'
 import { pool } from '../db/pool.js'
+import { setTenantLocal, tenantQuery } from '../db/tenant-query.js'
+import { pushTenantCondition, tenantWhereParam } from '../lib/tenant-sql.js'
+import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import {
   mapInventoryDetail,
   mapInventoryRow,
@@ -55,7 +58,7 @@ export type ListInventoryParams = {
 }
 
 async function loadMovements(positionId: string): Promise<StockMovementRow[]> {
-  const result = await pool.query<StockMovementRow>(
+  const result = await tenantQuery<StockMovementRow>(
     `SELECT ${MOVEMENT_COLUMNS}
      FROM crm_stock_movements
      WHERE inventory_position_id = $1
@@ -73,6 +76,7 @@ export async function listInventory(
   const values: unknown[] = []
   let idx = 1
 
+  idx = pushTenantCondition(conditions, values, idx, 'ip')
   if (params.status) {
     conditions.push(`ip.status = $${idx++}`)
     values.push(params.status)
@@ -90,7 +94,7 @@ export async function listInventory(
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
-  const countResult = await pool.query<{ count: string }>(
+  const countResult = await tenantQuery<{ count: string }>(
     `SELECT count(*)::text AS count FROM crm_inventory_positions ip ${where}`,
     values,
   )
@@ -98,7 +102,7 @@ export async function listInventory(
   const offset = paginationOffset(params.page, params.pageSize)
   values.push(params.pageSize, offset)
 
-  const result = await pool.query<InventoryRow>(
+  const result = await tenantQuery<InventoryRow>(
     `SELECT ${POSITION_COLUMNS}
      ${POSITION_FROM}
      ${where}
@@ -111,9 +115,9 @@ export async function listInventory(
 }
 
 export async function getInventoryById(id: string): Promise<InventoryDetail> {
-  const result = await pool.query<InventoryRow>(
-    `SELECT ${POSITION_COLUMNS} ${POSITION_FROM} WHERE ip.id = $1`,
-    [id],
+  const result = await tenantQuery<InventoryRow>(
+    `SELECT ${POSITION_COLUMNS} ${POSITION_FROM} WHERE ip.id = $1 AND ${tenantWhereParam(2, 'ip')}`,
+    [id, getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   if (!row) throw notFound('Posición de inventario no encontrada')
@@ -136,16 +140,16 @@ export async function updateInventory(
     input.status ??
     deriveInventoryStatus(onHand, reserved, minStock, existing.status)
 
-  const result = await pool.query<{ id: string }>(
+  const result = await tenantQuery<{ id: string }>(
     `UPDATE crm_inventory_positions SET
       quantity_on_hand = $2,
       quantity_available = $3,
       min_stock = $4,
       status = $5,
       updated_at = now()
-    WHERE id = $1
+    WHERE id = $1 AND ${tenantWhereParam(6)}
     RETURNING id`,
-    [id, onHand, available, minStock, status],
+    [id, onHand, available, minStock, status, getTenantIdOrDefault()],
   )
   if (!result.rows[0]) throw notFound('Posición de inventario no encontrada')
   const updated = await getInventoryById(id)
@@ -180,6 +184,7 @@ export async function adjustInventory(
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    await setTenantLocal(client)
     const posResult = await client.query<InventoryRow>(
       `SELECT ${POSITION_BASE_COLUMNS}
        FROM crm_inventory_positions

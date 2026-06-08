@@ -3,7 +3,9 @@ import {
   CalendarPlus,
   ChevronDown,
   Globe,
+  IdCard,
   Mail,
+  MapPin,
   MessageCircle,
   MoreHorizontal,
   Pencil,
@@ -21,6 +23,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  DetailHeaderMetaCell,
+  DetailHeaderMetaPanel,
+} from '@/components/shared/DetailHeaderMetaPanel'
 import type { CompanyDetail } from '@/data/company-detail.mock'
 import type { ContactActivityType } from '@/data/contact-detail.mock'
 import type { CompanyLifecycleStatus } from '@/data/companies.mock'
@@ -74,167 +80,200 @@ export function CompanyDetailHeader({
   const emailHref = companyEmailHref(company.email)
   const identifierType = inferCompanyIdentifierType(company.rut)
   const identifierDisplay = formatTaxIdentifierDisplay(identifierType, company.rut)
+  const headquartersAddress = [
+    company.headquarters?.street || company.headquartersStreet,
+    company.headquarters?.commune ?? company.headquarters?.city ?? company.city,
+    company.headquarters?.region,
+  ]
+    .filter(Boolean)
+    .join(', ')
+
+  const hasMeta =
+    Boolean(company.rut) ||
+    Boolean(headquartersAddress) ||
+    Boolean(company.website) ||
+    Boolean(company.email) ||
+    Boolean(company.phone)
 
   return (
-    <section className="rounded-xl border border-border bg-card p-5 shadow-sm sm:p-6">
-      <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-start 2xl:justify-between">
-        <div className="flex min-w-0 flex-1 gap-4">
-          <Avatar className="size-14 shrink-0 rounded-xl border-2 border-border shadow-sm sm:size-16">
-            <AvatarImage src={company.logoUrl} alt={company.name} />
-            <AvatarFallback className="rounded-xl text-lg">
-              {initialsFromLabel(company.name)}
-            </AvatarFallback>
-          </Avatar>
-          <div className="min-w-0 flex-1 space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="break-words text-2xl font-semibold tracking-tight text-foreground">
-                {company.name}
-              </h1>
-              <Badge variant={lifecycleVariant(company.lifecycle)}>
-                {company.lifecycle}
-              </Badge>
-              <Badge
-                variant={company.operationalStatus === 'Activa' ? 'customer' : 'muted'}
-              >
-                {company.operationalStatus}
-              </Badge>
+    <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+      <div className="border-b border-border bg-gradient-to-br from-muted/40 via-card to-card p-4 sm:p-5 lg:p-6">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div className="flex min-w-0 gap-3 sm:gap-4">
+            <Avatar className="size-14 shrink-0 rounded-xl border-2 border-border shadow-sm sm:size-16">
+              <AvatarImage src={company.logoUrl} alt={company.name} />
+              <AvatarFallback className="rounded-xl text-lg">
+                {initialsFromLabel(company.name)}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+                  {company.name}
+                </h1>
+                <Badge variant={lifecycleVariant(company.lifecycle)}>
+                  {company.lifecycle}
+                </Badge>
+                <Badge
+                  variant={company.operationalStatus === 'Activa' ? 'customer' : 'muted'}
+                >
+                  {company.operationalStatus}
+                </Badge>
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {[company.industry, company.city, company.employees && `${company.employees} empleados`]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </p>
             </div>
-            <p className="text-sm text-muted-foreground">
-              {company.industry} · {company.city} · {company.employees} empleados
-            </p>
-            <p className="font-mono text-xs text-muted-foreground">
-              {taxIdentifierLabel(identifierType)} {identifierDisplay}
-            </p>
           </div>
-        </div>
 
-        <div className="flex w-full flex-wrap items-center gap-2 border-t border-border/60 pt-4 2xl:w-auto 2xl:shrink-0 2xl:border-t-0 2xl:pt-0">
-          <div className="flex">
-            <Button
-              type="button"
-              size="sm"
-              className="rounded-e-none shadow-sm"
-              onClick={() => onRegisterActivity?.()}
-            >
-              <CalendarPlus aria-hidden className="size-4" />
-              Registrar actividad
-            </Button>
+          <div
+            className={cn(
+              'flex flex-wrap items-center gap-2',
+              'border-t border-border/60 pt-4 xl:shrink-0 xl:justify-end xl:border-t-0 xl:pt-0',
+            )}
+          >
+            <div className="flex w-full sm:w-auto">
+              <Button
+                type="button"
+                size="sm"
+                className="min-w-0 flex-1 rounded-e-none shadow-sm sm:flex-none"
+                onClick={() => onRegisterActivity?.()}
+              >
+                <CalendarPlus aria-hidden className="size-4 shrink-0" />
+                <span className="truncate">Registrar actividad</span>
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="rounded-s-none border-s-0 px-2 shadow-sm"
+                    aria-label="Tipo de actividad rápida"
+                  >
+                    <ChevronDown aria-hidden className="size-4 opacity-70" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52">
+                  <DropdownMenuItem onClick={() => onRegisterActivity?.('llamada')}>
+                    <Phone aria-hidden className="size-4" />
+                    Llamada
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onRegisterActivity?.('email')}>
+                    <Mail aria-hidden className="size-4" />
+                    Email
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onRegisterActivity?.('reunion')}>
+                    <Calendar aria-hidden className="size-4" />
+                    Reunión
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onRegisterActivity?.('whatsapp')}>
+                    <MessageCircle aria-hidden className="size-4" />
+                    WhatsApp
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onRegisterActivity?.('nota')}>
+                    <StickyNote aria-hidden className="size-4" />
+                    Nota
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            {showEdit ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-border shadow-sm"
+                onClick={onStartEdit}
+              >
+                <Pencil aria-hidden className="size-4" />
+                <span className="hidden md:inline">Editar empresa</span>
+              </Button>
+            ) : null}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  size="sm"
-                  className="rounded-s-none border-s-0 px-2 shadow-sm"
-                  aria-label="Tipo de actividad rápida"
-                >
-                  <ChevronDown aria-hidden className="size-4 opacity-70" />
+                <Button variant="outline" size="icon" className="border-border shadow-sm">
+                  <MoreHorizontal aria-hidden className="size-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52">
-                <DropdownMenuItem onClick={() => onRegisterActivity?.('llamada')}>
-                  <Phone aria-hidden className="size-4" />
-                  Llamada
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onRegisterActivity?.('email')}>
-                  <Mail aria-hidden className="size-4" />
-                  Email
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onRegisterActivity?.('reunion')}>
-                  <Calendar aria-hidden className="size-4" />
-                  Reunión
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onRegisterActivity?.('whatsapp')}>
-                  <MessageCircle aria-hidden className="size-4" />
-                  WhatsApp
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onRegisterActivity?.('nota')}>
-                  <StickyNote aria-hidden className="size-4" />
-                  Nota
-                </DropdownMenuItem>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem disabled>Duplicar</DropdownMenuItem>
+                {showArchive ? (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onClick={onArchive}
+                    >
+                      Archivar
+                    </DropdownMenuItem>
+                  </>
+                ) : null}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-          {showEdit ? (
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-border shadow-sm"
-              onClick={onStartEdit}
-            >
-              <Pencil aria-hidden className="size-4" />
-              Editar empresa
-            </Button>
-          ) : null}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" className="border-border shadow-sm">
-                <MoreHorizontal aria-hidden className="size-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem disabled>Duplicar</DropdownMenuItem>
-              {showArchive ? (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    className="text-destructive focus:text-destructive"
-                    onClick={onArchive}
-                  >
-                    Archivar
-                  </DropdownMenuItem>
-                </>
-              ) : null}
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
+
+        {hasMeta ? (
+          <DetailHeaderMetaPanel>
+            {company.rut ? (
+              <DetailHeaderMetaCell icon={IdCard} label={taxIdentifierLabel(identifierType)}>
+                <span className="font-mono text-[13px]">{identifierDisplay}</span>
+              </DetailHeaderMetaCell>
+            ) : null}
+            {headquartersAddress ? (
+              <DetailHeaderMetaCell icon={MapPin} label="Dirección" fullWidth>
+                {headquartersAddress}
+              </DetailHeaderMetaCell>
+            ) : null}
+            {company.website ? (
+              <DetailHeaderMetaCell icon={Globe} label="Sitio web">
+                {websiteHref ? (
+                  <a
+                    href={websiteHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary underline-offset-2 hover:underline"
+                  >
+                    {company.website}
+                  </a>
+                ) : (
+                  company.website
+                )}
+              </DetailHeaderMetaCell>
+            ) : null}
+            {company.email ? (
+              <DetailHeaderMetaCell icon={Mail} label="Email">
+                {emailHref ? (
+                  <a
+                    href={emailHref}
+                    className="text-primary underline-offset-2 hover:underline"
+                  >
+                    {company.email}
+                  </a>
+                ) : (
+                  company.email
+                )}
+              </DetailHeaderMetaCell>
+            ) : null}
+            {company.phone ? (
+              <DetailHeaderMetaCell icon={Phone} label="Teléfono">
+                {company.phone}
+              </DetailHeaderMetaCell>
+            ) : null}
+          </DetailHeaderMetaPanel>
+        ) : null}
       </div>
 
-      <div className="mt-6 grid gap-3 border-t border-border pt-5 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-px bg-border/70 sm:grid-cols-4">
         {metrics.map(({ label, value }) => (
-          <div key={label} className="rounded-lg border border-border bg-muted/20 px-4 py-3">
-            <p className="text-xs text-muted-foreground">{label}</p>
+          <div key={label} className="bg-card px-4 py-4 sm:px-5">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {label}
+            </p>
             <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">{value}</p>
           </div>
         ))}
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-4 text-sm text-muted-foreground">
-        {websiteHref ? (
-          <a
-            href={websiteHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={cn(
-              'inline-flex items-center gap-1.5 underline-offset-2 hover:text-primary hover:underline',
-            )}
-          >
-            <Globe aria-hidden className="size-4 shrink-0" />
-            {company.website}
-          </a>
-        ) : (
-          <span className="inline-flex items-center gap-1.5">
-            <Globe aria-hidden className="size-4" />
-            {company.website}
-          </span>
-        )}
-        {emailHref ? (
-          <a
-            href={emailHref}
-            className="inline-flex items-center gap-1.5 underline-offset-2 hover:text-primary hover:underline"
-          >
-            <Mail aria-hidden className="size-4 shrink-0" />
-            {company.email}
-          </a>
-        ) : (
-          <span className="inline-flex items-center gap-1.5">
-            <Mail aria-hidden className="size-4" />
-            {company.email}
-          </span>
-        )}
-        <span className="inline-flex items-center gap-1.5">
-          <Phone aria-hidden className="size-4" />
-          {company.phone}
-        </span>
       </div>
     </section>
   )

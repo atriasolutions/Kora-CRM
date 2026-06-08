@@ -14,6 +14,8 @@ type RegionCommuneFieldsProps = {
   /** Al cambiar región, limpia comuna si ya no aplica */
   onPatch?: (patch: { region: string; commune: string }) => void
   className?: string
+  /** En formularios estrechos (p. ej. marketing), apila región y comuna siempre. */
+  layout?: 'stacked' | 'responsive'
   disabled?: boolean
 }
 
@@ -26,6 +28,7 @@ export function RegionCommuneFields({
   onCommuneChange,
   onPatch,
   className,
+  layout = 'responsive',
   disabled = false,
 }: RegionCommuneFieldsProps) {
   const { regions, getCommunesForRegion, loading } = useChileLocations()
@@ -65,7 +68,13 @@ export function RegionCommuneFields({
   }
 
   return (
-    <div className={cn('grid gap-4 sm:grid-cols-2', className)}>
+    <div
+      className={cn(
+        'grid grid-cols-1 gap-4',
+        layout === 'responsive' && 'md:grid-cols-2',
+        className,
+      )}
+    >
       <ContactFormSelect
         id={regionId}
         label="Región"

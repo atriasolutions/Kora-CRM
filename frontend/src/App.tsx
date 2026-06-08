@@ -1,4 +1,4 @@
-import { Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes } from 'react-router-dom'
 
 import { RequireAuth } from '@/components/auth/RequireAuth'
 import { AppDataProviders } from '@/components/layout/AppDataProviders'
@@ -45,6 +45,13 @@ import { LoginPage } from '@/pages/LoginPage'
 import { ResetPasswordPage } from '@/pages/ResetPasswordPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { WelcomePage } from '@/pages/WelcomePage'
+import { CentralMarketingOnly } from '@/components/auth/CentralMarketingOnly'
+import { MarketingLayout } from '@/components/marketing/MarketingLayout'
+import { MarketingFeaturesPage } from '@/pages/marketing/MarketingFeaturesPage'
+import { MarketingHomePage } from '@/pages/marketing/MarketingHomePage'
+import { MarketingPricingPage } from '@/pages/marketing/MarketingPricingPage'
+import { MarketingTrialPage } from '@/pages/marketing/MarketingTrialPage'
+import { MarketingSupportPage } from '@/pages/marketing/MarketingSupportPage'
 
 const listRoutePaths = new Set<string>(listModuleSlugs)
 
@@ -54,6 +61,20 @@ export default function App() {
       <ShellLayoutProvider>
         <Toaster />
         <Routes>
+          <Route
+            element={
+              <CentralMarketingOnly>
+                <MarketingLayout />
+              </CentralMarketingOnly>
+            }
+          >
+            <Route index element={<MarketingHomePage />} />
+            <Route path="producto" element={<Navigate to="/" replace />} />
+            <Route path="funcionalidades" element={<MarketingFeaturesPage />} />
+            <Route path="planes" element={<MarketingPricingPage />} />
+            <Route path="prueba-gratis" element={<MarketingTrialPage />} />
+            <Route path="soporte" element={<MarketingSupportPage />} />
+          </Route>
           <Route path="login" element={<LoginPage />} />
           <Route path="activar-cuenta" element={<ActivateAccountPage />} />
           <Route path="olvide-contraseña" element={<ForgotPasswordPage />} />
@@ -62,7 +83,7 @@ export default function App() {
             <Route element={<AppDataProviders />}>
               <Route element={<AppShell />}>
                 <Route element={<RouteAccessGuard />}>
-                  <Route index element={<WelcomePage />} />
+                  <Route path="inicio" element={<WelcomePage />} />
                   <Route path="dashboard" element={<DashboardPage />} />
                   <Route path="contactos" element={<ContactsPage />} />
                   <Route path="contactos/:contactId" element={<ContactDetailPage />} />

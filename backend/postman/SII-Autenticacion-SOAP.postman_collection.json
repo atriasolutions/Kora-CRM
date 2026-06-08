@@ -1,0 +1,143 @@
+{
+  "info": {
+    "_postman_id": "b2000001-0001-4001-8001-0000000000sii",
+    "name": "SII Chile — Autenticación SOAP (semilla + token)",
+    "description": "Prueba manual de autenticación SII (CrSeed + GetTokenFromSeed).\n\n## Importar\n1. Postman → Import → selecciona este archivo y el environment `SII-maullin.postman_environment.json`.\n2. Activa el environment **SII Certificación (maullin)**.\n\n## Request 1 — Semilla\nEjecuta **1. CrSeed — Obtener semilla**. Debe responder ESTADO 00 y guardar `sii_seed` en el environment.\n\n## Request 2 — Token (requiere firma con .pfx)\nPostman **no firma** certificados. Genera el body firmado con:\n\n```bash\ncd backend\nnpx tsx scripts/export-sii-curl-test.ts /ruta/certificado.pfx 'contraseña' certification\n```\n\nAbre `backend/tmp/sii-curl-test/2-get-token-request.xml`, copia **todo** el contenido y pégalo en:\n- Environment → variable `token_request_xml`, **o**\n- Body de la request 2 (reemplaza el placeholder).\n\n⚠️ La semilla vence en ~2 minutos. Ejecuta el script justo antes de la request 2.\n\n## Respuestas\n- ESTADO 00 + TOKEN → OK\n- ESTADO 10 → SII no creó token (certificado/permisos)\n- ESTADO 05/11/21 → problema de firma XML",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Certificación (maullin)",
+      "item": [
+        {
+          "name": "1. CrSeed — Obtener semilla",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const body = pm.response.text();",
+                  "const estadoMatch = body.match(/<ESTADO>(\\d+)<\\/ESTADO>/);",
+                  "const semillaMatch = body.match(/<SEMILLA>(\\d+)<\\/SEMILLA>/);",
+                  "if (estadoMatch) {",
+                  "  pm.test('ESTADO semilla es 00', () => pm.expect(estadoMatch[1]).to.eql('00'));",
+                  "  console.log('ESTADO:', estadoMatch[1]);",
+                  "}",
+                  "if (semillaMatch) {",
+                  "  pm.environment.set('sii_seed', semillaMatch[1]);",
+                  "  console.log('SEMILLA guardada en sii_seed:', semillaMatch[1]);",
+                  "} else {",
+                  "  console.warn('No se encontró SEMILLA en la respuesta');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              },
+              {
+                "key": "SOAPAction",
+                "value": "\"\""
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<soapenv:Envelope xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\" xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:def=\"http://DefaultNamespace\">\n<soapenv:Header/>\n<soapenv:Body>\n<def:getSeed/>\n</soapenv:Body>\n</soapenv:Envelope>",
+              "options": {
+                "raw": {
+                  "language": "xml"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{sii_base_url}}/DTEWS/CrSeed.jws",
+              "host": ["{{sii_base_url}}"],
+              "path": ["DTEWS", "CrSeed.jws"]
+            },
+            "description": "Obtiene semilla aleatoria del SII. Usar environment maullin o palena."
+          },
+          "response": []
+        },
+        {
+          "name": "2. GetTokenFromSeed — Obtener token",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const xml = pm.environment.get('token_request_xml');",
+                  "if (!xml || xml.trim().length < 100) {",
+                  "  console.warn('Variable token_request_xml vacía. Ejecuta export-sii-curl-test.ts y pega 2-get-token-request.xml en el environment.');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const body = pm.response.text();",
+                  "const estadoMatch = body.match(/<ESTADO>(\\d+)<\\/ESTADO>/);",
+                  "const glosaMatch = body.match(/<GLOSA>([^<]*)<\\/GLOSA>/);",
+                  "const tokenMatch = body.match(/<TOKEN>([^<]+)<\\/TOKEN>/);",
+                  "if (estadoMatch) {",
+                  "  console.log('ESTADO:', estadoMatch[1]);",
+                  "  if (estadoMatch[1] === '00') {",
+                  "    pm.test('Token creado (ESTADO 00)', () => true);",
+                  "  }",
+                  "}",
+                  "if (glosaMatch) console.log('GLOSA:', glosaMatch[1]);",
+                  "if (tokenMatch) console.log('TOKEN:', tokenMatch[1]);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              },
+              {
+                "key": "SOAPAction",
+                "value": "\"\""
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{{token_request_xml}}",
+              "options": {
+                "raw": {
+                  "language": "xml"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{sii_base_url}}/DTEWS/GetTokenFromSeed.jws",
+              "host": ["{{sii_base_url}}"],
+              "path": ["DTEWS", "GetTokenFromSeed.jws"]
+            },
+            "description": "Envía semilla firmada con certificado .pfx.\n\n1. Ejecuta: npx tsx scripts/export-sii-curl-test.ts cert.pfx 'pass' certification\n2. Copia backend/tmp/sii-curl-test/2-get-token-request.xml\n3. Pégalo en Environment → token_request_xml\n4. Send (dentro de 2 min de generar el archivo)"
+          },
+          "response": []
+        }
+      ],
+      "description": "Ambiente certificación: maullin.sii.cl — activar environment **SII Certificación (maullin)**"
+    }
+  ],
+  "variable": [
+    {
+      "key": "sii_base_url",
+      "value": "https://maullin.sii.cl"
+    }
+  ]
+}

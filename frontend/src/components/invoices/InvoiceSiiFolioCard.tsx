@@ -1,8 +1,8 @@
 import { FileDigit } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import type { InvoiceDetail } from '@/data/invoice-detail.mock'
 import {
   formatSiiInvoiceNumberDisplay,
   INVOICE_EMITTED_STATUS,
@@ -10,10 +10,24 @@ import {
 } from '@/lib/invoice-sii'
 
 type InvoiceSiiFolioCardProps = {
-  invoice: Pick<InvoiceDetail, 'status' | 'siiNumber' | 'number'>
+  invoice: {
+    status: string
+    siiNumber?: string
+    number: string
+    dteStatus?: string
+    siiTrackId?: string
+  }
+  invoicingMode?: 'manual' | 'sii'
+  onEmitToSii?: () => void
+  emittingSii?: boolean
 }
 
-export function InvoiceSiiFolioCard({ invoice }: InvoiceSiiFolioCardProps) {
+export function InvoiceSiiFolioCard({
+  invoice,
+  invoicingMode = 'manual',
+  onEmitToSii,
+  emittingSii,
+}: InvoiceSiiFolioCardProps) {
   const hasFolio = Boolean(invoice.siiNumber?.trim())
   const isDraft = invoice.status === 'Borrador'
 
@@ -41,13 +55,33 @@ export function InvoiceSiiFolioCard({ invoice }: InvoiceSiiFolioCardProps) {
             <span className="font-mono font-medium text-foreground">
               {formatSiiInvoiceNumberDisplay(invoice.siiNumber!)}
             </span>
+            {invoice.siiTrackId ? (
+              <span className="block text-xs">Track SII: {invoice.siiTrackId}</span>
+            ) : null}
+            {invoice.dteStatus ? (
+              <span className="block text-xs">Estado DTE: {invoice.dteStatus}</span>
+            ) : null}
           </p>
         ) : isDraft ? (
-          <p>
-            Aún no hay folio. Al hacer clic en <strong className="text-foreground">Emitida</strong>{' '}
-            en la ruta del éxito se abrirá un formulario para ingresar el número del documento
-            emitido en el SII.
-          </p>
+          invoicingMode === 'sii' ? (
+            <div className="space-y-3">
+              <p>
+                En modo SII integrado, usa el botón para timbrar y enviar el DTE al Servicio de
+                Impuestos Internos.
+              </p>
+              {onEmitToSii ? (
+                <Button type="button" size="sm" onClick={onEmitToSii} disabled={emittingSii}>
+                  {emittingSii ? 'Emitiendo al SII…' : 'Emitir al SII'}
+                </Button>
+              ) : null}
+            </div>
+          ) : (
+            <p>
+              Aún no hay folio. Al hacer clic en <strong className="text-foreground">Emitida</strong>{' '}
+              en la ruta del éxito se abrirá un formulario para ingresar el número del documento
+              emitido en el SII.
+            </p>
+          )
         ) : invoice.status === INVOICE_EMITTED_STATUS ? (
           <p>
             Esta factura está emitida pero no tiene folio SII registrado. Edítala o vuelve a

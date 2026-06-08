@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import type { ProductDetail } from '@/data/product-detail.mock'
 import type { ProductStatus } from '@/data/products.mock'
-import { unitLabel } from '@/lib/product-catalog'
+import { formatProductPriceDisplay, unitLabel } from '@/lib/product-catalog'
 import { defaultProductImageUrl, initialsFromLabel } from '@/lib/image-upload'
 import { RegisterActivityHeaderButton } from '@/components/shared/RegisterActivityHeaderButton'
 import type { ContactActivityType } from '@/data/contact-detail.mock'
@@ -59,13 +59,21 @@ export function ProductDetailHeader({
   const imageUrl =
     (isEditing && form ? form.imageUrl : product.imageUrl) ||
     defaultProductImageUrl(displayName)
-  const uom = unitLabel(
-    isEditing && form ? form.unitOfMeasure : product.unitOfMeasure,
-    isEditing && form ? form.customUnit : product.customUnit,
-  )
+  const unitOfMeasure =
+    isEditing && form ? form.unitOfMeasure : product.unitOfMeasure
+  const customUnit = isEditing && form ? form.customUnit : product.customUnit
+  const billingPeriod =
+    isEditing && form ? form.billingPeriod : product.billingPeriod
+  const uom = unitLabel(unitOfMeasure, customUnit)
+  const formattedPrice = formatProductPriceDisplay({
+    price: displayPrice,
+    unitOfMeasure,
+    customUnit,
+    billingPeriod,
+  })
 
   const metrics = [
-    { label: 'Venta', value: displayPrice },
+    { label: 'Venta', value: formattedPrice },
     { label: 'Unidad', value: uom },
     { label: 'Stock', value: displayStock },
     { label: 'Vendidas', value: String(product.unitsSold) },
@@ -157,9 +165,8 @@ export function ProductDetailHeader({
                   <div className="flex flex-wrap gap-3 text-sm">
                     <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
                       <Tag aria-hidden className="size-4 text-muted-foreground" />
-                      {displayPrice}
+                      {formattedPrice}
                     </span>
-                    <span className="text-muted-foreground">/{uom}</span>
                   </div>
                 </>
               )}

@@ -3,7 +3,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { CreateContactDialog } from '@/components/contacts/CreateContactDialog'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { EntityAvatarImage } from '@/components/shared/EntityAvatarImage'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -132,7 +133,7 @@ export function CompanyContactsPanel({
                       <div className="flex min-w-0 items-start gap-3">
                         <Avatar className="size-10 shrink-0 border border-border">
                           {contact.avatarUrl ? (
-                            <AvatarImage src={contact.avatarUrl} alt="" />
+                            <EntityAvatarImage src={contact.avatarUrl} alt="" />
                           ) : null}
                           <AvatarFallback className="text-xs font-medium">
                             {initialsFromLabel(contact.name)}

@@ -1,3 +1,5 @@
+export type InvoicingMode = 'manual' | 'sii'
+
 export type OrganizationSettings = {
   id: string
   legalName: string
@@ -13,6 +15,8 @@ export type OrganizationSettings = {
   email: string
   logoUrl: string
   defaultVatPercent: number
+  invoicingMode: InvoicingMode
+  economicActivityCode: number | null
 }
 
 export type UpdateOrganizationSettingsInput = Partial<

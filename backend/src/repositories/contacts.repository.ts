@@ -1,4 +1,4 @@
-import { pool } from '../db/pool.js'
+import { tenantQuery } from '../db/tenant-query.js'
 import {
   findActiveCompanyIdByName,
   getCompanyById,
@@ -10,6 +10,8 @@ import {
   type ContactRow,
 } from '../mappers/contact.mapper.js'
 import { assertValidRegionCommune } from '../lib/validate-geo-fields.js'
+import { pushTenantCondition, tenantWhereParam } from '../lib/tenant-sql.js'
+import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import { badRequest, notFound } from '../middleware/errors.js'
 import type { AuditActor } from '../types/audit.js'
 import type {
@@ -78,6 +80,7 @@ export async function listContacts(
   } else {
     conditions.push('archived_at IS NULL')
   }
+  idx = pushTenantCondition(conditions, values, idx)
   if (params.status) {
     conditions.push(`status = $${idx++}`)
     values.push(params.status)
@@ -102,7 +105,7 @@ export async function listContacts(
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
 
-  const countResult = await pool.query<{ count: string }>(
+  const countResult = await tenantQuery<{ count: string }>(
     `SELECT count(*)::text AS count FROM crm_contacts ${where}`,
     values,
   )
@@ -111,7 +114,7 @@ export async function listContacts(
   const offset = paginationOffset(params.page, params.pageSize)
   values.push(params.pageSize, offset)
 
-  const result = await pool.query<ContactRow>(
+  const result = await tenantQuery<ContactRow>(
     `SELECT ${SELECT_COLUMNS}
      FROM crm_contacts
      ${where}
@@ -124,15 +127,24 @@ export async function listContacts(
 }
 
 export async function getContactById(id: string): Promise<ContactDetail> {
-  const result = await pool.query<ContactRow>(
+  const result = await tenantQuery<ContactRow>(
     `SELECT ${SELECT_COLUMNS}
      FROM crm_contacts
-     WHERE id = $1 AND deleted_at IS NULL`,
-    [id],
+     WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
+    [id, getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   if (!row) throw notFound('Contacto no encontrado')
   return mapContactDetail(row)
+}
+
+export async function getContactAvatarStored(id: string): Promise<string | null> {
+  const result = await tenantQuery<{ avatar_url: string | null }>(
+    `SELECT avatar_url FROM crm_contacts
+     WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
+    [id, getTenantIdOrDefault()],
+  )
+  return result.rows[0]?.avatar_url?.trim() ?? null
 }
 
 export async function createContact(
@@ -155,19 +167,21 @@ export async function createContact(
     input.company,
   )
 
-  const result = await pool.query<ContactRow>(
+  const result = await tenantQuery<ContactRow>(
     `INSERT INTO crm_contacts (
       name, subtitle, avatar_url, company_id, company_name,
       email, phone, mobile_phone, job_title, status, rut,
       street_address, region, commune, linked_in, source, initial_note,
       owner_name,
-      created_by_id, created_by_name, updated_by_id, updated_by_name
+      created_by_id, created_by_name, updated_by_id, updated_by_name,
+      tenant_id
     ) VALUES (
       $1, $2, $3, $4, $5,
       $6, $7, $8, $9, $10, $11,
       $12, $13, $14, $15, $16, $17,
       $18,
-      $19, $20, $19, $20
+      $19, $20, $19, $20,
+      $21
     )
     RETURNING ${SELECT_COLUMNS}`,
     [
@@ -191,6 +205,7 @@ export async function createContact(
       input.ownerName?.trim() || actor.userName,
       actor.userId,
       actor.userName,
+      getTenantIdOrDefault(),
     ],
   )
   return mapContactDetail(result.rows[0]!)
@@ -229,7 +244,7 @@ export async function updateContact(
   await assertUniqueContactRut(nextRut, id)
   await assertUniqueContactEmail(nextEmail, id)
 
-  const result = await pool.query<ContactRow>(
+  const result = await tenantQuery<ContactRow>(
     `UPDATE crm_contacts SET
       name = $2,
       subtitle = $3,
@@ -252,7 +267,7 @@ export async function updateContact(
       updated_by_id = $20,
       updated_by_name = $21,
       updated_at = now()
-    WHERE id = $1 AND deleted_at IS NULL
+    WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(22)}
     RETURNING ${SELECT_COLUMNS}`,
     [
       id,
@@ -276,6 +291,7 @@ export async function updateContact(
       input.ownerName?.trim() ?? existing.ownerName ?? actor.userName,
       actor.userId,
       actor.userName,
+      getTenantIdOrDefault(),
     ],
   )
   const row = result.rows[0]
@@ -300,12 +316,12 @@ export async function softDeleteContact(
   id: string,
   actor: AuditActor,
 ): Promise<void> {
-  const result = await pool.query(
+  const result = await tenantQuery(
     `UPDATE crm_contacts
      SET deleted_at = now(), deleted_by_id = $2,
          updated_by_id = $2, updated_by_name = $3, updated_at = now()
-     WHERE id = $1 AND deleted_at IS NULL`,
-    [id, actor.userId, actor.userName],
+     WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(4)}`,
+    [id, actor.userId, actor.userName, getTenantIdOrDefault()],
   )
   if (result.rowCount === 0) throw notFound('Contacto no encontrado')
   await purgeEntityNotesAndFiles('contacto', id)
@@ -315,13 +331,13 @@ export async function archiveContact(
   id: string,
   actor: AuditActor,
 ): Promise<ContactDetail> {
-  const result = await pool.query<ContactRow>(
+  const result = await tenantQuery<ContactRow>(
     `UPDATE crm_contacts
      SET archived_at = now(), archived_by_id = $2,
          updated_by_id = $2, updated_by_name = $3, updated_at = now()
-     WHERE id = $1 AND deleted_at IS NULL AND archived_at IS NULL
+     WHERE id = $1 AND deleted_at IS NULL AND archived_at IS NULL AND ${tenantWhereParam(4)}
      RETURNING ${SELECT_COLUMNS}`,
-    [id, actor.userId, actor.userName],
+    [id, actor.userId, actor.userName, getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   if (!row) throw notFound('Contacto no encontrado o ya archivado')
@@ -332,13 +348,13 @@ export async function restoreContact(
   id: string,
   actor: AuditActor,
 ): Promise<ContactDetail> {
-  const result = await pool.query<ContactRow>(
+  const result = await tenantQuery<ContactRow>(
     `UPDATE crm_contacts
      SET archived_at = NULL, archived_by_id = NULL,
          updated_by_id = $2, updated_by_name = $3, updated_at = now()
-     WHERE id = $1 AND deleted_at IS NULL
+     WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(4)}
      RETURNING ${SELECT_COLUMNS}`,
-    [id, actor.userId, actor.userName],
+    [id, actor.userId, actor.userName, getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   if (!row) throw notFound('Contacto no encontrado')

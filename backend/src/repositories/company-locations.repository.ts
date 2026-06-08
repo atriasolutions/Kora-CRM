@@ -1,4 +1,7 @@
 import { pool } from '../db/pool.js'
+import { setTenantLocal, tenantQuery } from '../db/tenant-query.js'
+import { tenantWhereParam } from '../lib/tenant-sql.js'
+import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import { notFound } from '../middleware/errors.js'
 import type {
   CompanyAddressDto,
@@ -75,9 +78,9 @@ function mapBranchRow(row: BranchRow): CompanyBranchDto {
 }
 
 async function assertCompanyExists(companyId: string): Promise<void> {
-  const result = await pool.query<{ id: string }>(
-    `SELECT id FROM crm_companies WHERE id = $1 AND deleted_at IS NULL`,
-    [companyId],
+  const result = await tenantQuery<{ id: string }>(
+    `SELECT id FROM crm_companies WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
+    [companyId, getTenantIdOrDefault()],
   )
   if (!result.rows[0]) throw notFound('Empresa no encontrada')
 }
@@ -88,7 +91,7 @@ export async function upsertCompanyHeadquarters(
 ): Promise<void> {
   await assertCompanyExists(companyId)
 
-  const existing = await pool.query<{ id: string }>(
+  const existing = await tenantQuery<{ id: string }>(
     `SELECT id FROM crm_company_addresses
      WHERE company_id = $1 AND is_headquarters = true
      LIMIT 1`,
@@ -108,7 +111,7 @@ export async function upsertCompanyHeadquarters(
   ]
 
   if (existing.rows[0]) {
-    await pool.query(
+    await tenantQuery(
       `UPDATE crm_company_addresses SET
         label = $2,
         street = $3,
@@ -125,7 +128,7 @@ export async function upsertCompanyHeadquarters(
     return
   }
 
-  await pool.query(
+  await tenantQuery(
     `INSERT INTO crm_company_addresses (
       id, company_id, label, street, city, commune, region, country,
       postal_code, lat, lng, is_headquarters
@@ -143,21 +146,21 @@ export async function getCompanyLocations(
   await assertCompanyExists(companyId)
 
   const [headquartersResult, addressResult, branchResult] = await Promise.all([
-    pool.query<AddressRow>(
+    tenantQuery<AddressRow>(
       `SELECT id, label, street, city, commune, region, country, postal_code, lat, lng
        FROM crm_company_addresses
        WHERE company_id = $1 AND is_headquarters = true
        LIMIT 1`,
       [companyId],
     ),
-    pool.query<AddressRow>(
+    tenantQuery<AddressRow>(
       `SELECT id, label, street, city, commune, region, country, postal_code, lat, lng
        FROM crm_company_addresses
        WHERE company_id = $1 AND is_headquarters = false
        ORDER BY label ASC`,
       [companyId],
     ),
-    pool.query<BranchRow>(
+    tenantQuery<BranchRow>(
       `SELECT id, name, address, phone
        FROM crm_company_branches
        WHERE company_id = $1
@@ -184,6 +187,7 @@ export async function replaceCompanyLocations(
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    await setTenantLocal(client)
 
     await client.query(
       `DELETE FROM crm_company_addresses

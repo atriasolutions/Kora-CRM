@@ -111,4 +111,190 @@
       display: none !important;
     }
   }
+
+  @keyframes marketing-fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .marketing-fade-in {
+    animation: marketing-fade-in 0.6s ease-out both;
+  }
+
+  .marketing-fade-in-delay {
+    animation-delay: 0.12s;
+  }
+
+  .marketing-reveal {
+    opacity: 0;
+    transform: translateY(28px);
+    transition:
+      opacity 0.65s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .marketing-reveal--visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  @keyframes marketing-tab-item-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .marketing-tab-item {
+    animation: marketing-tab-item-in 0.45s ease-out both;
+  }
+
+  @keyframes marketing-gradient-shift {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+
+  .marketing-gradient-animate {
+    background-size: 200% 200%;
+    animation: marketing-gradient-shift 8s ease infinite;
+  }
+
+  /* Hero: un solo movimiento suave, solo transform (GPU). Sin filter: blur. */
+  @keyframes marketing-ambient-drift {
+    0%,
+    100% {
+      transform: translate3d(0, 0, 0);
+    }
+    50% {
+      transform: translate3d(12px, -10px, 0);
+    }
+  }
+
+  .marketing-ambient-orb {
+    contain: layout style paint;
+    will-change: auto;
+  }
+
+  @media (min-width: 1024px) and (prefers-reduced-motion: no-preference) {
+    .marketing-tab-active .marketing-ambient-orb:first-child {
+      animation: marketing-ambient-drift 24s ease-in-out infinite;
+    }
+
+    .marketing-tab-active .marketing-ambient-orb:last-child {
+      animation: marketing-ambient-drift 30s ease-in-out infinite reverse;
+    }
+  }
+
+  @keyframes marketing-marquee-scroll {
+    from {
+      transform: translate3d(0, 0, 0);
+    }
+    to {
+      transform: translate3d(-50%, 0, 0);
+    }
+  }
+
+  .marketing-marquee-track {
+    contain: layout style;
+  }
+
+  .marketing-marquee-track.marketing-marquee {
+    animation: marketing-marquee-scroll 55s linear infinite;
+  }
+
+  .marketing-marquee-track.marketing-marquee-slow {
+    animation: marketing-marquee-scroll 80s linear infinite;
+  }
+
+  .marketing-motion-paused,
+  .marketing-tab-hidden .marketing-marquee-track {
+    animation-play-state: paused !important;
+  }
+
+  .marketing-heading-gradient {
+    background-image: linear-gradient(
+      120deg,
+      #ffffff 0%,
+      #bae6fd 38%,
+      #c4b5fd 62%,
+      #f8fafc 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .marketing-bento-grid {
+    contain: layout style;
+  }
+
+  .marketing-bento-card {
+    border-radius: 1.75rem 1rem 1.75rem 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: linear-gradient(
+      145deg,
+      rgba(255, 255, 255, 0.08) 0%,
+      rgba(255, 255, 255, 0.03) 100%
+    );
+    contain: layout style paint;
+    transition:
+      transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+      border-color 0.25s ease,
+      box-shadow 0.25s ease;
+  }
+
+  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    .marketing-bento-card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(139, 92, 246, 0.35);
+      box-shadow: 0 16px 32px -20px rgba(88, 28, 135, 0.4);
+    }
+  }
+
+  .marketing-card-organic {
+    border-radius: 1.5rem 2rem 1.25rem 2rem;
+  }
+
+  .marketing-flow-card {
+    contain: layout style paint;
+  }
+
+  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    .marketing-flow-card:hover {
+      transform: translateY(-2px);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .marketing-ambient-orb,
+    .marketing-marquee-track,
+    .marketing-gradient-animate {
+      animation: none !important;
+    }
+
+    .marketing-bento-card:hover {
+      transform: none;
+    }
+
+    .marketing-flow-card:hover {
+      transform: none;
+    }
+  }
 }

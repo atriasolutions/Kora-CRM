@@ -3,7 +3,8 @@ import { toast } from '@/lib/toast'
 import { useMemo, useState } from 'react'
 
 import type { ArchivedCompanyEntry } from '@/contexts/companies-registry-context'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { EntityAvatarImage } from '@/components/shared/EntityAvatarImage'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -248,7 +249,7 @@ export function CompaniesArchivedView({ query }: CompaniesArchivedViewProps) {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <Avatar className="size-10 border border-border">
-                            <AvatarImage src={company.logoUrl} alt={company.name} />
+                            <EntityAvatarImage src={company.logoUrl} alt={company.name} />
                             <AvatarFallback>
                               {initialsFromLabel(company.name)}
                             </AvatarFallback>

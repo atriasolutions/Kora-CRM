@@ -1,4 +1,5 @@
-import { pool } from '../db/pool.js'
+import { tenantQuery } from '../db/tenant-query.js'
+import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import { allowedSearchEntityTypes } from '../lib/global-search-access.js'
 import { badRequest } from '../middleware/errors.js'
 import type { AccessProfile } from '../types/access-profile.js'
@@ -23,21 +24,21 @@ const SEARCH_SQL: Record<SearchEntityType, string> = {
   contact: `SELECT 'contact' AS type, id, name AS title,
               coalesce(nullif(trim(company_name), ''), nullif(trim(email), ''), status::text) AS subtitle
        FROM crm_contacts
-       WHERE ${ACTIVE_NOT_ARCHIVED}
+       WHERE ${ACTIVE_NOT_ARCHIVED} AND tenant_id = $3
          AND (name ILIKE $1 OR email ILIKE $1 OR company_name ILIKE $1 OR phone ILIKE $1)
        ORDER BY name ASC
        LIMIT $2`,
   company: `SELECT 'company' AS type, id, name AS title,
               coalesce(nullif(trim(industry), ''), nullif(trim(city), ''), lifecycle::text) AS subtitle
        FROM crm_companies
-       WHERE ${ACTIVE_NOT_ARCHIVED}
+       WHERE ${ACTIVE_NOT_ARCHIVED} AND tenant_id = $3
          AND (name ILIKE $1 OR rut ILIKE $1 OR industry ILIKE $1 OR city ILIKE $1)
        ORDER BY name ASC
        LIMIT $2`,
   opportunity: `SELECT 'opportunity' AS type, id, name AS title,
               coalesce(nullif(trim(company_name), ''), stage) AS subtitle
        FROM crm_opportunities
-       WHERE ${ACTIVE_NOT_ARCHIVED}
+       WHERE ${ACTIVE_NOT_ARCHIVED} AND tenant_id = $3
          AND (name ILIKE $1 OR company_name ILIKE $1 OR contact_name ILIKE $1)
        ORDER BY updated_at DESC
        LIMIT $2`,
@@ -45,42 +46,42 @@ const SEARCH_SQL: Record<SearchEntityType, string> = {
               trim(code || ' — ' || title) AS title,
               coalesce(nullif(trim(company_name), ''), status) AS subtitle
        FROM crm_quotes
-       WHERE ${ACTIVE_NOT_ARCHIVED}
+       WHERE ${ACTIVE_NOT_ARCHIVED} AND tenant_id = $3
          AND (code ILIKE $1 OR title ILIKE $1 OR company_name ILIKE $1 OR opportunity_name ILIKE $1)
        ORDER BY updated_at DESC
        LIMIT $2`,
   invoice: `SELECT 'invoice' AS type, id, number AS title,
               coalesce(nullif(trim(client_name), ''), status::text) AS subtitle
        FROM crm_invoices
-       WHERE ${ACTIVE_NOT_ARCHIVED}
+       WHERE ${ACTIVE_NOT_ARCHIVED} AND tenant_id = $3
          AND (number ILIKE $1 OR client_name ILIKE $1 OR quote_code ILIKE $1 OR contact_name ILIKE $1)
        ORDER BY updated_at DESC
        LIMIT $2`,
   activity: `SELECT 'activity' AS type, id, title,
               coalesce(nullif(trim(company_name), ''), type_label, status::text) AS subtitle
        FROM crm_activities
-       WHERE ${ACTIVE_ONLY}
+       WHERE ${ACTIVE_ONLY} AND tenant_id = $3
          AND (title ILIKE $1 OR company_name ILIKE $1 OR related_name ILIKE $1 OR type_label ILIKE $1)
        ORDER BY scheduled_at DESC NULLS LAST
        LIMIT $2`,
   project: `SELECT 'project' AS type, id, name AS title,
               coalesce(nullif(trim(client_name), ''), status) AS subtitle
        FROM crm_projects
-       WHERE ${ACTIVE_NOT_ARCHIVED}
+       WHERE ${ACTIVE_NOT_ARCHIVED} AND tenant_id = $3
          AND (name ILIKE $1 OR client_name ILIKE $1 OR opportunity_name ILIKE $1)
        ORDER BY updated_at DESC
        LIMIT $2`,
   product: `SELECT 'product' AS type, id, name AS title,
               coalesce(nullif(trim(sku), ''), nullif(trim(product_type), ''), status::text) AS subtitle
        FROM crm_products
-       WHERE ${ACTIVE_NOT_ARCHIVED}
+       WHERE ${ACTIVE_NOT_ARCHIVED} AND tenant_id = $3
          AND (name ILIKE $1 OR sku ILIKE $1 OR product_type ILIKE $1)
        ORDER BY name ASC
        LIMIT $2`,
   purchase: `SELECT 'purchase' AS type, id, reference AS title,
               coalesce(nullif(trim(supplier_name), ''), status::text) AS subtitle
        FROM crm_purchases
-       WHERE ${ACTIVE_NOT_ARCHIVED}
+       WHERE ${ACTIVE_NOT_ARCHIVED} AND tenant_id = $3
          AND (reference ILIKE $1 OR supplier_name ILIKE $1 OR product_summary ILIKE $1)
        ORDER BY updated_at DESC
        LIMIT $2`,
@@ -101,8 +102,8 @@ async function searchTable(
   limit: number,
   extraValues: unknown[] = [],
 ): Promise<SearchResultItem[]> {
-  const values = [pattern, limit, ...extraValues]
-  const result = await pool.query<SearchRow>(sql, values)
+  const values = [pattern, limit, getTenantIdOrDefault(), ...extraValues]
+  const result = await tenantQuery<SearchRow>(sql, values)
   return result.rows.map(mapRow)
 }
 
@@ -118,16 +119,16 @@ async function searchProjects(
   const sql = `SELECT 'project' AS type, id, name AS title,
               coalesce(nullif(trim(client_name), ''), status) AS subtitle
        FROM crm_projects
-       WHERE ${ACTIVE_NOT_ARCHIVED}
+       WHERE ${ACTIVE_NOT_ARCHIVED} AND tenant_id = $3
          AND (name ILIKE $1 OR client_name ILIKE $1 OR opportunity_name ILIKE $1)
          AND (
-           lower(trim(manager_name)) = lower($3)
+           lower(trim(manager_name)) = lower($4)
            OR EXISTS (
              SELECT 1 FROM crm_project_team_members tm
              WHERE tm.project_id = crm_projects.id
              AND (
-               tm.user_id = $4::uuid
-               OR lower(trim(tm.user_name)) = lower($3)
+               tm.user_id = $5::uuid
+               OR lower(trim(tm.user_name)) = lower($4)
              )
            )
          )

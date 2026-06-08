@@ -9,6 +9,9 @@ import {
 } from '../lib/document-line-items.js'
 import { getExchangeRatesForDocumentDate } from '../services/exchange-rates.service.js'
 import { pool } from '../db/pool.js'
+import { setTenantLocal, tenantQuery } from '../db/tenant-query.js'
+import { pushTenantCondition, tenantWhereParam } from '../lib/tenant-sql.js'
+import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import {
   mapPurchaseDetail,
   mapPurchaseRow,
@@ -71,7 +74,7 @@ export type ListPurchasesParams = {
 }
 
 async function loadPurchaseLines(purchaseId: string): Promise<PurchaseLineRow[]> {
-  const result = await pool.query<PurchaseLineRow>(
+  const result = await tenantQuery<PurchaseLineRow>(
     `SELECT ${LINE_COLUMNS}
      FROM crm_purchase_line_items
      WHERE purchase_id = $1
@@ -86,9 +89,9 @@ async function resolveSupplier(
   supplierName?: string,
 ): Promise<{ supplierId: string | null; supplierName: string }> {
   if (supplierId?.trim()) {
-    const row = await pool.query<{ id: string; name: string }>(
-      `SELECT id, name FROM crm_companies WHERE id = $1 AND deleted_at IS NULL`,
-      [supplierId],
+    const row = await tenantQuery<{ id: string; name: string }>(
+      `SELECT id, name FROM crm_companies WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
+      [supplierId, getTenantIdOrDefault()],
     )
     if (row.rows[0]) {
       return { supplierId: row.rows[0].id, supplierName: row.rows[0].name }
@@ -96,7 +99,7 @@ async function resolveSupplier(
   }
   const name = supplierName?.trim() || ''
   if (!name) return { supplierId: null, supplierName: '' }
-  const byName = await pool.query<{ id: string; name: string }>(
+  const byName = await tenantQuery<{ id: string; name: string }>(
     `SELECT id, name FROM crm_companies
      WHERE deleted_at IS NULL AND lower(trim(name)) = lower($1)
      LIMIT 1`,
@@ -111,7 +114,7 @@ async function resolveSupplier(
 async function nextPurchaseReference(): Promise<string> {
   const year = new Date().getFullYear()
   const prefix = `OC-${year}-`
-  const result = await pool.query<{ reference: string }>(
+  const result = await tenantQuery<{ reference: string }>(
     `SELECT reference FROM crm_purchases
      WHERE reference LIKE $1
      ORDER BY reference DESC
@@ -132,7 +135,7 @@ async function nextPurchaseReference(): Promise<string> {
 async function resolvePurchaseReference(preferred?: string): Promise<string> {
   const trimmed = preferred?.trim()
   if (trimmed) {
-    const taken = await pool.query<{ id: string }>(
+    const taken = await tenantQuery<{ id: string }>(
       `SELECT id FROM crm_purchases WHERE reference = $1 LIMIT 1`,
       [trimmed],
     )
@@ -225,6 +228,7 @@ export async function listPurchases(
   } else {
     conditions.push('archived_at IS NULL')
   }
+  idx = pushTenantCondition(conditions, values, idx)
   if (params.status) {
     conditions.push(`status = $${idx++}`)
     values.push(params.status)
@@ -238,7 +242,7 @@ export async function listPurchases(
   }
 
   const where = `WHERE ${conditions.join(' AND ')}`
-  const countResult = await pool.query<{ count: string }>(
+  const countResult = await tenantQuery<{ count: string }>(
     `SELECT count(*)::text AS count FROM crm_purchases ${where}`,
     values,
   )
@@ -246,7 +250,7 @@ export async function listPurchases(
   const offset = paginationOffset(params.page, params.pageSize)
   values.push(params.pageSize, offset)
 
-  const result = await pool.query<PurchaseRow>(
+  const result = await tenantQuery<PurchaseRow>(
     `SELECT ${PURCHASE_COLUMNS}
      FROM crm_purchases
      ${where}
@@ -259,11 +263,11 @@ export async function listPurchases(
 }
 
 export async function getPurchaseById(id: string): Promise<PurchaseDetail> {
-  const result = await pool.query<PurchaseRow>(
+  const result = await tenantQuery<PurchaseRow>(
     `SELECT ${PURCHASE_COLUMNS}
      FROM crm_purchases
-     WHERE id = $1 AND deleted_at IS NULL`,
-    [id],
+     WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
+    [id, getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   if (!row) throw notFound('Orden de compra no encontrada')
@@ -300,6 +304,7 @@ export async function createPurchase(
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    await setTenantLocal(client)
     const result = await client.query<PurchaseRow>(
       `INSERT INTO crm_purchases (
         reference, supplier_id, supplier_name, product_summary, order_date,
@@ -309,12 +314,12 @@ export async function createPurchase(
         supplier_contact_id, supplier_contact_name, supplier_email, supplier_phone,
         owner_name,
         exchange_rate_uf, exchange_rate_usd, exchange_rate_eur, exchange_rate_date,
-        created_by_id, created_by_name, updated_by_id, updated_by_name
+        created_by_id, created_by_name, updated_by_id, updated_by_name, tenant_id
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7,
         $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
         $18, $19, $20, $21, $22,
-        $23, $24, $23, $24
+        $23, $24, $23, $24, $25
       )
       RETURNING ${PURCHASE_COLUMNS}`,
       [
@@ -342,6 +347,7 @@ export async function createPurchase(
         exchangeRates.exchangeRateDate,
         actor.userId,
         actor.userName,
+        getTenantIdOrDefault(),
       ],
     )
     const row = result.rows[0]!
@@ -412,6 +418,7 @@ export async function updatePurchase(
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    await setTenantLocal(client)
     const result = await client.query<PurchaseRow>(
       `UPDATE crm_purchases SET
         reference = COALESCE($2, reference),
@@ -439,7 +446,7 @@ export async function updatePurchase(
         updated_by_id = $24,
         updated_by_name = $25,
         updated_at = now()
-      WHERE id = $1 AND deleted_at IS NULL
+      WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(26)}
       RETURNING ${PURCHASE_COLUMNS}`,
       [
         id,
@@ -469,6 +476,7 @@ export async function updatePurchase(
         exchangeRates?.exchangeRateDate ?? null,
         actor.userId,
         actor.userName,
+        getTenantIdOrDefault(),
       ],
     )
     const row = result.rows[0]
@@ -508,12 +516,12 @@ export async function archivePurchase(
   id: string,
   actor: AuditActor,
 ): Promise<PurchaseListItem> {
-  const result = await pool.query<PurchaseRow>(
+  const result = await tenantQuery<PurchaseRow>(
     `UPDATE crm_purchases
      SET archived_at = now(), updated_by_id = $2, updated_by_name = $3, updated_at = now()
-     WHERE id = $1 AND deleted_at IS NULL AND archived_at IS NULL
+     WHERE id = $1 AND deleted_at IS NULL AND archived_at IS NULL AND ${tenantWhereParam(4)}
      RETURNING ${PURCHASE_COLUMNS}`,
-    [id, actor.userId, actor.userName],
+    [id, actor.userId, actor.userName, getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   if (!row) throw notFound('Orden de compra no encontrada o ya archivada')
@@ -524,12 +532,12 @@ export async function restorePurchase(
   id: string,
   actor: AuditActor,
 ): Promise<PurchaseListItem> {
-  const result = await pool.query<PurchaseRow>(
+  const result = await tenantQuery<PurchaseRow>(
     `UPDATE crm_purchases
      SET archived_at = NULL, updated_by_id = $2, updated_by_name = $3, updated_at = now()
-     WHERE id = $1 AND deleted_at IS NULL
+     WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(4)}
      RETURNING ${PURCHASE_COLUMNS}`,
-    [id, actor.userId, actor.userName],
+    [id, actor.userId, actor.userName, getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   if (!row) throw notFound('Orden de compra no encontrada')
@@ -541,6 +549,7 @@ export async function permanentlyDeletePurchase(id: string): Promise<void> {
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    await setTenantLocal(client)
 
     const found = await client.query<{ id: string }>(
       `SELECT id

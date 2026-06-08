@@ -8,18 +8,27 @@ import {
   Users,
   WifiOff,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 
+import { identifyTenantsApi, type TenantMembershipOption } from '@/api/auth'
 import { LoginAtriaCredit } from '@/components/auth/LoginAtriaCredit'
 import { LoginBackground } from '@/components/auth/LoginBackground'
+import { LoginTenantLogo, LoginTenantPicker } from '@/components/auth/LoginTenantPicker'
+import { MarketingHeader } from '@/components/marketing/MarketingHeader'
+import { MarketingScrollContext } from '@/components/marketing/marketing-scroll-context'
 import { ContactFormInput } from '@/components/contacts/ContactFormField'
 import { Button } from '@/components/ui/button'
 import { KoraLogoMark } from '@/components/layout/KoraLogoMark'
 import { LoginTwoFactorFlow } from '@/components/auth/LoginTwoFactorFlow'
 import { useAuth } from '@/hooks/use-auth'
+import { useDebouncedValue } from '@/hooks/use-debounced-value'
+import { useTenantBranding } from '@/hooks/use-tenant-branding'
 import { CONNECTION_TITLE, isLoginConnectionError } from '@/lib/login-errors'
 import { getPostLoginRedirect } from '@/lib/auth-routes'
+import { loadAuthSession, saveAuthSession } from '@/lib/auth-session'
+import { isCentralAppHost, resolveTenantSlugFromHostname, tenantAppOrigin } from '@/lib/tenant-host'
+import { marketingTheme } from '@/lib/marketing-theme'
 import { cn } from '@/lib/utils'
 
 const HIGHLIGHTS = [
@@ -91,12 +100,19 @@ function LoginFormCard({
   setTwoFactorStep,
   handleSubmit,
   handleTwoFactorSuccess,
+  onContinueAfterBackup,
   navigate,
   locationState,
+  tenantDisplayName,
+  tenantLogoUrl,
+  memberships,
+  selectedTenantId,
+  setSelectedTenantId,
+  showTenantField,
 }: {
   twoFactorStep:
-    | { mode: 'verify'; challengeId: string; userEmail: string }
-    | { mode: 'enroll'; enrollmentToken: string; userEmail: string }
+    | { mode: 'verify'; challengeId: string; userEmail: string; tenantId: string }
+    | { mode: 'enroll'; enrollmentToken: string; userEmail: string; tenantId: string }
     | null
   backupCodesNotice: string[] | null
   loading: boolean
@@ -108,15 +124,22 @@ function LoginFormCard({
   setError: (v: string | null) => void
   setTwoFactorStep: React.Dispatch<
     React.SetStateAction<
-      | { mode: 'verify'; challengeId: string; userEmail: string }
-      | { mode: 'enroll'; enrollmentToken: string; userEmail: string }
+      | { mode: 'verify'; challengeId: string; userEmail: string; tenantId: string }
+      | { mode: 'enroll'; enrollmentToken: string; userEmail: string; tenantId: string }
       | null
     >
   >
   handleSubmit: (event: React.FormEvent) => void
   handleTwoFactorSuccess: (backupCodes?: string[]) => void
+  onContinueAfterBackup: () => void
   navigate: ReturnType<typeof useNavigate>
   locationState: unknown
+  tenantDisplayName: string
+  tenantLogoUrl?: string
+  memberships: TenantMembershipOption[]
+  selectedTenantId: string
+  setSelectedTenantId: (v: string) => void
+  showTenantField: boolean
 }) {
   const title = twoFactorStep
     ? twoFactorStep.mode === 'enroll'
@@ -140,6 +163,9 @@ function LoginFormCard({
         <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{subtitle}</p>
 
         <div className="mt-6">
+          {!twoFactorStep && !backupCodesNotice ? (
+            <LoginTenantLogo displayName={tenantDisplayName} logoUrl={tenantLogoUrl} />
+          ) : null}
           {backupCodesNotice ? (
             <div className="space-y-4">
               <ul className="grid gap-2 rounded-xl border border-border bg-muted/40 p-4 font-mono text-sm">
@@ -150,9 +176,7 @@ function LoginFormCard({
               <Button
                 type="button"
                 className="h-11 w-full text-base font-semibold"
-                onClick={() =>
-                  navigate(getPostLoginRedirect(locationState), { replace: true })
-                }
+                onClick={onContinueAfterBackup}
               >
                 Continuar al CRM
               </Button>
@@ -169,6 +193,7 @@ function LoginFormCard({
                   : undefined
               }
               userEmail={twoFactorStep.userEmail}
+              tenantId={twoFactorStep.tenantId}
               onSuccess={handleTwoFactorSuccess}
               onBack={() => {
                 setTwoFactorStep(null)
@@ -185,6 +210,17 @@ function LoginFormCard({
                 onChange={setEmail}
                 required
               />
+              <div
+                className={
+                  showTenantField && memberships.length > 1 ? 'min-h-[4.5rem]' : undefined
+                }
+              >
+                <LoginTenantPicker
+                  memberships={memberships}
+                  value={selectedTenantId}
+                  onChange={setSelectedTenantId}
+                />
+              </div>
               <ContactFormInput
                 id="login-password"
                 label="Contraseña"
@@ -224,19 +260,96 @@ function LoginFormCard({
 }
 
 export function LoginPage() {
+  const scrollRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const location = useLocation()
-  const { isAuthenticated, isReady, login } = useAuth()
+  const { isAuthenticated, isReady, login, session } = useAuth()
+  const { tenant, isCentral, logoUrl, displayName } = useTenantBranding()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [memberships, setMemberships] = useState<TenantMembershipOption[]>([])
+  const [selectedTenantId, setSelectedTenantId] = useState('')
+  const [loginBranding, setLoginBranding] = useState({ displayName: 'Kora CRM', logoUrl: '' })
+  const debouncedEmail = useDebouncedValue(email.trim(), 450)
   const [twoFactorStep, setTwoFactorStep] = useState<
-    | { mode: 'verify'; challengeId: string; userEmail: string }
-    | { mode: 'enroll'; enrollmentToken: string; userEmail: string }
+    | { mode: 'verify'; challengeId: string; userEmail: string; tenantId: string }
+    | { mode: 'enroll'; enrollmentToken: string; userEmail: string; tenantId: string }
     | null
   >(null)
   const [backupCodesNotice, setBackupCodesNotice] = useState<string[] | null>(null)
+
+  useEffect(() => {
+    if (!isCentral) {
+      if (tenant?.id) setSelectedTenantId(tenant.id)
+      return
+    }
+    if (!debouncedEmail.includes('@')) {
+      setMemberships([])
+      setSelectedTenantId('')
+      setLoginBranding({ displayName: 'Kora CRM', logoUrl: '' })
+      return
+    }
+    let cancelled = false
+    void identifyTenantsApi(debouncedEmail)
+      .then((list) => {
+        if (cancelled) return
+        setMemberships(list)
+        setSelectedTenantId((prev) => {
+          if (prev && list.some((m) => m.tenantId === prev)) return prev
+          return list.find((m) => m.isDefault)?.tenantId ?? list[0]?.tenantId ?? ''
+        })
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setMemberships([])
+          setSelectedTenantId('')
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [debouncedEmail, isCentral, tenant?.id])
+
+  const activeMembership = memberships.find((m) => m.tenantId === selectedTenantId)
+
+  useEffect(() => {
+    if (!isCentral) return
+    if (activeMembership) {
+      setLoginBranding({
+        displayName: activeMembership.displayName,
+        logoUrl: activeMembership.logoUrl ?? '',
+      })
+    }
+  }, [activeMembership, isCentral])
+
+  function resolveTenantSlug(): string | undefined {
+    if (!isCentral) return tenant?.slug ?? undefined
+    return memberships.find((m) => m.tenantId === selectedTenantId)?.slug
+  }
+
+  function persistTenantSlugInSession() {
+    const slug = resolveTenantSlug()
+    if (!slug) return
+    const stored = loadAuthSession()
+    if (stored) saveAuthSession({ ...stored, tenantSlug: slug })
+  }
+
+  function redirectAfterLogin() {
+    persistTenantSlugInSession()
+    const path = getPostLoginRedirect(location.state)
+    const slug = resolveTenantSlug()
+    if (isCentral && slug) {
+      window.location.href = `${tenantAppOrigin(slug)}${path}`
+      return
+    }
+    navigate(path, { replace: true })
+  }
+
+  const tenantDisplayName = isCentral ? loginBranding.displayName : displayName
+  const tenantLogoUrl = isCentral ? loginBranding.logoUrl : tenant?.logoUrl
+  const showTenantField = isCentral && debouncedEmail.includes('@')
 
   if (!isReady) {
     return (
@@ -247,15 +360,36 @@ export function LoginPage() {
   }
 
   if (isAuthenticated) {
-    return <Navigate to={getPostLoginRedirect(location.state)} replace />
+    const path = getPostLoginRedirect(location.state)
+    const slug =
+      session?.tenantSlug ??
+      tenant?.slug ??
+      memberships.find((m) => m.tenantId === session?.tenantId)?.slug
+    const hostSlug = resolveTenantSlugFromHostname(window.location.hostname)
+
+    if (slug && (isCentralAppHost() || (hostSlug && hostSlug !== slug))) {
+      window.location.replace(`${tenantAppOrigin(slug)}${path}`)
+      return (
+        <div className="flex min-h-svh items-center justify-center bg-background">
+          <Loader2 aria-hidden className="size-8 animate-spin text-primary" />
+        </div>
+      )
+    }
+
+    return <Navigate to={path} replace />
   }
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
     setError(null)
+    const tenantId = isCentral ? selectedTenantId : tenant?.id
+    if (!tenantId) {
+      setError('Selecciona la empresa con la que deseas ingresar.')
+      return
+    }
     setLoading(true)
     try {
-      const outcome = await login(email.trim(), password)
+      const outcome = await login(email.trim(), password, tenantId)
       if (outcome.status === 'error') {
         setError(outcome.message)
         return
@@ -265,6 +399,7 @@ export function LoginPage() {
           mode: 'verify',
           challengeId: outcome.challengeId,
           userEmail: outcome.userEmail,
+          tenantId: outcome.tenantId,
         })
         return
       }
@@ -273,10 +408,11 @@ export function LoginPage() {
           mode: 'enroll',
           enrollmentToken: outcome.enrollmentToken,
           userEmail: outcome.userEmail,
+          tenantId: outcome.tenantId,
         })
         return
       }
-      navigate(getPostLoginRedirect(location.state), { replace: true })
+      redirectAfterLogin()
     } finally {
       setLoading(false)
     }
@@ -287,7 +423,7 @@ export function LoginPage() {
       setBackupCodesNotice(backupCodes)
       return
     }
-    navigate(getPostLoginRedirect(location.state), { replace: true })
+    redirectAfterLogin()
   }
 
   const formProps = {
@@ -303,21 +439,38 @@ export function LoginPage() {
     setTwoFactorStep,
     handleSubmit,
     handleTwoFactorSuccess,
+    onContinueAfterBackup: redirectAfterLogin,
     navigate,
     locationState: location.state,
+    tenantDisplayName,
+    tenantLogoUrl,
+    memberships: isCentral ? memberships : [],
+    selectedTenantId,
+    setSelectedTenantId,
+    showTenantField,
   }
 
   return (
-    <div className="relative flex min-h-svh flex-col overflow-hidden bg-background">
-      <LoginBackground />
+    <MarketingScrollContext.Provider value={scrollRef}>
+      <div
+        ref={scrollRef}
+        className={cn(
+          'marketing-scroll flex h-svh max-h-svh min-h-0 flex-col overflow-x-hidden overflow-y-auto',
+          marketingTheme.pageCanvas,
+        )}
+      >
+        <MarketingHeader />
 
-      <div className="relative z-10 flex min-h-0 flex-1 flex-col lg:flex-row">
-        <section
-          className={cn(
-            'relative hidden flex-[1.12] flex-col justify-between overflow-hidden lg:flex',
-            'bg-gradient-to-br from-[#0f0818] via-[#15103a] to-[#0a2d45]',
-          )}
-        >
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+          <LoginBackground />
+
+          <div className="relative z-10 flex min-h-0 flex-1 flex-col lg:flex-row">
+            <section
+              className={cn(
+                'relative hidden flex-[1.12] flex-col justify-between overflow-hidden lg:flex',
+                marketingTheme.hero,
+              )}
+            >
           <div
             className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_90%_70%_at_20%_0%,rgba(147,51,234,0.28),transparent_55%)]"
             aria-hidden
@@ -386,10 +539,6 @@ export function LoginPage() {
         </section>
 
         <section className="flex flex-1 flex-col items-center justify-center px-5 py-10 sm:px-10 lg:min-h-0 lg:px-12 xl:px-16">
-          <div className="mb-8 w-full max-w-[420px] lg:hidden">
-            <KoraLogoMark variant="hero" size="md" align="center" />
-          </div>
-
           <LoginFormCard {...formProps} />
 
           <p className="mt-7 max-w-[420px] text-center text-xs leading-relaxed text-muted-foreground">
@@ -400,7 +549,9 @@ export function LoginPage() {
             <LoginAtriaCredit />
           </div>
         </section>
+          </div>
+        </div>
       </div>
-    </div>
+    </MarketingScrollContext.Provider>
   )
 }
