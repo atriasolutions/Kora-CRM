@@ -15,6 +15,7 @@ export const usersListConfig: ModuleListConfig<UserListItem> = {
   total: 0,
   seeds: [],
   showImport: false,
+  showRowActions: false,
   viewModes: [{ id: 'lista', label: 'Lista', Icon: List }],
   getDetailPath: (row) => getUserDetailPath(row.id),
   searchFilter: (row, q) =>

@@ -188,9 +188,21 @@ export function InvoiceDetailSidebar({
             </p>
           ) : null}
           <p>
-            <span className="text-muted-foreground">Subtotal: </span>
+            <span className="text-muted-foreground">Subtotal líneas: </span>
             {invoice.subtotal}
           </p>
+          {invoice.discountAmount &&
+          invoice.discountAmount !== '$0' &&
+          invoice.discountAmount !== '−$0' &&
+          invoice.discountAmount !== '-$0' ? (
+            <p>
+              <span className="text-muted-foreground">
+                Descuento global
+                {invoice.discountPercent ? ` (${invoice.discountPercent})` : ''}:{' '}
+              </span>
+              <span className="text-destructive">{invoice.discountAmount}</span>
+            </p>
+          ) : null}
           <p>
             <span className="text-muted-foreground">IVA ({invoice.taxPercent}): </span>
             {invoice.taxAmount}

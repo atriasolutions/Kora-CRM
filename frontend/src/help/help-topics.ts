@@ -6,6 +6,7 @@ import {
   HELP_OPPORTUNITY_STAGE_CONCEPTS,
   HELP_PROJECT_JOURNEY_CONCEPTS,
   HELP_QUOTE_STAGE_CONCEPTS,
+  HELP_SOLICITUD_JOURNEY_CONCEPTS,
 } from '@/help/help-lifecycle-stages'
 
 export type HelpTopic = {
@@ -359,6 +360,87 @@ export const HELP_CONTENT: Record<string, HelpTopic> = {
     ],
   }),
 
+  ...listDetail('solicitudes', {
+    titleList: 'Solicitudes · listado',
+    summary:
+      'Peticiones internas o de clientes: título, descripción, responsable, prioridad y etapa en la ruta del éxito. Centraliza el seguimiento operativo con equipo, notas, archivos y actividades.',
+    actions: [
+      'Buscar por título, código o responsable.',
+      'Cambiar entre vista Lista, Kanban, Segmentos y Archivados.',
+      'Usar «Mis solicitudes» para ver solo las que te asignan como responsable o miembro del equipo.',
+      'Los perfiles Administrador pueden usar «Todas las solicitudes» para ver el listado completo.',
+      'Abrir una ficha para ver la ruta del éxito, descripción enriquecida y pestañas de equipo, notas, archivos y actividad.',
+      'Revisar archivados desde la vista de papelera si tu perfil lo permite.',
+    ],
+    actionsIfCreate: ['Crear solicitud con título, descripción, prioridad y responsable.'],
+    actionsIfEdit: [
+      'Editar datos desde el listado o la ficha.',
+      'Archivar solicitudes cerradas o que ya no requieran seguimiento.',
+    ],
+    concepts: HELP_SOLICITUD_JOURNEY_CONCEPTS,
+    permissionsNote: 'Ver «Todas las solicitudes» suele estar reservado a perfiles de sistema (Administrador).',
+    tips: [
+      'El responsable predeterminado al crear se configura en Configuración → Solicitudes.',
+      'En Kanban las columnas son Activos, Detenidos y Cierre según la etapa de la ruta del éxito.',
+    ],
+    keywords: [
+      'ticket',
+      'requerimiento',
+      'prioridad',
+      'responsable',
+      'equipo',
+      'etapa',
+      'estado',
+      'kanban',
+      'segmentos',
+    ],
+  }, {
+    titleDetail: 'Solicitudes · ficha',
+    summary:
+      'Centro de operación de una solicitud: ruta del éxito, descripción con imágenes, equipo con acceso, notas internas, archivos adjuntos y actividades vinculadas.',
+    actions: [
+      'Revisar el encabezado: código, responsable, estado y prioridad.',
+      'Usar la ruta del éxito para ver la etapa actual, el historial y las transiciones permitidas.',
+      'Pestaña Detalle: leer la descripción (clic en miniaturas para ampliar imágenes).',
+      'Pestaña Equipo: ver quién tiene acceso además del responsable.',
+      'Pestaña Notas: consultar notas internas del equipo.',
+      'Pestaña Archivos: descargar o revisar documentos adjuntos.',
+      'Pestaña Actividad: listar seguimientos (llamadas, reuniones, tareas) vinculados a esta solicitud.',
+      'Registrar actividad desde el botón del encabezado; queda vinculada a la solicitud.',
+    ],
+    actionsIfEdit: [
+      'Editar título, descripción, prioridad y responsable.',
+      'Avanzar, retroceder o pausar la solicitud en la ruta del éxito (incluye estados fuera de ruta).',
+      'Pestaña Equipo: agregar o quitar miembros; al invitar a alguien nuevo puede recibir notificación.',
+      'Pestaña Notas: añadir y eliminar notas.',
+      'Pestaña Archivos: subir, renombrar o eliminar archivos.',
+      'Archivar la solicitud (papelera temporal; restaurar o eliminación definitiva según política del módulo).',
+    ],
+    concepts: [
+      ...HELP_SOLICITUD_JOURNEY_CONCEPTS,
+      'Equipo de la solicitud — en la pestaña Equipo defines quién ve la solicitud en «Mis solicitudes» además del responsable.',
+      'Descripción enriquecida — las imágenes insertadas en el editor se guardan también en Archivos; al reabrir la ficha se muestran en la descripción.',
+      'Actividades — puedes vincular actividades del módulo Actividades a esta solicitud al crearlas o editarlas.',
+    ],
+    permissionsNote:
+      'Editar la ruta del éxito, archivos y equipo requiere permiso de edición en Solicitudes. Archivar suele requerir eliminación/archivo según perfil.',
+    tips: [
+      'Si no ves el botón de editar etapas, tu perfil puede ser solo lectura en este módulo.',
+      'Usa Segmentos en el listado para filtrar urgentes, nuevas, detenidas o sin responsable.',
+    ],
+    keywords: [
+      'detalle solicitud',
+      'ruta del éxito',
+      'camino de éxito',
+      'equipo',
+      'archivos',
+      'notas',
+      'actividad',
+      'descripción',
+      'imágenes',
+    ],
+  }),
+
   ...listDetail('compras', {
     titleList: 'Compras · listado',
     summary:
@@ -551,6 +633,7 @@ const MODULE_LABEL: Record<string, string> = {
   facturacion: 'Facturación',
   actividades: 'Actividades',
   proyectos: 'Proyectos',
+  solicitudes: 'Solicitudes',
   compras: 'Compras',
   ingresos: 'Ingresos',
   inventario: 'Inventario',

@@ -10,6 +10,7 @@ export type EntityRecentSlug =
   | 'facturacion'
   | 'actividades'
   | 'proyectos'
+  | 'solicitudes'
   | 'compras'
   | 'ingresos'
   | 'inventario'

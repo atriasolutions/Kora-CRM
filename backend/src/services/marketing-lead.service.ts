@@ -1,7 +1,11 @@
 import { env } from '../config/env.js'
+import { AppError, badRequest } from '../middleware/errors.js'
 import { sendMail } from './mail.service.js'
 import { createAtriaProspectFromTrialLead } from './marketing-prospect.service.js'
-import { provisionTrialFromLead } from './tenant-lifecycle.service.js'
+import {
+  findActiveTrialForEmail,
+  provisionTrialFromLead,
+} from './tenant-lifecycle.service.js'
 import type { SupportRequestInput, TrialLeadInput } from '../validators/marketing.validator.js'
 
 function escapeHtml(text: string): string {
@@ -12,11 +16,30 @@ function escapeHtml(text: string): string {
     .replace(/"/g, '&quot;')
 }
 
+function rethrowMarketingLeadError(err: unknown): never {
+  if (err instanceof AppError) {
+    if (err.statusCode === 409) {
+      throw badRequest(
+        'Ya tenemos registrados tus datos comerciales. Si necesitas ayuda con tu demo, escríbenos a contacto@atriasolutions.cl.',
+      )
+    }
+    if (err.statusCode >= 400 && err.statusCode < 500) {
+      throw err
+    }
+  }
+
+  console.error('[marketing-lead] Error inesperado al registrar lead:', err)
+  throw badRequest(
+    'No pudimos completar tu solicitud en este momento. Intenta nuevamente en unos minutos o escríbenos a contacto@atriasolutions.cl.',
+  )
+}
+
 export type TrialLeadSubmissionResult = {
   received: boolean
   emailed: boolean
   companyId: string
   contactId: string
+  opportunityId: string
   trial: {
     provisioned: boolean
     slug?: string
@@ -30,17 +53,38 @@ export type TrialLeadSubmissionResult = {
 export async function submitTrialLead(
   input: TrialLeadInput,
 ): Promise<TrialLeadSubmissionResult> {
-  const crm = await createAtriaProspectFromTrialLead(input)
+  const activeTrial = await findActiveTrialForEmail(input.email)
+  if (activeTrial) {
+    throw badRequest(
+      `Ya tienes una demo activa asociada a este correo. Puedes entrar en ${activeTrial.loginUrl}`,
+    )
+  }
+
+  let crm
+  try {
+    crm = await createAtriaProspectFromTrialLead(input)
+  } catch (err) {
+    rethrowMarketingLeadError(err)
+  }
 
   let trial: TrialLeadSubmissionResult['trial'] = { provisioned: false }
   if (env.marketingAutoProvisionTrial) {
-    trial = await provisionTrialFromLead({
-      name: input.name,
-      company: input.company,
-      email: input.email,
-      phone: input.phone,
-      contactId: crm.contactId,
-    })
+    try {
+      trial = await provisionTrialFromLead({
+        name: input.name,
+        company: input.company,
+        email: input.email,
+        phone: input.phone,
+        contactId: crm.contactId,
+      })
+    } catch (err) {
+      console.error('[marketing-lead] Error al provisionar demo:', err)
+      trial = {
+        provisioned: false,
+        error:
+          'No pudimos crear tu demo automática, pero registramos tu solicitud. Te contactaremos pronto.',
+      }
+    }
   }
 
   const to = env.marketingLeadTo
@@ -57,7 +101,7 @@ export async function submitTrialLead(
     `Teléfono: ${input.phone.trim()}`,
     input.message?.trim() ? `\nMensaje:\n${input.message.trim()}` : null,
     `\nCRM Atria · Origen: ${env.marketingLeadSource} · Asignado a: ${env.marketingLeadOwnerName}`,
-    `\nCRM Atria: empresa ${crm.companyId}${crm.createdCompany ? ' (nueva)' : ' (existente)'} · contacto ${crm.contactId}${crm.createdContact ? ' (nuevo)' : ' (existente)'}`,
+    `\nCRM Atria: empresa ${crm.companyId}${crm.createdCompany ? ' (nueva)' : ' (existente)'} · contacto ${crm.contactId}${crm.createdContact ? ' (nuevo)' : ' (existente)'} · oportunidad ${crm.opportunityId}`,
     trial.provisioned && trial.loginUrl
       ? `\nDemo auto-provisionada: ${trial.loginUrl}${trial.slug ? ` (slug: ${trial.slug})` : ''}`
       : trial.error
@@ -92,23 +136,29 @@ export async function submitTrialLead(
     }
     ${trialHtmlBlock}
     <p style="font-family:sans-serif;color:#64748b;font-size:13px;">
-      Registrado en Atria Solutions como prospecto (empresa + contacto).
+      Registrado en Atria Solutions como prospecto (empresa, contacto y oportunidad).
     </p>
   `
 
-  const emailed = await sendMail({
-    to,
-    subject,
-    text,
-    html,
-    category: 'marketing_trial_lead',
-  })
+  let emailed = false
+  try {
+    emailed = await sendMail({
+      to,
+      subject,
+      text,
+      html,
+      category: 'marketing_trial_lead',
+    })
+  } catch (err) {
+    console.error('[marketing-lead] Error al enviar correo interno:', err)
+  }
 
   return {
     received: true,
     emailed,
     companyId: crm.companyId,
     contactId: crm.contactId,
+    opportunityId: crm.opportunityId,
     trial,
   }
 }

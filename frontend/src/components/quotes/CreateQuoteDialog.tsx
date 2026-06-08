@@ -7,6 +7,8 @@ import {
 } from '@/components/quotes/QuoteFormFields'
 import { QuoteCommercialTermsFields } from '@/components/quotes/QuoteCommercialTermsFields'
 import { QuoteLineItemsEditor } from '@/components/quotes/QuoteLineItemsEditor'
+import { DocumentGlobalDiscountField } from '@/components/shared/DocumentGlobalDiscountField'
+import { DocumentTotalsBreakdown } from '@/components/shared/DocumentTotalsBreakdown'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -74,7 +76,13 @@ export function CreateQuoteDialog({
   const [form, setForm] = useState(() => createDefaultQuoteFormValues(initialValues))
   const { reloadFromApi: reloadProducts } = useProductsRegistry()
 
-  const totals = useMemo(() => computeQuoteTotals(form.lineItems), [form.lineItems])
+  const totals = useMemo(
+    () =>
+      computeQuoteTotals(form.lineItems, {
+        globalDiscountPercent: form.globalDiscountPercent,
+      }),
+    [form.lineItems, form.globalDiscountPercent],
+  )
 
   useEffect(() => {
     if (!open) return
@@ -141,9 +149,33 @@ export function CreateQuoteDialog({
               setForm((f) => ({
                 ...f,
                 lineItems,
-                amount: computeQuoteTotals(lineItems).amount,
+                amount: computeQuoteTotals(lineItems, {
+                  globalDiscountPercent: f.globalDiscountPercent,
+                }).amount,
               }))
             }
+          />
+
+          <DocumentGlobalDiscountField
+            id="create-qt-global-discount"
+            value={form.globalDiscountPercent}
+            onChange={(globalDiscountPercent) =>
+              setForm((f) => ({
+                ...f,
+                globalDiscountPercent,
+                amount: computeQuoteTotals(f.lineItems, { globalDiscountPercent }).amount,
+              }))
+            }
+          />
+
+          <DocumentTotalsBreakdown
+            subtotal={totals.subtotal}
+            discountPercent={totals.discountPercent}
+            discountAmount={totals.discountAmount}
+            taxLabel={`IVA (${totals.taxPercent})`}
+            taxAmount={totals.taxAmount}
+            total={totals.amount}
+            totalLabel="Total cotización (IVA incl.)"
           />
 
           <QuoteCommercialTermsFields
@@ -156,14 +188,6 @@ export function CreateQuoteDialog({
             onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
           />
 
-          <div className="rounded-lg border border-border bg-muted/20 px-4 py-3 text-sm">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-muted-foreground">Total cotización (IVA incl.)</span>
-              <span className="text-lg font-bold tabular-nums text-primary">
-                {totals.amount}
-              </span>
-            </div>
-          </div>
           <DialogFooter className="gap-2 border-t border-border pt-4 sm:gap-0">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar

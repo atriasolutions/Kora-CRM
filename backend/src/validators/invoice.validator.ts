@@ -26,6 +26,7 @@ const paymentMethodSchema = z.enum([
   'Tarjeta',
   'Cheque',
   'Efectivo',
+  'Crédito',
   'Otro',
 ])
 
@@ -59,6 +60,7 @@ export const createInvoiceSchema = z.object({
   ownerName: z.string().optional(),
   paymentMethod: paymentMethodSchema.optional(),
   siiNumber: z.string().max(64).optional(),
+  globalDiscount: z.string().max(16).optional(),
   lineItems: z.array(invoiceLineSchema).optional(),
 })
 

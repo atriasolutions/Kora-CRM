@@ -33,6 +33,7 @@ export type QuoteRow = {
   exchange_rate_uf: string | number | null
   exchange_rate_usd: string | number | null
   exchange_rate_eur: string | number | null
+  global_discount_pct: string | number | null
   created_at: Date
   created_by_id: string | null
   created_by_name: string | null
@@ -111,6 +112,7 @@ export function mapQuoteDetail(row: QuoteRow, lineItems: QuoteLineRow[]): QuoteD
   const exchange = mapDocumentExchangeRates(row)
   return {
     ...mapQuoteRow(row),
+    globalDiscount: formatDiscountPct(row.global_discount_pct),
     lineItems: lineItems.map(mapQuoteLineRow),
     paymentTerms: row.payment_terms?.trim() ?? '',
     deliveryTerms: row.delivery_terms?.trim() ?? '',

@@ -29,6 +29,7 @@ function sessionFromLogin(
   user: { id: string; email: string; name: string; profileId: string },
   tenantId?: string,
   tenantSlug?: string,
+  isPlatformOperator?: boolean,
 ): AuthSession {
   return {
     userId: user.id,
@@ -38,6 +39,7 @@ function sessionFromLogin(
     profileId: user.profileId,
     tenantId,
     tenantSlug: tenantSlug ?? resolveTenantSlugFromHostname(window.location.hostname) ?? undefined,
+    isPlatformOperator: isPlatformOperator ?? false,
   }
 }
 
@@ -62,7 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     bootstrapTokenRef.current = validatedToken
     let cancelled = false
     void fetchMeApi()
-      .then(({ user, profile: meProfile, tenantId, tenantSlug }) => {
+      .then(({ user, profile: meProfile, tenantId, tenantSlug, isPlatformOperator }) => {
         if (cancelled || bootstrapTokenRef.current !== validatedToken) return
         const next = sessionFromLogin(
           validatedToken,
@@ -77,6 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             stored.tenantSlug ??
             resolveTenantSlugFromHostname(window.location.hostname) ??
             undefined,
+          isPlatformOperator ?? stored.isPlatformOperator,
         )
         saveAuthSession(next)
         setSession(next)
@@ -106,9 +109,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       meProfile: AccessProfile,
       tenantId: string,
       tenantSlug?: string,
+      isPlatformOperator?: boolean,
     ) => {
       bootstrapTokenRef.current = null
-      const next = sessionFromLogin(token, user, tenantId, tenantSlug)
+      const next = sessionFromLogin(token, user, tenantId, tenantSlug, isPlatformOperator)
       saveAuthSession(next)
       setSession(next)
       setProfile(meProfile)
@@ -142,7 +146,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               tenantId: result.tenantId,
             }
           }
-          applyLoginSession(result.token, result.user, result.profile, result.tenantId)
+          applyLoginSession(
+            result.token,
+            result.user,
+            result.profile,
+            result.tenantId,
+            undefined,
+            result.isPlatformOperator,
+          )
           return { status: 'ok' }
         } catch (err) {
           return { status: 'error', message: parseLoginErrorMessage(err) }
@@ -164,7 +175,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!useApi) return { status: 'error', message: '2FA no disponible en modo demo.' }
       try {
         const result = await verifyTwoFactorLoginApi(challengeId, code, tenantId)
-        applyLoginSession(result.token, result.user, result.profile, result.tenantId)
+        applyLoginSession(
+          result.token,
+          result.user,
+          result.profile,
+          result.tenantId,
+          undefined,
+          result.isPlatformOperator,
+        )
         return { status: 'ok' }
       } catch (err) {
         return { status: 'error', message: parseLoginErrorMessage(err) }
@@ -188,7 +206,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setupId,
           tenantId,
         )
-        applyLoginSession(result.token, result.user, result.profile, result.tenantId)
+        applyLoginSession(
+          result.token,
+          result.user,
+          result.profile,
+          result.tenantId,
+          undefined,
+          result.isPlatformOperator,
+        )
         return { status: 'ok', backupCodes: result.backupCodes }
       } catch (err) {
         return { status: 'error', message: parseLoginErrorMessage(err) }
@@ -200,8 +225,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshProfile = useCallback(async () => {
     if (!useApi || !session?.token) return
     try {
-      const { profile: meProfile } = await fetchMeApi()
+      const { profile: meProfile, isPlatformOperator, tenantId, tenantSlug } =
+        await fetchMeApi()
       setProfile(meProfile)
+      const stored = loadAuthSession()
+      if (stored?.token) {
+        saveAuthSession({
+          ...stored,
+          profileId: meProfile.id,
+          tenantId: tenantId ?? stored.tenantId,
+          tenantSlug: tenantSlug || stored.tenantSlug,
+          isPlatformOperator,
+        })
+        setSession((prev) =>
+          prev
+            ? {
+                ...prev,
+                profileId: meProfile.id,
+                tenantId: tenantId ?? prev.tenantId,
+                tenantSlug: tenantSlug || prev.tenantSlug,
+                isPlatformOperator,
+              }
+            : prev,
+        )
+      }
     } catch {
       /* sesión inválida: logout en próximo request */
     }

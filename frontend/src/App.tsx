@@ -25,6 +25,8 @@ import { InvoiceDetailPage } from '@/pages/InvoiceDetailPage'
 import { InvoicesPage } from '@/pages/InvoicesPage'
 import { ProjectDetailPage } from '@/pages/ProjectDetailPage'
 import { ProjectsPage } from '@/pages/ProjectsPage'
+import { SolicitudesPage } from '@/pages/SolicitudesPage'
+import { SolicitudDetailPage } from '@/pages/SolicitudDetailPage'
 import { InventoryDetailPage } from '@/pages/InventoryDetailPage'
 import { InventoryPage } from '@/pages/InventoryPage'
 import { PurchaseDetailPage } from '@/pages/PurchaseDetailPage'
@@ -100,6 +102,8 @@ export default function App() {
                   <Route path="actividades/:activityId" element={<ActivityDetailPage />} />
                   <Route path="proyectos" element={<ProjectsPage />} />
                   <Route path="proyectos/:projectId" element={<ProjectDetailPage />} />
+                  <Route path="solicitudes" element={<SolicitudesPage />} />
+                  <Route path="solicitudes/:solicitudId" element={<SolicitudDetailPage />} />
                   <Route path="compras" element={<PurchasesPage />} />
                   <Route path="compras/:purchaseId" element={<PurchaseDetailPage />} />
                   <Route path="ingresos" element={<StockReceiptsPage />} />
@@ -125,6 +129,7 @@ export default function App() {
                         slug !== 'cotizaciones' &&
                         slug !== 'actividades' &&
                         slug !== 'proyectos' &&
+                        slug !== 'solicitudes' &&
                         slug !== 'productos' &&
                         slug !== 'facturacion' &&
                         slug !== 'usuarios' &&

@@ -191,10 +191,7 @@ export function TopBar() {
   return (
     <header
       className={cn(
-        'relative z-20 flex shrink-0 items-center gap-2',
-        'border-b border-border/60 bg-gradient-to-r from-background via-background to-primary/[0.04]',
-        'shadow-[0_1px_0_0_hsl(var(--border)/0.9),0_8px_32px_-12px_rgba(15,23,42,0.1)]',
-        'backdrop-blur-xl supports-[backdrop-filter]:bg-background/85',
+        'shell-topbar relative z-20 flex shrink-0 items-center gap-2',
         'pt-[env(safe-area-inset-top)] pb-2.5',
         'ps-[max(0.75rem,env(safe-area-inset-left))] pe-[max(0.75rem,env(safe-area-inset-right))]',
         'sm:gap-3 sm:pb-3',
@@ -202,11 +199,13 @@ export function TopBar() {
         'lg:gap-4 lg:px-6',
       )}
     >
+      <div className="shell-topbar-accent" aria-hidden />
+
       <Button
         type="button"
         variant="ghost"
         size="icon"
-        className="size-9 shrink-0 rounded-full text-muted-foreground lg:hidden"
+        className="size-9 shrink-0 rounded-xl text-muted-foreground hover:bg-primary/8 hover:text-primary lg:hidden"
         aria-label="Abrir menú de navegación"
         onClick={openMobileNav}
       >
@@ -217,19 +216,14 @@ export function TopBar() {
 
       <GlobalSearch />
 
-      <div
-        className={cn(
-          'flex shrink-0 items-center gap-0.5 rounded-full border border-border/50',
-          'bg-muted/35 p-0.5 shadow-sm sm:gap-1 sm:p-1',
-        )}
-      >
+      <div className="shell-topbar-actions flex shrink-0 items-center gap-0.5 rounded-2xl p-0.5 sm:gap-1 sm:p-1">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              className="relative size-9 rounded-full text-muted-foreground hover:bg-background/90 hover:text-foreground hover:shadow-sm"
+              className="relative size-9 rounded-xl text-muted-foreground hover:bg-primary/8 hover:text-primary"
               aria-label="Notificaciones"
             >
               <Bell aria-hidden className="size-[18px]" />
@@ -345,7 +339,7 @@ export function TopBar() {
               type="button"
               variant="ghost"
               size="icon"
-              className="size-9 rounded-full text-muted-foreground hover:bg-background/90 hover:text-foreground hover:shadow-sm"
+              className="size-9 rounded-xl text-muted-foreground hover:bg-primary/8 hover:text-primary"
               aria-label="Ayuda"
               onClick={openHelp}
             >
@@ -367,14 +361,14 @@ export function TopBar() {
             <button
               type="button"
               className={cn(
-                'flex max-w-[11rem] items-center gap-2 rounded-full py-1 ps-1 pe-2.5 transition-all',
-                'hover:bg-background/90 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30',
-                'data-[state=open]:bg-background/90 data-[state=open]:shadow-sm',
+                'flex max-w-[11rem] items-center gap-2 rounded-xl py-1 ps-1 pe-2.5 transition-colors',
+                'hover:bg-primary/8 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30',
+                'data-[state=open]:bg-primary/8',
                 'sm:pe-3',
               )}
               aria-label="Menú de cuenta"
             >
-              <Avatar className="size-8 shrink-0 ring-1 ring-border/60 sm:size-9">
+              <Avatar className="size-8 shrink-0 ring-2 ring-primary/15 sm:size-9">
                 {avatarUrl ? (
                   <AvatarImage src={avatarUrl} alt={`Avatar de ${current.name}`} />
                 ) : null}

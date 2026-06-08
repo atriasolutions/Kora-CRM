@@ -36,6 +36,7 @@ projectsRouter.get(
         q: query.q,
         status: query.status,
         opportunityId: query.opportunityId,
+        solicitudId: query.solicitudId,
         companyId: query.companyId,
         archivedOnly: query.archived === true,
         memberAccess: isSystemAccessProfile(profile)

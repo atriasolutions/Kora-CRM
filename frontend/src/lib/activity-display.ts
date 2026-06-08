@@ -50,6 +50,8 @@ export function activityRelatedLabel(type: ActivityRelatedType): string {
       return 'Factura'
     case 'proyecto':
       return 'Proyecto'
+    case 'solicitud':
+      return 'Solicitud'
     case 'ingreso':
       return 'Ingreso'
     case 'producto':
@@ -84,6 +86,8 @@ export function activityRelatedPath(
       return `/facturacion/${relatedId}`
     case 'proyecto':
       return `/proyectos/${relatedId}`
+    case 'solicitud':
+      return `/solicitudes/${relatedId}`
     case 'ingreso':
       return `/ingresos/${relatedId}`
     case 'producto':

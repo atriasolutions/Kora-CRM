@@ -10,6 +10,7 @@ const ROUTE_SLUG_TO_KIND: Record<string, MentionKind> = {
   productos: 'product',
   facturacion: 'invoice',
   actividades: 'activity',
+  solicitudes: 'solicitud',
 }
 
 export type ParsedCrmRecordPath = {

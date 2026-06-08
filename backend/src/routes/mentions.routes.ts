@@ -1,6 +1,6 @@
 import { Router } from 'express'
 
-import { requirePermission } from '../middleware/require-permission.js'
+import { requireMentionLookup } from '../middleware/require-permission.js'
 import { searchMentions } from '../repositories/mentions.repository.js'
 import { mentionSearchQuerySchema } from '../validators/mentions.validator.js'
 
@@ -8,7 +8,7 @@ export const mentionsRouter = Router()
 
 mentionsRouter.get(
   '/',
-  requirePermission('contactos', 'view'),
+  requireMentionLookup(),
   async (req, res, next) => {
     try {
       const query = mentionSearchQuerySchema.parse(req.query)

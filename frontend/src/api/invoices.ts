@@ -29,6 +29,7 @@ export type InvoiceApiBody = {
   ownerName?: string
   paymentMethod?: string
   siiNumber?: string
+  globalDiscount?: string
   lineItems?: {
     productId?: string
     sku?: string
@@ -70,7 +71,9 @@ function lineItemsToApi(lineItems: InvoiceLineItem[]) {
 }
 
 export function invoiceFormToApiBody(values: CreateInvoiceFormValues): InvoiceApiBody {
-  const totals = computeInvoiceTotals(values.lineItems)
+  const totals = computeInvoiceTotals(values.lineItems, {
+    globalDiscountPercent: values.globalDiscountPercent,
+  })
   return {
     customerKind: values.customerKind,
     companyId: values.companyId.trim() || undefined,
@@ -86,12 +89,23 @@ export function invoiceFormToApiBody(values: CreateInvoiceFormValues): InvoiceAp
     status: values.status,
     ownerName: values.ownerName.trim() || undefined,
     paymentMethod: values.paymentMethod,
+    globalDiscount: values.globalDiscountPercent.trim() || undefined,
     lineItems: lineItemsToApi(values.lineItems),
   }
 }
 
+function resolveInvoiceGlobalDiscount(detail: InvoiceDetail): string | undefined {
+  return (
+    detail.discountPercent ??
+    (detail as InvoiceDetail & { globalDiscount?: string }).globalDiscount
+  )
+}
+
 export function invoiceDetailToApiBody(detail: InvoiceDetail): InvoiceApiBody {
-  const totals = computeInvoiceTotals(detail.lineItems)
+  const globalDiscount = resolveInvoiceGlobalDiscount(detail)
+  const totals = computeInvoiceTotals(detail.lineItems, {
+    globalDiscountPercent: globalDiscount,
+  })
   return {
     customerKind: detail.customerKind,
     companyId: detail.companyId,
@@ -107,6 +121,7 @@ export function invoiceDetailToApiBody(detail: InvoiceDetail): InvoiceApiBody {
     ownerName: detail.owner,
     paymentMethod: detail.paymentMethod,
     siiNumber: detail.siiNumber,
+    globalDiscount,
     lineItems: lineItemsToApi(detail.lineItems),
   }
 }

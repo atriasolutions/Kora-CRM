@@ -8,6 +8,7 @@ export type MentionKind =
   | 'product'
   | 'invoice'
   | 'activity'
+  | 'solicitud'
 
 export type MentionSearchItem = {
   id: string

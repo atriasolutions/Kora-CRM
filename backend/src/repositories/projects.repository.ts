@@ -40,7 +40,9 @@ import { purgeEntityNotesAndFiles } from '../services/entity-purge.service.js'
 const PROJECT_COLUMNS = `
   id, name, client_name, customer_kind, company_id, contact_id,
   opportunity_id, opportunity_name,
-  accepted_quote_id, quote_code, progress_pct, work_plan_json, deadline, manager_name,
+  accepted_quote_id, quote_code,
+  solicitud_id, solicitud_code, solicitud_title,
+  progress_pct, work_plan_json, deadline, manager_name,
   journey_stage, status, priority, health, budget_cents, start_date,
   created_at, created_by_id, created_by_name,
   updated_at, updated_by_id, updated_by_name
@@ -54,6 +56,7 @@ export type ListProjectsParams = {
   q?: string
   status?: string
   opportunityId?: string
+  solicitudId?: string
   companyId?: string
   archivedOnly?: boolean
   /** Si se define, solo proyectos donde el usuario es gerente o miembro del equipo. */
@@ -234,6 +237,22 @@ async function resolveCompany(
   return { companyId: null, clientName: name }
 }
 
+async function resolveSolicitudSnapshot(
+  solicitudId?: string | null,
+): Promise<{ solicitudId: string | null; solicitudCode: string; solicitudTitle: string }> {
+  if (!solicitudId?.trim()) {
+    return { solicitudId: null, solicitudCode: '', solicitudTitle: '' }
+  }
+  const result = await tenantQuery<{ id: string; code: string; title: string }>(
+    `SELECT id, code, title FROM crm_solicitudes
+     WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
+    [solicitudId, getTenantIdOrDefault()],
+  )
+  const row = result.rows[0]
+  if (!row) throw badRequest('Solicitud no encontrada')
+  return { solicitudId: row.id, solicitudCode: row.code, solicitudTitle: row.title }
+}
+
 async function resolveCommercialLinks(input: {
   companyId?: string | null
   client?: string
@@ -281,6 +300,55 @@ async function resolveCommercialLinks(input: {
     opportunityName: opp.opportunityName,
     acceptedQuoteId: quote.acceptedQuoteId,
     quoteCode: quote.quoteCode,
+  }
+}
+
+async function resolveProjectOriginLinks(input: {
+  companyId?: string | null
+  client?: string
+  opportunityId?: string | null
+  acceptedQuoteId?: string | null
+  solicitudId?: string | null
+}): Promise<{
+  companyId: string | null
+  clientName: string
+  opportunityId: string | null
+  opportunityName: string
+  acceptedQuoteId: string | null
+  quoteCode: string
+  solicitudId: string | null
+  solicitudCode: string
+  solicitudTitle: string
+}> {
+  const solicitud = await resolveSolicitudSnapshot(input.solicitudId)
+  const hasSolicitud = Boolean(solicitud.solicitudId)
+  const hasOpportunity = Boolean(input.opportunityId?.trim())
+
+  if (hasSolicitud && hasOpportunity) {
+    throw badRequest('El proyecto no puede vincular oportunidad y solicitud a la vez.')
+  }
+
+  if (hasSolicitud) {
+    const company = await resolveCompany(input.companyId ?? null, input.client?.trim() || '')
+    return {
+      companyId: company.companyId,
+      clientName: company.clientName,
+      opportunityId: null,
+      opportunityName: '',
+      acceptedQuoteId: null,
+      quoteCode: '',
+      solicitudId: solicitud.solicitudId,
+      solicitudCode: solicitud.solicitudCode,
+      solicitudTitle: solicitud.solicitudTitle,
+    }
+  }
+
+  const commercial = await resolveCommercialLinks(input)
+  return {
+    ...commercial,
+    solicitudId: null,
+    solicitudCode: '',
+    solicitudTitle: '',
   }
 }
 
@@ -332,6 +400,10 @@ export async function listProjects(
   if (params.opportunityId) {
     conditions.push(`opportunity_id = $${idx++}`)
     values.push(params.opportunityId)
+  }
+  if (params.solicitudId) {
+    conditions.push(`solicitud_id = $${idx++}`)
+    values.push(params.solicitudId)
   }
   if (params.companyId) {
     conditions.push(
@@ -430,11 +502,12 @@ export async function createProject(
   }
 
   const clientFields = await resolveProjectClientFields(input)
-  const links = await resolveCommercialLinks({
+  const links = await resolveProjectOriginLinks({
     companyId: input.companyId ?? clientFields.companyId,
     client: clientFields.clientName,
     opportunityId: input.opportunityId,
     acceptedQuoteId: input.acceptedQuoteId,
+    solicitudId: input.solicitudId,
   })
   if (!links.clientName) throw badRequest('El cliente es obligatorio')
   const { customerKind, contactId } = clientFields
@@ -450,15 +523,19 @@ export async function createProject(
       `INSERT INTO crm_projects (
         name, client_name, customer_kind, company_id, contact_id,
         opportunity_id, opportunity_name,
-        accepted_quote_id, quote_code, progress_pct, deadline, manager_name,
+        accepted_quote_id, quote_code,
+        solicitud_id, solicitud_code, solicitud_title,
+        progress_pct, deadline, manager_name,
         journey_stage, status, priority, health, budget_cents, start_date,
         created_by_id, created_by_name, updated_by_id, updated_by_name, tenant_id
       ) VALUES (
         $1, $2, $3, $4, $5,
         $6, $7,
-        $8, $9, $10, $11, $12,
-        $13, $14, $15, $16, $17, $18,
-        $19, $20, $19, $20, $21
+        $8, $9,
+        $10, $11, $12,
+        $13, $14, $15,
+        $16, $17, $18, $19, $20, $21,
+        $22, $23, $22, $23, $24
       )
       RETURNING ${PROJECT_COLUMNS}`,
       [
@@ -471,6 +548,9 @@ export async function createProject(
         links.opportunityName,
         links.acceptedQuoteId,
         links.quoteCode,
+        links.solicitudId,
+        links.solicitudCode,
+        links.solicitudTitle,
         0,
         parseDateInput(input.deadline),
         managerName,
@@ -522,6 +602,11 @@ export async function updateProject(
       ? input.acceptedQuoteId
       : existing.acceptedQuoteId ?? null
 
+  const solicitudId =
+    input.solicitudId !== undefined
+      ? input.solicitudId
+      : existing.solicitudId ?? null
+
   const clientInputTouched =
     input.customerKind !== undefined ||
     input.contactId !== undefined ||
@@ -540,12 +625,14 @@ export async function updateProject(
   const links =
     input.opportunityId !== undefined ||
     input.acceptedQuoteId !== undefined ||
+    input.solicitudId !== undefined ||
     clientInputTouched
-      ? await resolveCommercialLinks({
+      ? await resolveProjectOriginLinks({
           companyId: input.companyId ?? clientFields?.companyId ?? existing.companyId ?? null,
           client: clientFields?.clientName ?? input.client ?? existing.client,
           opportunityId,
           acceptedQuoteId,
+          solicitudId,
         })
       : {
           companyId: existing.companyId ?? null,
@@ -554,6 +641,9 @@ export async function updateProject(
           opportunityName: existing.opportunityName ?? '',
           acceptedQuoteId: existing.acceptedQuoteId ?? null,
           quoteCode: existing.acceptedQuoteCode ?? '',
+          solicitudId: existing.solicitudId ?? null,
+          solicitudCode: existing.solicitudCode ?? '',
+          solicitudTitle: existing.solicitudTitle ?? '',
         }
 
   const customerKind = clientFields?.customerKind ?? existing.customerKind ?? null
@@ -594,18 +684,21 @@ export async function updateProject(
         opportunity_name = $8,
         accepted_quote_id = $9,
         quote_code = $10,
-        deadline = COALESCE($11, deadline),
-        manager_name = COALESCE($12, manager_name),
-        journey_stage = COALESCE($13, journey_stage),
-        status = COALESCE($14, status),
-        priority = COALESCE($15, priority),
-        health = COALESCE($16, health),
-        budget_cents = COALESCE($17, budget_cents),
-        start_date = COALESCE($18, start_date),
-        updated_by_id = $19,
-        updated_by_name = $20,
+        solicitud_id = $11,
+        solicitud_code = $12,
+        solicitud_title = $13,
+        deadline = COALESCE($14, deadline),
+        manager_name = COALESCE($15, manager_name),
+        journey_stage = COALESCE($16, journey_stage),
+        status = COALESCE($17, status),
+        priority = COALESCE($18, priority),
+        health = COALESCE($19, health),
+        budget_cents = COALESCE($20, budget_cents),
+        start_date = COALESCE($21, start_date),
+        updated_by_id = $22,
+        updated_by_name = $23,
         updated_at = now()
-      WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(21)}
+      WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(24)}
       RETURNING ${PROJECT_COLUMNS}`,
       [
         id,
@@ -618,6 +711,9 @@ export async function updateProject(
         links.opportunityName,
         links.acceptedQuoteId,
         links.quoteCode,
+        links.solicitudId,
+        links.solicitudCode,
+        links.solicitudTitle,
         parseDateInput(input.deadline),
         input.managerName?.trim() || null,
         input.journeyStage ?? null,

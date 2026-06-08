@@ -166,9 +166,22 @@ export function ProjectDetailSidebar({
                 {project.opportunityName}
               </Link>
             </p>
-          ) : (
-            <p className="text-muted-foreground">Sin oportunidad vinculada (proyecto interno).</p>
-          )}
+          ) : null}
+          {project.solicitudId && project.solicitudTitle ? (
+            <p>
+              <span className="text-muted-foreground">Solicitud: </span>
+              <Link
+                to={`/solicitudes/${project.solicitudId}`}
+                className="font-medium text-primary hover:underline"
+              >
+                {project.solicitudTitle}
+                {project.solicitudCode ? ` (${project.solicitudCode})` : ''}
+              </Link>
+            </p>
+          ) : null}
+          {!project.opportunityId && !project.solicitudId ? (
+            <p className="text-muted-foreground">Sin origen comercial vinculado.</p>
+          ) : null}
           {project.acceptedQuote ? (
             <p>
               <span className="text-muted-foreground">Cotización: </span>

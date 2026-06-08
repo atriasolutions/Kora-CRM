@@ -48,6 +48,9 @@ import {
   isColumnSortable,
   listColumnKey,
   LIST_COL_DEFAULT_WIDTH,
+  LIST_TABLE_ACTIONS_COL_WIDTH,
+  LIST_TABLE_SELECTION_COL_WIDTH,
+  computeListTableMinWidth,
   loadListColumnPrefs,
   parseWidthFromClassName,
   saveListColumnPrefs,
@@ -152,12 +155,13 @@ export function ModuleListPage<T extends ListRowBase>({
       { id: 'lista', label: 'Lista', Icon: List },
       { id: 'kanban', label: 'Kanban', Icon: LayoutGrid },
     ],
-    showImport = true,
-    minTableWidth = '940px',
-    rowActions = 'default',
-    alternateViewMessage,
-    getDetailPath,
-  } = config
+  showImport = true,
+  minTableWidth = '940px',
+  rowActions = 'default',
+  showRowActions = true,
+  alternateViewMessage,
+  getDetailPath,
+} = config
 
   const navigate = useNavigate()
   const [view, setView] = useState(viewModes[0]?.id ?? 'lista')
@@ -231,6 +235,18 @@ export function ModuleListPage<T extends ListRowBase>({
   const visibleColumnEntries = useMemo(
     () => orderedColumnMeta.filter((m) => !columnPrefs.hidden.has(m.key)),
     [orderedColumnMeta, columnPrefs.hidden],
+  )
+
+  const computedTableMinWidth = useMemo(
+    () =>
+      computeListTableMinWidth(
+        visibleColumnEntries.map(
+          ({ key }) => columnPrefs.widths[key] ?? LIST_COL_DEFAULT_WIDTH,
+        ),
+        minTableWidth,
+        { includeActionsColumn: showRowActions },
+      ),
+    [visibleColumnEntries, columnPrefs.widths, minTableWidth, showRowActions],
   )
 
   const columnOptions = useMemo(() => {
@@ -501,7 +517,7 @@ export function ModuleListPage<T extends ListRowBase>({
   const rangeStart =
     effectiveTotal === 0 ? 0 : (page - 1) * pageSize + 1
   const rangeEnd = Math.min(page * pageSize, effectiveTotal)
-  const colSpan = visibleColumnEntries.length + 2
+  const colSpan = visibleColumnEntries.length + 1 + (showRowActions ? 1 : 0)
 
   const handleExport = useCallback(() => {
     if (exportRowCount === 0) return
@@ -566,9 +582,9 @@ export function ModuleListPage<T extends ListRowBase>({
   const showAlternateView = !embedded && view !== 'lista'
   const rootClassName = embedded
     ? toolbarHost
-      ? 'space-y-4'
-      : 'space-y-5'
-    : 'space-y-5'
+      ? 'min-w-0 space-y-4'
+      : 'min-w-0 space-y-5'
+    : 'min-w-0 space-y-5'
 
   const moduleListHeader = (
       <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -657,7 +673,7 @@ export function ModuleListPage<T extends ListRowBase>({
           </Button>
         </div>
       ) : (
-        <div className="space-y-5">
+        <div className="min-w-0 space-y-5">
         <>
           {embedded && !toolbarHost ? (
             <div className="flex justify-end">
@@ -743,14 +759,17 @@ export function ModuleListPage<T extends ListRowBase>({
             </div>
           ) : null}
 
-          <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-            <div className="overflow-x-auto">
+          <div className="min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+            <div className="overflow-x-auto overscroll-x-contain">
               <table
-                className="w-full table-fixed border-collapse text-sm"
-                style={{ minWidth: minTableWidth }}
+                className="border-collapse text-sm"
+                style={{
+                  width: '100%',
+                  minWidth: computedTableMinWidth,
+                }}
               >
                 <colgroup>
-                  <col style={{ width: 44 }} />
+                  <col style={{ width: LIST_TABLE_SELECTION_COL_WIDTH }} />
                   {visibleColumnEntries.map(({ key }) => (
                     <col
                       key={key}
@@ -759,7 +778,9 @@ export function ModuleListPage<T extends ListRowBase>({
                       }}
                     />
                   ))}
-                  <col style={{ width: 104 }} />
+                  {showRowActions ? (
+                    <col style={{ width: LIST_TABLE_ACTIONS_COL_WIDTH }} />
+                  ) : null}
                 </colgroup>
                 <thead>
                   <tr className="border-b border-border bg-muted/30 text-left">
@@ -786,9 +807,11 @@ export function ModuleListPage<T extends ListRowBase>({
                         onResize={(width) => setColumnWidth(key, width)}
                       />
                     ))}
-                    <th className="w-[104px] px-4 py-3 text-center font-semibold text-foreground">
-                      Acciones
-                    </th>
+                    {showRowActions ? (
+                      <th className="w-[104px] px-4 py-3 text-center font-semibold text-foreground">
+                        Acciones
+                      </th>
+                    ) : null}
                   </tr>
                 </thead>
                 <tbody>
@@ -867,38 +890,40 @@ export function ModuleListPage<T extends ListRowBase>({
                             />
                           </td>
                         ))}
-                        <td
-                          className="px-4 py-3"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <RowActions
-                            rowLabel={primaryTitle(row)}
-                            variant={rowActions}
-                            onEdit={onEditRow ? () => onEditRow(row) : undefined}
-                            onArchive={
-                              onArchiveRow ? () => onArchiveRow(row) : undefined
-                            }
-                            onLogOutreach={
-                              onLogOutreachRow ? () => onLogOutreachRow(row) : undefined
-                            }
-                            emailHref={
-                              rowActions === 'contact'
-                                ? getEmailHref(
-                                    (row as unknown as ContactListItem).email,
-                                  )
-                                : null
-                            }
-                            callHref={
-                              rowActions === 'contact'
-                                ? getTelHref(
-                                    contactDisplayPhone(
-                                      row as unknown as ContactListItem,
-                                    ),
-                                  )
-                                : null
-                            }
-                          />
-                        </td>
+                        {showRowActions ? (
+                          <td
+                            className="px-4 py-3"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <RowActions
+                              rowLabel={primaryTitle(row)}
+                              variant={rowActions}
+                              onEdit={onEditRow ? () => onEditRow(row) : undefined}
+                              onArchive={
+                                onArchiveRow ? () => onArchiveRow(row) : undefined
+                              }
+                              onLogOutreach={
+                                onLogOutreachRow ? () => onLogOutreachRow(row) : undefined
+                              }
+                              emailHref={
+                                rowActions === 'contact'
+                                  ? getEmailHref(
+                                      (row as unknown as ContactListItem).email,
+                                    )
+                                  : null
+                              }
+                              callHref={
+                                rowActions === 'contact'
+                                  ? getTelHref(
+                                      contactDisplayPhone(
+                                        row as unknown as ContactListItem,
+                                      ),
+                                    )
+                                  : null
+                              }
+                            />
+                          </td>
+                        ) : null}
                       </tr>
                     ))
                   )}

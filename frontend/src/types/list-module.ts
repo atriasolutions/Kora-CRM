@@ -66,6 +66,8 @@ export type ModuleListConfig<T extends ListRowBase> = {
   showImport?: boolean
   minTableWidth?: string
   rowActions?: 'contact' | 'default'
+  /** Muestra la columna «Acciones» al final de la tabla (por defecto true). */
+  showRowActions?: boolean
   alternateViewMessage?: string
   /** Si se define, la fila y «Ver detalle» navegan a esta ruta. */
   getDetailPath?: (row: T) => string

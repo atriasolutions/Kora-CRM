@@ -10,6 +10,7 @@ import { getQuoteDetail } from '@/data/quote-detail.mock'
 import { getDefaultOwnerName } from '@/lib/user-lookup'
 import { parseAmountNum } from '@/lib/invoice-display'
 import type { InvoiceDetailOverride } from '@/lib/invoice-detail-storage'
+import { DEFAULT_GLOBAL_DISCOUNT } from '@/lib/document-global-discount'
 import {
   computeInvoiceTotals,
   defaultInvoiceLineItem,
@@ -37,6 +38,7 @@ export type CreateInvoiceFormValues = SaleCustomerValues & {
   quoteCode?: string
   lockQuote?: boolean
   lineItems: InvoiceLineItem[]
+  globalDiscountPercent: string
 }
 
 export function createDefaultInvoiceFormValues(
@@ -46,7 +48,9 @@ export function createDefaultInvoiceFormValues(
     partial?.lineItems && partial.lineItems.length > 0
       ? partial.lineItems
       : [defaultInvoiceLineItem()]
-  const totals = computeInvoiceTotals(lineItems)
+  const totals = computeInvoiceTotals(lineItems, {
+    globalDiscountPercent: partial?.globalDiscountPercent,
+  })
 
   return {
     ...defaultSaleCustomerValues(partial),
@@ -59,6 +63,7 @@ export function createDefaultInvoiceFormValues(
     status: 'Borrador',
     paymentMethod: 'Transferencia',
     quoteId: '',
+    globalDiscountPercent: partial?.globalDiscountPercent ?? DEFAULT_GLOBAL_DISCOUNT,
     lineItems,
     ...partial,
   }
@@ -67,10 +72,11 @@ export function createDefaultInvoiceFormValues(
 export function duplicateInvoiceFormValues(
   source: InvoiceListItem,
   lineItems?: InvoiceLineItem[],
+  globalDiscountPercent = DEFAULT_GLOBAL_DISCOUNT,
 ): CreateInvoiceFormValues {
   const baseNumber = source.number.replace(/ \(copia\)$/i, '')
   const items = lineItems?.length ? lineItems : [defaultInvoiceLineItem()]
-  const totals = computeInvoiceTotals(items)
+  const totals = computeInvoiceTotals(items, { globalDiscountPercent })
   return {
     invoiceSource: source.quoteId ? 'cotizacion' : 'directa',
     customerKind: source.customerKind ?? 'empresa',
@@ -86,6 +92,7 @@ export function duplicateInvoiceFormValues(
     status: 'Borrador',
     paymentMethod: source.paymentMethod,
     quoteId: source.quoteId ?? '',
+    globalDiscountPercent,
     lineItems: items,
   }
 }
@@ -105,7 +112,8 @@ export function invoiceFormValuesFromQuote(
 ): Partial<CreateInvoiceFormValues> {
   const customerKind = quote.customerKind ?? (quote.contactId ? 'contacto' : 'empresa')
   const lineItems = invoiceLinesFromQuote(quote)
-  const totals = computeInvoiceTotals(lineItems)
+  const globalDiscountPercent = quote.discountPercent ?? DEFAULT_GLOBAL_DISCOUNT
+  const totals = computeInvoiceTotals(lineItems, { globalDiscountPercent })
 
   return {
     invoiceSource: 'cotizacion',
@@ -123,6 +131,7 @@ export function invoiceFormValuesFromQuote(
     quoteId: quote.id,
     quoteCode: quote.code,
     lockQuote: true,
+    globalDiscountPercent,
     lineItems,
   }
 }
@@ -133,7 +142,8 @@ export function applyQuoteToInvoiceForm(
 ): Partial<CreateInvoiceFormValues> {
   const quote = getQuoteDetail(quoteId)
   const lineItems = invoiceLinesFromQuote(quote)
-  const totals = computeInvoiceTotals(lineItems)
+  const globalDiscountPercent = quote.discountPercent ?? DEFAULT_GLOBAL_DISCOUNT
+  const totals = computeInvoiceTotals(lineItems, { globalDiscountPercent })
   const customerKind = quote.customerKind ?? (quote.contactId ? 'contacto' : 'empresa')
   return {
     quoteId: quote.id,
@@ -146,14 +156,18 @@ export function applyQuoteToInvoiceForm(
     amount: totals.amount,
     issueDate: current.issueDate || quote.issueDate,
     dueDate: current.dueDate || quote.validUntil,
+    globalDiscountPercent,
     lineItems,
   }
 }
 
 export function syncInvoiceFormAmount(
   lineItems: InvoiceLineItem[],
+  globalDiscountPercent = DEFAULT_GLOBAL_DISCOUNT,
 ): Pick<CreateInvoiceFormValues, 'amount'> {
-  return { amount: computeInvoiceTotals(lineItems).amount }
+  return {
+    amount: computeInvoiceTotals(lineItems, { globalDiscountPercent }).amount,
+  }
 }
 
 export function validateCreateInvoiceForm(values: CreateInvoiceFormValues): string | null {
@@ -188,7 +202,9 @@ export function formValuesToListItem(
   values: CreateInvoiceFormValues,
   id = createInvoiceId(),
 ): InvoiceListItem {
-  const totals = computeInvoiceTotals(values.lineItems)
+  const totals = computeInvoiceTotals(values.lineItems, {
+    globalDiscountPercent: values.globalDiscountPercent,
+  })
   const amountNum = totals.amountNum
   const client = saleCustomerDisplayName(values)
   return stampRecordAuditOnCreate({
@@ -214,12 +230,16 @@ export function formValuesToListItem(
 export function formValuesToDetailOverride(
   values: CreateInvoiceFormValues,
 ): InvoiceDetailOverride {
-  const totals = computeInvoiceTotals(values.lineItems)
+  const totals = computeInvoiceTotals(values.lineItems, {
+    globalDiscountPercent: values.globalDiscountPercent,
+  })
   return {
     lineItems: values.lineItems,
     subtotal: totals.subtotal,
     taxableSubtotal: totals.taxableSubtotal,
     exemptSubtotal: totals.exemptSubtotal,
+    discountPercent: totals.discountPercent,
+    discountAmount: totals.discountAmount,
     taxPercent: totals.taxPercent,
     taxAmount: totals.taxAmount,
     amount: totals.amount,

@@ -1,4 +1,5 @@
 import type { QuoteDetail, QuoteLineItem } from '@/data/quote-detail.mock'
+import { DEFAULT_GLOBAL_DISCOUNT } from '@/lib/document-global-discount'
 import { computeQuoteTotals, recalcQuoteLine } from '@/lib/quote-line-item'
 import { getDefaultVatPercent, formatVatPercentLabel } from '@/lib/default-vat'
 import { formatMoneyCLP, parseMoneyNum } from '@/lib/product-pricing'
@@ -11,6 +12,7 @@ import {
 type QuoteApiPayload = Partial<QuoteDetail> & {
   contactName?: string
   lineItems?: QuoteLineItem[]
+  globalDiscount?: string
 }
 
 function totalsFromAmount(amount: string) {
@@ -56,9 +58,11 @@ export function normalizeQuoteDetailFromApi(
       unitPriceOriginalNum: li.unitPriceOriginalNum,
     }),
   )
+  const globalDiscountPercent =
+    api.globalDiscount?.trim() || api.discountPercent?.trim() || DEFAULT_GLOBAL_DISCOUNT
   const totals =
     lineItems.length > 0
-      ? computeQuoteTotals(lineItems)
+      ? computeQuoteTotals(lineItems, { globalDiscountPercent })
       : totalsFromAmount(api.amount ?? '$0')
 
   const status = legacyStatusToQuoteJourney(api.status ?? 'Borrador')

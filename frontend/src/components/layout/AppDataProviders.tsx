@@ -13,6 +13,7 @@ import { OrganizationSettingsProvider } from '@/contexts/organization-settings'
 import { ProductsRegistryProvider } from '@/contexts/products-registry'
 import { ProfilesRegistryProvider } from '@/contexts/profiles-registry'
 import { ProjectsRegistryProvider } from '@/contexts/projects-registry'
+import { SolicitudesRegistryProvider } from '@/contexts/solicitudes-registry'
 import { PurchasesRegistryProvider } from '@/contexts/purchases-registry'
 import { QuotesRegistryProvider } from '@/contexts/quotes-registry'
 import { ReportsRegistryProvider } from '@/contexts/reports-registry'
@@ -35,6 +36,7 @@ export function AppDataProviders({ children }: { children?: ReactNode }) {
                   <OpportunitiesRegistryProvider>
                     <ActivitiesRegistryProvider>
                       <ProjectsRegistryProvider>
+                        <SolicitudesRegistryProvider>
                         <ProductsRegistryProvider>
                           <InvoicesRegistryProvider>
                             <ReportsRegistryProvider>
@@ -50,6 +52,7 @@ export function AppDataProviders({ children }: { children?: ReactNode }) {
                             </ReportsRegistryProvider>
                           </InvoicesRegistryProvider>
                         </ProductsRegistryProvider>
+                        </SolicitudesRegistryProvider>
                       </ProjectsRegistryProvider>
                     </ActivitiesRegistryProvider>
                   </OpportunitiesRegistryProvider>

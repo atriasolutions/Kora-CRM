@@ -31,7 +31,7 @@ import type {
   UpdateQuoteInput,
 } from '../types/quote.js'
 import { parseDateInput } from '../utils/format.js'
-import { parseMoneyToCents } from '../utils/money.js'
+import { parseMoneyToCents, parsePercentToInt } from '../utils/money.js'
 import { paginationOffset } from '../utils/pagination.js'
 import { purgeEntityNotesAndFiles } from '../services/entity-purge.service.js'
 import { broadcastInventoryUpdated } from '../services/notifications.service.js'
@@ -41,11 +41,17 @@ const QUOTE_COLUMNS = `
   id, code, title, opportunity_id, opportunity_name, company_id, company_name,
   contact_id, contact_name, amount_cents, status, valid_until, issue_date,
   owner_name, customer_kind,
-  payment_terms, delivery_terms, terms,
+  payment_terms, delivery_terms, terms, global_discount_pct,
   exchange_rate_uf, exchange_rate_usd, exchange_rate_eur, exchange_rate_date,
   created_at, created_by_id, created_by_name,
   updated_at, updated_by_id, updated_by_name
 `
+
+function resolveGlobalDiscountPct(input: {
+  globalDiscount?: string
+}): number {
+  return parsePercentToInt(input.globalDiscount) ?? 0
+}
 
 function normalizeQuoteTerms(input: {
   paymentTerms?: string
@@ -267,6 +273,7 @@ export async function createQuote(
   const lineTotal = sumLineTotals(lines)
   const amountCents = resolveAmountCents(input, lineTotal)
   const commercialTerms = normalizeQuoteTerms(input)
+  const globalDiscountPct = resolveGlobalDiscountPct(input)
 
   const opp = await resolveOpportunitySnapshot(input.opportunityId)
   let customer = await resolveCustomerSnapshots({
@@ -315,7 +322,7 @@ export async function createQuote(
         company_id, company_name, contact_id, contact_name,
         amount_cents, status, valid_until, issue_date,
         owner_name, customer_kind,
-        payment_terms, delivery_terms, terms,
+        payment_terms, delivery_terms, terms, global_discount_pct,
         exchange_rate_uf, exchange_rate_usd, exchange_rate_eur, exchange_rate_date,
         created_by_id, created_by_name, updated_by_id, updated_by_name, tenant_id
       ) VALUES (
@@ -323,9 +330,9 @@ export async function createQuote(
         $5, $6, $7, $8,
         $9, $10, $11, $12,
         $13, $14,
-        $15, $16, $17,
-        $18, $19, $20, $21,
-        $22, $23, $22, $23, $24
+        $15, $16, $17, $18,
+        $19, $20, $21, $22,
+        $23, $24, $23, $24, $25
       )
       RETURNING ${QUOTE_COLUMNS}`,
       [
@@ -346,6 +353,7 @@ export async function createQuote(
         commercialTerms.paymentTerms,
         commercialTerms.deliveryTerms,
         commercialTerms.terms,
+        globalDiscountPct,
         exchangeRates.exchangeRateUf,
         exchangeRates.exchangeRateUsd,
         exchangeRates.exchangeRateEur,
@@ -431,6 +439,11 @@ export async function updateQuote(
         ? parseMoneyToCents(input.amount)
         : lineTotal ?? parseMoneyToCents(existing.amount)
 
+  const globalDiscountPct =
+    input.globalDiscount !== undefined
+      ? resolveGlobalDiscountPct(input)
+      : parsePercentToInt(existing.globalDiscount) ?? 0
+
   const termsPatch =
     input.paymentTerms !== undefined ||
     input.deliveryTerms !== undefined ||
@@ -462,14 +475,15 @@ export async function updateQuote(
         payment_terms = COALESCE($16, payment_terms),
         delivery_terms = COALESCE($17, delivery_terms),
         terms = COALESCE($18, terms),
-        exchange_rate_uf = COALESCE($19, exchange_rate_uf),
-        exchange_rate_usd = COALESCE($20, exchange_rate_usd),
-        exchange_rate_eur = COALESCE($21, exchange_rate_eur),
-        exchange_rate_date = COALESCE($22, exchange_rate_date),
-        updated_by_id = $23,
-        updated_by_name = $24,
+        global_discount_pct = $19,
+        exchange_rate_uf = COALESCE($20, exchange_rate_uf),
+        exchange_rate_usd = COALESCE($21, exchange_rate_usd),
+        exchange_rate_eur = COALESCE($22, exchange_rate_eur),
+        exchange_rate_date = COALESCE($23, exchange_rate_date),
+        updated_by_id = $24,
+        updated_by_name = $25,
         updated_at = now()
-      WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(25)}
+      WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(26)}
       RETURNING ${QUOTE_COLUMNS}`,
       [
         id,
@@ -490,6 +504,7 @@ export async function updateQuote(
         termsPatch?.paymentTerms ?? null,
         termsPatch?.deliveryTerms ?? null,
         termsPatch?.terms ?? null,
+        globalDiscountPct,
         exchangeRates?.exchangeRateUf ?? null,
         exchangeRates?.exchangeRateUsd ?? null,
         exchangeRates?.exchangeRateEur ?? null,

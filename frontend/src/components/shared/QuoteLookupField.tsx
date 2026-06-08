@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import type { QuoteListItem } from '@/data/quotes.mock'
 import { stampRecordAuditOnCreate } from '@/lib/record-audit'
+import { isApiEnabled } from '@/api/config'
+import { listQuotesForOpportunityApi } from '@/api/quotes'
 import { useQuotesRegistry } from '@/hooks/use-quotes-registry'
 import { findQuoteById, searchQuotes } from '@/lib/quote-lookup'
 import { cn } from '@/lib/utils'
@@ -39,11 +41,42 @@ export function QuoteLookupField({
   const generatedId = useId()
   const inputId = `crm-quote-lookup-${generatedId.replace(/:/g, '')}`
   const inputName = `crm-quote-lookup-field-${generatedId.replace(/:/g, '')}`
-  const { allQuotes } = useQuotesRegistry()
+  const { allQuotes, reloadFromApi } = useQuotesRegistry()
   const containerRef = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [blockAutofill, setBlockAutofill] = useState(true)
+  const [opportunityQuotes, setOpportunityQuotes] = useState<QuoteListItem[]>([])
+  const useApi = isApiEnabled()
+  const scopedOpportunityId = opportunityId?.trim() ?? ''
+
+  useEffect(() => {
+    if (!scopedOpportunityId) {
+      setOpportunityQuotes([])
+      return
+    }
+    if (useApi) {
+      let cancelled = false
+      void listQuotesForOpportunityApi(scopedOpportunityId)
+        .then((items) => {
+          if (!cancelled) setOpportunityQuotes(items)
+        })
+        .catch(() => {
+          if (!cancelled) setOpportunityQuotes([])
+        })
+      return () => {
+        cancelled = true
+      }
+    }
+    setOpportunityQuotes(allQuotes.filter((q) => q.opportunityId === scopedOpportunityId))
+  }, [scopedOpportunityId, useApi, allQuotes])
+
+  useEffect(() => {
+    if (!open) return
+    if (allQuotes.length === 0) {
+      void reloadFromApi().catch(() => {})
+    }
+  }, [open, allQuotes.length, reloadFromApi])
 
   const selected = useMemo(() => {
     const byId = findQuoteById(allQuotes, quoteId)
@@ -66,14 +99,19 @@ export function QuoteLookupField({
     return undefined
   }, [allQuotes, quoteId, quoteCode])
 
+  const quotePool = useMemo(
+    () => (scopedOpportunityId ? opportunityQuotes : allQuotes),
+    [scopedOpportunityId, opportunityQuotes, allQuotes],
+  )
+
   const results = useMemo(
     () =>
-      searchQuotes(allQuotes, query, {
+      searchQuotes(quotePool, query, {
         statusFilter: acceptedOnly ? 'Aceptada' : undefined,
-        opportunityId,
+        opportunityId: scopedOpportunityId || undefined,
         limit: 10,
       }),
-    [allQuotes, query, acceptedOnly, opportunityId],
+    [quotePool, query, acceptedOnly, scopedOpportunityId],
   )
 
   useEffect(() => {

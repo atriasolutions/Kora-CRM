@@ -1,9 +1,10 @@
 import { ReactRenderer } from '@tiptap/react'
 import type { SuggestionOptions } from '@tiptap/suggestion'
 import tippy, { type Instance as TippyInstance } from 'tippy.js'
+import 'tippy.js/dist/tippy.css'
 
 import { MentionList, type MentionListRef } from '@/components/shared/rich-text/MentionList'
-import { filterMentionItemsAsync } from '@/lib/mentions'
+import { filterMentionItems, filterMentionItemsAsync } from '@/lib/mentions'
 
 export const mentionSuggestionOptions: Omit<
   SuggestionOptions,
@@ -11,7 +12,13 @@ export const mentionSuggestionOptions: Omit<
 > = {
   char: '@',
   allowSpaces: false,
-  items: ({ query }) => filterMentionItemsAsync(query, 12),
+  items: async ({ query }) => {
+    try {
+      return await filterMentionItemsAsync(query, 12)
+    } catch {
+      return filterMentionItems(query, 12)
+    }
+  },
 
   render: () => {
     let component: ReactRenderer<MentionListRef> | null = null

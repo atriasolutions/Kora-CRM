@@ -38,6 +38,7 @@ export type QuoteListItem = {
 
 export type QuoteDetail = QuoteListItem & {
   lineItems: QuoteLineItemDto[]
+  globalDiscount?: string
   paymentTerms: string
   deliveryTerms: string
   terms: string
@@ -75,6 +76,7 @@ export type CreateQuoteInput = {
   paymentTerms?: string
   deliveryTerms?: string
   terms?: string
+  globalDiscount?: string
   lineItems?: QuoteLineItemInput[]
 }
 

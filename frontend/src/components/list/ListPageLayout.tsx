@@ -22,12 +22,12 @@ export function ListPageLayout({
   className,
 }: ListPageLayoutProps) {
   return (
-    <div className={cn('flex min-h-0 flex-1 flex-col', className)}>
+    <div className={cn('flex min-h-0 min-w-0 flex-1 flex-col', className)}>
       <div className="shrink-0 space-y-3 border-b border-border bg-background px-3 py-3 sm:space-y-4 sm:px-6 sm:py-4">
         {feedback}
         {header}
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-3 pb-8 pt-3 sm:px-6 sm:pb-10 sm:pt-4">
+      <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain px-3 pb-8 pt-3 sm:px-6 sm:pb-10 sm:pt-4">
         {children}
       </div>
     </div>

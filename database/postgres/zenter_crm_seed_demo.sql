@@ -21,7 +21,7 @@ INSERT INTO crm_access_profile_permissions (profile_id, module_id, can_menu, can
 SELECT 'a1000001-0001-4001-8001-000000000001', m, true, true, true, true, true
 FROM unnest(ARRAY[
   'dashboard','contactos','empresas','oportunidades','cotizaciones','facturacion',
-  'actividades','proyectos','compras','ingresos','inventario','productos',
+  'actividades','proyectos','solicitudes','compras','ingresos','inventario','productos',
   'reportes','usuarios','perfiles','configuracion'
 ]::varchar[]) AS m
 ON CONFLICT (profile_id, module_id) DO NOTHING;

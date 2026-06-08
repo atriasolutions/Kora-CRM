@@ -11,4 +11,5 @@ export type AuditActor = {
   userId: string
   userName: string
   tenantId: string
+  isPlatformOperator?: boolean
 }

@@ -8,6 +8,10 @@ import {
   type ProductCurrency,
 } from '@/lib/currency'
 import { getDefaultVatPercent, formatVatPercentLabel } from '@/lib/default-vat'
+import {
+  formatGlobalDiscountPercent,
+  parseGlobalDiscountPercent,
+} from '@/lib/document-global-discount'
 import { parseProductPrice } from '@/lib/product-currency-input'
 import { formatMoneyCLP, parseMoneyNum } from '@/lib/product-pricing'
 
@@ -145,20 +149,24 @@ export type QuoteTotals = {
 
 export function computeQuoteTotals(
   lineItems: QuoteLineItem[],
-  options?: { taxPercent?: number },
+  options?: { taxPercent?: number; globalDiscountPercent?: string | number },
 ): QuoteTotals {
   const taxPct = options?.taxPercent ?? getDefaultVatPercent()
-  const subtotalNum = lineItems.reduce(
+  const globalPct = parseGlobalDiscountPercent(options?.globalDiscountPercent)
+  const linesSubtotalNum = lineItems.reduce(
     (sum, li) => sum + parseMoneyNum(li.total),
     0,
   )
-  const taxAmount = Math.round((subtotalNum * taxPct) / 100)
-  const total = subtotalNum + taxAmount
+  const discountAmountNum = Math.round((linesSubtotalNum * globalPct) / 100)
+  const netSubtotalNum = linesSubtotalNum - discountAmountNum
+  const taxAmount = Math.round((netSubtotalNum * taxPct) / 100)
+  const total = netSubtotalNum + taxAmount
 
   return {
-    subtotal: formatMoneyCLP(subtotalNum),
-    discountPercent: '0%',
-    discountAmount: '$0',
+    subtotal: formatMoneyCLP(linesSubtotalNum),
+    discountPercent: formatGlobalDiscountPercent(globalPct),
+    discountAmount:
+      discountAmountNum > 0 ? `−${formatMoneyCLP(discountAmountNum)}` : '$0',
     taxPercent: formatVatPercentLabel(taxPct),
     taxAmount: formatMoneyCLP(taxAmount),
     amount: formatMoneyCLP(total),

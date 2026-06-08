@@ -107,7 +107,17 @@ export function isPdfEntityFile(file: EntityFileRecord): boolean {
   return fileIconKind(file.mimeType, file.name) === 'pdf'
 }
 
+export function isImageEntityFile(file: EntityFileRecord): boolean {
+  return fileIconKind(file.mimeType, file.name) === 'image'
+}
+
+export function getEntityFileImageUrl(file: EntityFileRecord): string | null {
+  if (!isImageEntityFile(file)) return null
+  return file.dataUrl ?? null
+}
+
 export function getEntityFilePreviewUrl(file: EntityFileRecord): string | null {
+  if (isImageEntityFile(file)) return getEntityFileImageUrl(file)
   if (!isPdfEntityFile(file)) return null
   if (file.dataUrl) return file.dataUrl
   if (file.id.startsWith('seed-')) return DEMO_PDF_PREVIEW_DATA_URL

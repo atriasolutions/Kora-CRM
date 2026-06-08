@@ -207,11 +207,11 @@ export function GlobalSearch() {
         onFocus={() => setOpen(true)}
         onKeyDown={handleKeyDown}
         className={cn(
-          'h-9 rounded-lg border-transparent bg-muted/40 ps-9 text-sm shadow-none',
+          'h-9 rounded-xl border border-border/60 bg-muted/30 ps-9 text-sm shadow-none',
           'placeholder:text-muted-foreground/70',
-          'ring-1 ring-border/50 transition-[box-shadow,background-color]',
-          'hover:bg-muted/55 hover:ring-border/80',
-          'focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-ring/25',
+          'transition-[box-shadow,background-color,border-color]',
+          'hover:border-primary/20 hover:bg-background',
+          'focus-visible:border-primary/30 focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-primary/15',
           'sm:pe-[4.5rem]',
         )}
         aria-label="Buscar en el CRM"

@@ -27,6 +27,7 @@ export const listProjectsQuerySchema = z.object({
   q: z.string().optional(),
   status: z.string().optional(),
   opportunityId: z.string().uuid().optional(),
+  solicitudId: z.string().uuid().optional(),
   companyId: z.string().uuid().optional(),
   archived: z
     .union([z.literal('true'), z.literal('false')])
@@ -75,6 +76,7 @@ export const createProjectSchema = z.object({
   companyId: z.string().uuid().optional(),
   opportunityId: z.string().uuid().optional(),
   acceptedQuoteId: z.string().uuid().optional(),
+  solicitudId: z.string().uuid().optional(),
   progress: z.string().optional(),
   progressPct: z.number().int().min(0).max(100).optional(),
   progressNum: z.number().int().min(0).max(100).optional(),

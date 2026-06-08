@@ -1,4 +1,4 @@
-import type { InvoiceDetail } from '@/data/invoice-detail.mock'
+import type { InvoiceDetail, InvoiceLineItem } from '@/data/invoice-detail.mock'
 import { stampRecordAuditOnUpdate } from '@/lib/record-audit'
 import type {
   InvoiceListItem,
@@ -6,7 +6,9 @@ import type {
   InvoiceStatus,
 } from '@/data/invoices.mock'
 import { INVOICE_PAYMENT_METHOD_OPTIONS } from '@/data/invoices.mock'
+import { DEFAULT_GLOBAL_DISCOUNT } from '@/lib/document-global-discount'
 import { formatAmount, parseAmountNum } from '@/lib/invoice-display'
+import { computeInvoiceTotals } from '@/lib/invoice-line-item'
 import { INVOICE_JOURNEY_STAGE_OPTIONS } from '@/lib/invoice-journey'
 import { saleCustomerDisplayName } from '@/lib/sale-customer'
 import type { SaleCustomerKind } from '@/lib/sale-customer'
@@ -30,11 +32,23 @@ export type InvoiceFormValues = {
   quoteId: string
   notes: string
   siiNumber: string
+  lineItems: InvoiceLineItem[]
+  globalDiscountPercent: string
 }
 
 export { INVOICE_PAYMENT_METHOD_OPTIONS }
 
+function resolveGlobalDiscountFromDetail(invoice: InvoiceDetail): string {
+  return (
+    invoice.discountPercent ??
+    (invoice as InvoiceDetail & { globalDiscount?: string }).globalDiscount ??
+    DEFAULT_GLOBAL_DISCOUNT
+  )
+}
+
 export function invoiceDetailToFormValues(invoice: InvoiceDetail): InvoiceFormValues {
+  const globalDiscountPercent = resolveGlobalDiscountFromDetail(invoice)
+  const totals = computeInvoiceTotals(invoice.lineItems, { globalDiscountPercent })
   return {
     number: invoice.number,
     customerKind: invoice.customerKind ?? (invoice.contactId ? 'contacto' : 'empresa'),
@@ -42,7 +56,7 @@ export function invoiceDetailToFormValues(invoice: InvoiceDetail): InvoiceFormVa
     contactName: invoice.contactName ?? '',
     companyId: invoice.companyId ?? '',
     companyName: invoice.companyName ?? invoice.client,
-    amount: invoice.amount,
+    amount: totals.amount,
     issueDate: invoice.issueDate,
     dueDate: invoice.dueDate,
     ownerName: invoice.owner,
@@ -51,6 +65,17 @@ export function invoiceDetailToFormValues(invoice: InvoiceDetail): InvoiceFormVa
     quoteId: invoice.quoteId ?? '',
     notes: invoice.internalNotes,
     siiNumber: invoice.siiNumber ?? '',
+    lineItems: invoice.lineItems,
+    globalDiscountPercent,
+  }
+}
+
+export function syncInvoiceEditFormAmount(
+  lineItems: InvoiceLineItem[],
+  globalDiscountPercent = DEFAULT_GLOBAL_DISCOUNT,
+): Pick<InvoiceFormValues, 'amount'> {
+  return {
+    amount: computeInvoiceTotals(lineItems, { globalDiscountPercent }).amount,
   }
 }
 
@@ -58,7 +83,10 @@ export function applyFormValuesToInvoice(
   invoice: InvoiceDetail,
   values: InvoiceFormValues,
 ): InvoiceDetail {
-  const amountNum = parseAmountNum(values.amount)
+  const totals = computeInvoiceTotals(values.lineItems, {
+    globalDiscountPercent: values.globalDiscountPercent,
+  })
+  const amountNum = totals.amountNum
   const client = saleCustomerDisplayName({
     customerKind: values.customerKind,
     contactId: values.contactId,
@@ -75,7 +103,7 @@ export function applyFormValuesToInvoice(
     contactName: values.contactName.trim() || undefined,
     companyId: values.companyId.trim() || undefined,
     companyName: values.companyName.trim() || undefined,
-    amount: values.amount.trim(),
+    amount: totals.amount,
     amountNum,
     issueDate: values.issueDate.trim(),
     dueDate: values.dueDate.trim(),
@@ -87,6 +115,14 @@ export function applyFormValuesToInvoice(
     siiNumber: values.siiNumber.trim()
       ? normalizeSiiInvoiceNumber(values.siiNumber)
       : undefined,
+    lineItems: values.lineItems,
+    subtotal: totals.subtotal,
+    taxableSubtotal: totals.taxableSubtotal,
+    exemptSubtotal: totals.exemptSubtotal,
+    discountPercent: totals.discountPercent,
+    discountAmount: totals.discountAmount,
+    taxPercent: totals.taxPercent,
+    taxAmount: totals.taxAmount,
     balanceDue:
       values.status === 'Pagada'
         ? '$0'
@@ -102,6 +138,10 @@ export function listItemFromInvoiceDetail(invoice: InvoiceDetail): InvoiceListIt
     notes: _n,
     description: _d,
     subtotal: _s,
+    taxableSubtotal: _ts,
+    exemptSubtotal: _es,
+    discountPercent: _dp,
+    discountAmount: _da,
     taxAmount: _t,
     taxPercent: _tp,
     balanceDue: _b,

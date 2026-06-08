@@ -137,7 +137,7 @@ CREATE TABLE IF NOT EXISTS crm_access_profile_permissions (
   CONSTRAINT crm_app_module_id_check CHECK (
     module_id IN (
       'dashboard','contactos','empresas','oportunidades','cotizaciones',
-      'facturacion','actividades','proyectos','compras','ingresos',
+      'facturacion','actividades','proyectos','solicitudes','compras','ingresos',
       'inventario','productos','reportes','usuarios','perfiles','configuracion'
     )
   )

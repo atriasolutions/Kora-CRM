@@ -46,6 +46,7 @@ import { inventoryFormToCreateValues } from '@/lib/inventory-activities'
 import { invoiceFormToCreateValues } from '@/lib/invoice-activities'
 import { productFormToCreateValues } from '@/lib/product-activities'
 import { projectFormToCreateValues } from '@/lib/project-activities'
+import { solicitudFormToCreateValues } from '@/lib/solicitud-activities'
 import { purchaseFormToCreateValues } from '@/lib/purchase-activities'
 import { quoteFormToCreateValues } from '@/lib/quote-activities'
 import { stockReceiptFormToCreateValues } from '@/lib/stock-receipt-activities'
@@ -92,13 +93,14 @@ export function RegisterActivityDialog({
   const isQuote = relatedType === 'cotizacion'
   const isInvoice = relatedType === 'factura'
   const isProject = relatedType === 'proyecto'
+  const isSolicitud = relatedType === 'solicitud'
   const isStockReceipt = relatedType === 'ingreso'
   const isProduct = relatedType === 'producto'
   const isInventory = relatedType === 'inventario'
   const displayName =
     isPurchase || isStockReceipt
       ? contactName
-      : isCompany || isOpportunity || isQuote || isInvoice || isProject
+      : isCompany || isOpportunity || isQuote || isInvoice || isProject || isSolicitud
         ? (companyName ?? contactName)
         : isProduct || isInventory
           ? contactName
@@ -154,6 +156,13 @@ export function RegisterActivityDialog({
               companyName ?? contactName,
               form,
             )
+          : isSolicitud
+            ? solicitudFormToCreateValues(
+                contactId,
+                contactName,
+                companyName ?? contactName,
+                form,
+              )
           : isStockReceipt
             ? stockReceiptFormToCreateValues(
                 contactId,
@@ -228,7 +237,19 @@ export function RegisterActivityDialog({
                     ? 'Oportunidad'
                     : isQuote
                       ? 'Cotización'
-                      : 'Contacto'}
+                      : isInvoice
+                        ? 'Factura'
+                        : isProject
+                          ? 'Proyecto'
+                          : isSolicitud
+                            ? 'Solicitud'
+                            : isStockReceipt
+                              ? 'Ingreso'
+                              : isProduct
+                                ? 'Producto'
+                                : isInventory
+                                  ? 'Inventario'
+                                  : 'Contacto'}
             </Badge>
             <span className="text-sm text-muted-foreground">{displayName}</span>
             {isPurchase && companyName ? (
@@ -237,7 +258,17 @@ export function RegisterActivityDialog({
                 <span className="text-sm text-muted-foreground">{companyName}</span>
               </>
             ) : null}
-            {!isCompany && !isPurchase && !isOpportunity && !isQuote && companyName ? (
+            {!isCompany &&
+            !isPurchase &&
+            !isOpportunity &&
+            !isQuote &&
+            !isInvoice &&
+            !isProject &&
+            !isSolicitud &&
+            !isStockReceipt &&
+            !isProduct &&
+            !isInventory &&
+            companyName ? (
               <>
                 <span className="text-muted-foreground/50">·</span>
                 <span className="text-sm text-muted-foreground">{companyName}</span>

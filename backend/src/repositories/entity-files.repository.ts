@@ -8,6 +8,13 @@ import {
 } from '../mappers/entity-file.mapper.js'
 import type { EntityFileDto } from '../types/entity-file.js'
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+function isPersistedFileId(id: string | null | undefined): id is string {
+  return !!id && UUID_RE.test(id)
+}
+
 export async function ensureEntityFilesTable(): Promise<void> {
   await tenantQuery(`
     CREATE TABLE IF NOT EXISTS crm_entity_files (
@@ -53,6 +60,7 @@ export async function replaceEntityFiles(params: {
   uploadedById?: string | null
   uploadedByName?: string | null
   files: Array<{
+    id?: string | null
     name: string
     size: number
     mimeType?: string
@@ -61,20 +69,78 @@ export async function replaceEntityFiles(params: {
   }>
 }): Promise<EntityFileDto[]> {
   const client = await pool.connect()
+  const tenantId = getTenantIdOrDefault()
+  const keptIds: string[] = []
+
   try {
     await client.query('BEGIN')
     await setTenantLocal(client)
-    await client.query(
-      `DELETE FROM crm_entity_files WHERE entity_type = $1 AND entity_id = $2::uuid`,
-      [params.entityType, params.entityId],
-    )
 
     for (const file of params.files) {
-      await client.query(
+      const uploadedByName = file.uploadedByName ?? params.uploadedByName ?? null
+
+      if (isPersistedFileId(file.id)) {
+        const updated = await client.query<{ id: string }>(
+          `UPDATE crm_entity_files SET
+            entity_label_snapshot = $3,
+            file_name = $4,
+            size_bytes = $5,
+            mime_type = $6,
+            storage_key = $7,
+            uploaded_by_id = COALESCE($8, uploaded_by_id),
+            uploaded_by_name = COALESCE($9, uploaded_by_name)
+          WHERE id = $10::uuid
+            AND entity_type = $1
+            AND entity_id = $2::uuid
+            AND tenant_id = $11
+          RETURNING id`,
+          [
+            params.entityType,
+            params.entityId,
+            params.entityLabel,
+            file.name,
+            file.size,
+            file.mimeType ?? null,
+            file.storageKey,
+            params.uploadedById ?? null,
+            uploadedByName,
+            file.id,
+            tenantId,
+          ],
+        )
+
+        if ((updated.rowCount ?? 0) === 0) {
+          await client.query(
+            `INSERT INTO crm_entity_files (
+              id, entity_type, entity_id, entity_label_snapshot, file_name,
+              size_bytes, mime_type, storage_key, uploaded_by_id, uploaded_by_name, tenant_id
+            ) VALUES ($10::uuid, $1, $2::uuid, $3, $4, $5, $6, $7, $8, $9, $11)`,
+            [
+              params.entityType,
+              params.entityId,
+              params.entityLabel,
+              file.name,
+              file.size,
+              file.mimeType ?? null,
+              file.storageKey,
+              params.uploadedById ?? null,
+              uploadedByName,
+              file.id,
+              tenantId,
+            ],
+          )
+        }
+
+        keptIds.push(file.id)
+        continue
+      }
+
+      const inserted = await client.query<{ id: string }>(
         `INSERT INTO crm_entity_files (
           entity_type, entity_id, entity_label_snapshot, file_name,
           size_bytes, mime_type, storage_key, uploaded_by_id, uploaded_by_name, tenant_id
-        ) VALUES ($1, $2::uuid, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        ) VALUES ($1, $2::uuid, $3, $4, $5, $6, $7, $8, $9, $10)
+        RETURNING id`,
         [
           params.entityType,
           params.entityId,
@@ -84,9 +150,27 @@ export async function replaceEntityFiles(params: {
           file.mimeType ?? null,
           file.storageKey,
           params.uploadedById ?? null,
-          file.uploadedByName ?? params.uploadedByName ?? null,
-          getTenantIdOrDefault(),
+          uploadedByName,
+          tenantId,
         ],
+      )
+      keptIds.push(inserted.rows[0]!.id)
+    }
+
+    if (keptIds.length > 0) {
+      await client.query(
+        `DELETE FROM crm_entity_files
+         WHERE entity_type = $1
+           AND entity_id = $2::uuid
+           AND tenant_id = $3
+           AND NOT (id = ANY($4::uuid[]))`,
+        [params.entityType, params.entityId, tenantId, keptIds],
+      )
+    } else {
+      await client.query(
+        `DELETE FROM crm_entity_files
+         WHERE entity_type = $1 AND entity_id = $2::uuid AND tenant_id = $3`,
+        [params.entityType, params.entityId, tenantId],
       )
     }
 

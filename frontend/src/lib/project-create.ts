@@ -1,8 +1,9 @@
 import { stampRecordAuditOnCreate } from '@/lib/record-audit'
 import type { ProjectListItem } from '@/data/projects.mock'
 import { journeyToListStatus } from '@/lib/project-journey'
-import { findOpportunityById } from '@/lib/project-relations'
+import { inferCommercialOrigin, validateCommercialOrigin } from '@/lib/project-commercial-origin'
 import { validateProjectRelations } from '@/lib/project-relations'
+import type { QuoteListItem } from '@/data/quotes.mock'
 import {
   defaultProjectFormValues,
   validateProjectScheduleDates,
@@ -52,17 +53,34 @@ export function duplicateProjectFormValues(
     opportunityName: '',
     acceptedQuoteId: source.acceptedQuoteId ?? '',
     acceptedQuoteCode: '',
+    solicitudId: source.solicitudId ?? '',
+    solicitudTitle: source.solicitudTitle ?? '',
+    solicitudCode: source.solicitudCode ?? '',
+    commercialOrigin: inferCommercialOrigin({
+      commercialOrigin: 'none',
+      solicitudId: source.solicitudId ?? '',
+      opportunityId: source.opportunityId ?? '',
+    }),
   }
 }
 
-export function validateCreateProjectForm(values: CreateProjectFormValues): string | null {
+export function validateCreateProjectForm(
+  values: CreateProjectFormValues,
+  allQuotes: QuoteListItem[] = [],
+): string | null {
   if (!values.name.trim()) return 'El nombre del proyecto es obligatorio.'
   const customerError = validateProjectCustomer(values)
   if (customerError) return customerError
   if (!values.deadline.trim()) return 'La fecha de entrega es obligatoria.'
   const scheduleError = validateProjectScheduleDates(values)
   if (scheduleError) return scheduleError
-  return validateProjectRelations(values.opportunityId.trim(), values.acceptedQuoteId.trim())
+  const originError = validateCommercialOrigin(values)
+  if (originError) return originError
+  return validateProjectRelations(
+    values.opportunityId.trim(),
+    values.acceptedQuoteId.trim(),
+    allQuotes,
+  )
 }
 
 export function createProjectId(): string {
@@ -73,9 +91,12 @@ export function formValuesToListItem(
   values: CreateProjectFormValues,
   id = createProjectId(),
 ): ProjectListItem {
-  const opportunityId = values.opportunityId.trim() || undefined
-  const acceptedQuoteId = values.acceptedQuoteId.trim() || undefined
-  const opp = opportunityId ? findOpportunityById(opportunityId) : undefined
+  const origin = inferCommercialOrigin(values)
+  const opportunityId =
+    origin === 'oportunidad' ? values.opportunityId.trim() || undefined : undefined
+  const acceptedQuoteId =
+    origin === 'oportunidad' ? values.acceptedQuoteId.trim() || undefined : undefined
+  const solicitudId = origin === 'solicitud' ? values.solicitudId.trim() || undefined : undefined
   const journeyStage = values.journeyStage
   const customerPatch = projectCustomerToListPatch(values)
   return stampRecordAuditOnCreate({
@@ -83,9 +104,12 @@ export function formValuesToListItem(
     name: values.name.trim(),
     ...customerPatch,
     client: resolveProjectClientName(values),
-    companyId: customerPatch.companyId ?? opp?.companyId,
+    companyId: customerPatch.companyId,
     opportunityId,
     acceptedQuoteId,
+    solicitudId,
+    solicitudTitle: origin === 'solicitud' ? values.solicitudTitle.trim() || undefined : undefined,
+    solicitudCode: origin === 'solicitud' ? values.solicitudCode.trim() || undefined : undefined,
     progress: '0%',
     progressNum: 0,
     deadline: values.deadline.trim(),

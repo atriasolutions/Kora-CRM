@@ -22,6 +22,7 @@ export type TrialLeadSubmission = {
   emailed?: boolean
   companyId?: string
   contactId?: string
+  opportunityId?: string
   trial?: {
     provisioned: boolean
     slug?: string

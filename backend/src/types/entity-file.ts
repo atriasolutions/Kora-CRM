@@ -7,6 +7,7 @@ export const ENTITY_FILE_TYPES = [
   'cotizacion',
   'oportunidad',
   'proyecto',
+  'solicitud',
 ] as const
 
 export type EntityFileType = (typeof ENTITY_FILE_TYPES)[number]

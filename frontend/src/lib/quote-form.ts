@@ -4,6 +4,7 @@ import type { QuoteListItem, QuoteStatus } from '@/data/quotes.mock'
 import { saleCustomerDisplayName } from '@/lib/sale-customer'
 import type { SaleCustomerKind } from '@/lib/sale-customer'
 import { QUOTE_JOURNEY_STAGE_OPTIONS } from '@/lib/quote-journey'
+import { DEFAULT_GLOBAL_DISCOUNT } from '@/lib/document-global-discount'
 import { computeQuoteTotals } from '@/lib/quote-line-item'
 import type { QuoteLineItem } from '@/data/quote-detail.mock'
 
@@ -32,6 +33,7 @@ export type QuoteFormValues = {
   deliveryAddress: string
   terms: string
   internalNotes: string
+  globalDiscountPercent: string
 }
 
 export function quoteDetailToFormValues(quote: QuoteDetail): QuoteFormValues {
@@ -58,6 +60,7 @@ export function quoteDetailToFormValues(quote: QuoteDetail): QuoteFormValues {
     deliveryAddress: quote.deliveryAddress,
     terms: quote.terms,
     internalNotes: quote.internalNotes,
+    globalDiscountPercent: quote.discountPercent ?? DEFAULT_GLOBAL_DISCOUNT,
   }
 }
 
@@ -67,7 +70,9 @@ export function applyFormValuesToQuote(
   lineItems?: QuoteLineItem[],
 ): QuoteDetail {
   const items = lineItems ?? quote.lineItems
-  const totals = computeQuoteTotals(items)
+  const totals = computeQuoteTotals(items, {
+    globalDiscountPercent: values.globalDiscountPercent,
+  })
   return {
     ...quote,
     code: quote.code,

@@ -20,6 +20,7 @@ export type ProjectApiBody = {
   companyId?: string
   opportunityId?: string
   acceptedQuoteId?: string
+  solicitudId?: string
   progress?: string
   progressPct?: number
   deadline?: string
@@ -38,8 +39,18 @@ export function projectFormToApiBody(values: CreateProjectFormValues): ProjectAp
   return {
     name: values.name.trim(),
     ...customer,
-    opportunityId: values.opportunityId.trim() || undefined,
-    acceptedQuoteId: values.acceptedQuoteId.trim() || undefined,
+    opportunityId:
+      values.commercialOrigin === 'oportunidad'
+        ? values.opportunityId.trim() || undefined
+        : undefined,
+    acceptedQuoteId:
+      values.commercialOrigin === 'oportunidad'
+        ? values.acceptedQuoteId.trim() || undefined
+        : undefined,
+    solicitudId:
+      values.commercialOrigin === 'solicitud'
+        ? values.solicitudId.trim() || undefined
+        : undefined,
     deadline: values.deadline.trim(),
     managerName: values.managerName.trim() || undefined,
     journeyStage: values.journeyStage,
@@ -69,6 +80,7 @@ export function projectDetailToApiBody(detail: ProjectDetail): ProjectApiBody {
     companyId: optionalUuid(detail.companyId),
     opportunityId: optionalUuid(detail.opportunityId),
     acceptedQuoteId: optionalUuid(detail.acceptedQuoteId),
+    solicitudId: optionalUuid(detail.solicitudId),
     deadline: detail.deadline || undefined,
     managerName: detail.manager || undefined,
     journeyStage: detail.journeyStage,
@@ -86,8 +98,18 @@ export function projectFormValuesToApiBody(values: ProjectFormValues): ProjectAp
   return {
     name: values.name.trim(),
     ...customer,
-    opportunityId: values.opportunityId.trim() || undefined,
-    acceptedQuoteId: values.acceptedQuoteId.trim() || undefined,
+    opportunityId:
+      values.commercialOrigin === 'oportunidad'
+        ? values.opportunityId.trim() || undefined
+        : undefined,
+    acceptedQuoteId:
+      values.commercialOrigin === 'oportunidad'
+        ? values.acceptedQuoteId.trim() || undefined
+        : undefined,
+    solicitudId:
+      values.commercialOrigin === 'solicitud'
+        ? values.solicitudId.trim() || undefined
+        : undefined,
     deadline: values.deadline.trim(),
     managerName: values.managerName.trim() || undefined,
     journeyStage: values.journeyStage,
@@ -108,6 +130,7 @@ export function projectPatchToApiBody(patch: Partial<ProjectListItem>): ProjectA
   if (patch.contactId !== undefined) body.contactId = patch.contactId
   if (patch.opportunityId !== undefined) body.opportunityId = patch.opportunityId
   if (patch.acceptedQuoteId !== undefined) body.acceptedQuoteId = patch.acceptedQuoteId
+  if (patch.solicitudId !== undefined) body.solicitudId = patch.solicitudId
   if (patch.deadline !== undefined) body.deadline = patch.deadline
   if (patch.manager !== undefined) body.managerName = patch.manager
   if (patch.journeyStage !== undefined) body.journeyStage = patch.journeyStage
@@ -122,6 +145,17 @@ export function projectPatchToApiBody(patch: Partial<ProjectListItem>): ProjectA
 export async function listProjectsApi(archived: boolean): Promise<ProjectListItem[]> {
   return fetchAllPages<ProjectListItem>(BASE, {
     archived: archived ? 'true' : 'false',
+  })
+}
+
+export async function listProjectsForSolicitudApi(
+  solicitudId: string,
+): Promise<ProjectListItem[]> {
+  const id = solicitudId.trim()
+  if (!id) return []
+  return fetchAllPages<ProjectListItem>(BASE, {
+    archived: 'false',
+    solicitudId: id,
   })
 }
 

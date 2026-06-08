@@ -67,6 +67,7 @@ export async function authSessionMiddleware(
           userId: session.user.id,
           userName: session.user.name,
           tenantId: session.tenantId,
+          isPlatformOperator: session.isPlatformOperator,
         }
         r.authProfile = session.profile
         await runWithTenantAsync(

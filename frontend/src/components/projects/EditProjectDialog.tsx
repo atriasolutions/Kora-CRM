@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import type { ProjectDetail } from '@/data/project-detail.mock'
+import { useQuotesRegistry } from '@/hooks/use-quotes-registry'
 import {
   applyFormValuesToProject,
   projectDetailToFormValues,
@@ -32,6 +33,7 @@ export function EditProjectDialog({
   project,
   onSave,
 }: EditProjectDialogProps) {
+  const { allQuotes } = useQuotesRegistry()
   const [form, setForm] = useState<ProjectFormValues>(() =>
     projectDetailToFormValues(project),
   )
@@ -59,7 +61,7 @@ export function EditProjectDialog({
       toast.warning('La fecha de entrega es obligatoria.')
       return
     }
-    const validation = validateProjectForm(form)
+    const validation = validateProjectForm(form, allQuotes)
     if (validation) {
       toast.warning(validation)
       return

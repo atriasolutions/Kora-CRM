@@ -1,5 +1,5 @@
-import { Briefcase, FileText, Truck, Warehouse } from 'lucide-react'
-import { useMemo } from 'react'
+import { Briefcase, ClipboardList, FileText, Truck, Warehouse } from 'lucide-react'
+import { useEffect, useMemo } from 'react'
 
 import { CompanyLookupField } from '@/components/shared/CompanyLookupField'
 import { ContactLookupField } from '@/components/shared/ContactLookupField'
@@ -15,6 +15,7 @@ import type { ActivityRelatedType } from '@/data/activities.mock'
 import { useInventoryRegistry } from '@/hooks/use-inventory-registry'
 import { useInvoicesRegistry } from '@/hooks/use-invoices-registry'
 import { useProjectsRegistry } from '@/hooks/use-projects-registry'
+import { useSolicitudesRegistry } from '@/hooks/use-solicitudes-registry'
 import { useStockReceiptsRegistry } from '@/hooks/use-stock-receipts-registry'
 import { activityRelatedLabel } from '@/lib/activity-display'
 import {
@@ -279,6 +280,65 @@ function ProyectoBranch({
   )
 }
 
+function SolicitudBranch({
+  relatedId,
+  onChange,
+  disabled,
+}: Omit<ActivityRelatedLookupFieldProps, 'relatedType' | 'relatedName'>) {
+  const { allSolicitudes, reloadFromApi } = useSolicitudesRegistry()
+
+  useEffect(() => {
+    if (allSolicitudes.length === 0) {
+      void reloadFromApi().catch(() => {})
+    }
+  }, [allSolicitudes.length, reloadFromApi])
+
+  const rows = useMemo<RegistryLookupRow[]>(
+    () =>
+      allSolicitudes.map((item) => ({
+        id: item.id,
+        primary: item.title,
+        secondary: `${item.code} · ${item.status}`,
+      })),
+    [allSolicitudes],
+  )
+  const selected = allSolicitudes.find((item) => item.id === relatedId)
+
+  const displayRows = useMemo(() => {
+    if (selected && !rows.some((row) => row.id === selected.id)) {
+      return [
+        {
+          id: selected.id,
+          primary: selected.title,
+          secondary: `${selected.code} · ${selected.status}`,
+        },
+        ...rows,
+      ]
+    }
+    return rows
+  }, [rows, selected])
+
+  return (
+    <RegistryEntityLookupField
+      label="Registro"
+      value={relatedId}
+      rows={displayRows}
+      Icon={ClipboardList}
+      placeholder="Buscar solicitud por título o código…"
+      disabled={disabled}
+      detailPath={(id) => `/solicitudes/${id}`}
+      onChange={(id) => {
+        const solicitud = allSolicitudes.find((item) => item.id === id)
+        onChange({
+          relatedId: id,
+          relatedName: solicitud?.title ?? '',
+          companyName: solicitud?.code ?? '',
+        })
+      }}
+    />
+  )
+}
+
 function IngresoBranch({
   relatedId,
   onChange,
@@ -446,6 +506,10 @@ export function ActivityRelatedLookupField({
     case 'proyecto':
       return (
         <ProyectoBranch relatedId={relatedId} onChange={onChange} disabled={disabled} />
+      )
+    case 'solicitud':
+      return (
+        <SolicitudBranch relatedId={relatedId} onChange={onChange} disabled={disabled} />
       )
     case 'ingreso':
       return (

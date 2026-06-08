@@ -13,6 +13,7 @@ export type AuthSession = {
   profileId?: string
   tenantId?: string
   tenantSlug?: string
+  isPlatformOperator?: boolean
 }
 
 function parseAuthSession(raw: string | null | undefined): AuthSession | null {

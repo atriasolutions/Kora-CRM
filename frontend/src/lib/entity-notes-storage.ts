@@ -21,6 +21,7 @@ export type EntityNotesScope =
   | 'recepcion'
   | 'actividad'
   | 'proyecto'
+  | 'solicitud'
   | 'usuario'
 
 function storageKey(scope: EntityNotesScope, entityId: string): string {

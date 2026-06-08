@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
  * Job: purga tenants trial vencidos.
- * Cron sugerido: 0 3 * * * cd /var/www/kora-crm/backend && node dist/scripts/purge-expired-trials.js
+ * Cron: 0 3 * * * cd /var/www/kora-crm/backend && npm run job:purge-expired-trials
  */
 import 'dotenv/config'
 
-import { purgeExpiredTrialTenants } from '../services/tenant-lifecycle.service.js'
+import { purgeExpiredTrialTenants } from '../src/services/tenant-lifecycle.service.js'
 
 async function main() {
   const count = await purgeExpiredTrialTenants()

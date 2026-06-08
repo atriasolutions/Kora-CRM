@@ -14,6 +14,7 @@ export type EntityFilesScope =
   | 'cotizacion'
   | 'oportunidad'
   | 'proyecto'
+  | 'solicitud'
 
 function storageKey(scope: EntityFilesScope, entityId: string): string {
   return `${scope}:${entityId.trim()}`

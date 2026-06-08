@@ -9,9 +9,23 @@ type QuoteTotalsSummaryProps = {
 }
 
 export function QuoteTotalsSummary({ quote, className }: QuoteTotalsSummaryProps) {
+  const showDiscount =
+    quote.discountAmount &&
+    quote.discountAmount !== '$0' &&
+    quote.discountAmount !== '−$0' &&
+    quote.discountAmount !== '-$0'
+
   const rows = [
-    { id: 'subtotal', label: 'Subtotal', value: quote.subtotal },
-    { id: 'discount', label: `Descuento (${quote.discountPercent})`, value: quote.discountAmount },
+    { id: 'subtotal', label: 'Subtotal líneas', value: quote.subtotal },
+    ...(showDiscount
+      ? [
+          {
+            id: 'discount',
+            label: `Descuento global (${quote.discountPercent})`,
+            value: quote.discountAmount,
+          },
+        ]
+      : []),
     { id: 'tax', label: quote.taxPercent, value: quote.taxAmount },
   ]
 

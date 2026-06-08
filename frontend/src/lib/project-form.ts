@@ -2,6 +2,15 @@ import type { ProjectDetail } from '@/data/project-detail.mock'
 import { stampRecordAuditOnUpdate } from '@/lib/record-audit'
 import type { ProjectJourneyStage } from '@/lib/project-journey'
 import { journeyToListStatus } from '@/lib/project-journey'
+import type { ProjectCommercialOrigin } from '@/lib/project-commercial-origin'
+import {
+  inferCommercialOrigin,
+  validateCommercialOrigin,
+} from '@/lib/project-commercial-origin'
+import {
+  enrichProjectCommercialLinks,
+  validateProjectRelations,
+} from '@/lib/project-relations'
 import {
   projectCustomerFromListItem,
   projectCustomerToListPatch,
@@ -9,10 +18,7 @@ import {
   validateProjectCustomer,
   type ProjectCustomerKind,
 } from '@/lib/project-customer'
-import {
-  enrichProjectCommercialLinks,
-  validateProjectRelations,
-} from '@/lib/project-relations'
+import type { QuoteListItem } from '@/data/quotes.mock'
 import type {
   ProjectHealth,
   ProjectListItem,
@@ -55,10 +61,14 @@ export type ProjectFormValues = {
   company: string
   contactId: string
   contactName: string
+  commercialOrigin: ProjectCommercialOrigin
   opportunityId: string
   opportunityName: string
   acceptedQuoteId: string
   acceptedQuoteCode: string
+  solicitudId: string
+  solicitudTitle: string
+  solicitudCode: string
   progress: string
   deadline: string
   managerName: string
@@ -84,10 +94,14 @@ export function defaultProjectFormValues(
     company: '',
     contactId: '',
     contactName: '',
+    commercialOrigin: 'none',
     opportunityId: '',
     opportunityName: '',
     acceptedQuoteId: '',
     acceptedQuoteCode: '',
+    solicitudId: '',
+    solicitudTitle: '',
+    solicitudCode: '',
     progress: '0%',
     deadline: '',
     managerName: '',
@@ -102,26 +116,41 @@ export function defaultProjectFormValues(
   }
 }
 
-export function validateProjectForm(values: ProjectFormValues): string | null {
+export function validateProjectForm(
+  values: ProjectFormValues,
+  allQuotes: QuoteListItem[] = [],
+): string | null {
   const customerError = validateProjectCustomer(values)
   if (customerError) return customerError
   const scheduleError = validateProjectScheduleDates(values)
   if (scheduleError) return scheduleError
+  const originError = validateCommercialOrigin(values)
+  if (originError) return originError
   return validateProjectRelations(
     values.opportunityId.trim(),
     values.acceptedQuoteId.trim(),
+    allQuotes,
   )
 }
 
 export function projectDetailToFormValues(project: ProjectDetail): ProjectFormValues {
   const customer = projectCustomerFromListItem(project)
+  const commercialOrigin = inferCommercialOrigin({
+    commercialOrigin: 'none',
+    solicitudId: project.solicitudId ?? '',
+    opportunityId: project.opportunityId ?? '',
+  })
   return {
     name: project.name,
     ...customer,
+    commercialOrigin,
     opportunityId: project.opportunityId ?? '',
     opportunityName: project.opportunityName ?? '',
     acceptedQuoteId: project.acceptedQuoteId ?? '',
     acceptedQuoteCode: project.acceptedQuoteCode ?? '',
+    solicitudId: project.solicitudId ?? '',
+    solicitudTitle: project.solicitudTitle ?? '',
+    solicitudCode: project.solicitudCode ?? '',
     progress: project.progress,
     deadline: project.deadline,
     managerName: project.manager,
@@ -139,16 +168,25 @@ export function applyFormValuesToProject(
   project: ProjectDetail,
   values: ProjectFormValues,
 ): ProjectDetail {
-  const opportunityId = values.opportunityId.trim() || undefined
-  const acceptedQuoteId = values.acceptedQuoteId.trim() || undefined
+  const origin = inferCommercialOrigin(values)
+  const opportunityId =
+    origin === 'oportunidad' ? values.opportunityId.trim() || undefined : undefined
+  const acceptedQuoteId =
+    origin === 'oportunidad' ? values.acceptedQuoteId.trim() || undefined : undefined
+  const solicitudId =
+    origin === 'solicitud' ? values.solicitudId.trim() || undefined : undefined
   const customerPatch = projectCustomerToListPatch(values)
   const next = {
     ...project,
     name: values.name.trim(),
     ...customerPatch,
     client: resolveProjectClientName(values),
+    commercialOrigin: origin,
     opportunityId,
     acceptedQuoteId,
+    solicitudId,
+    solicitudTitle: origin === 'solicitud' ? values.solicitudTitle.trim() : undefined,
+    solicitudCode: origin === 'solicitud' ? values.solicitudCode.trim() : undefined,
     deadline: values.deadline.trim(),
     manager: values.managerName.trim(),
     journeyStage: values.journeyStage,

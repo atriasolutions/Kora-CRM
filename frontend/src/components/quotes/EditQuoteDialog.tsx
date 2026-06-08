@@ -6,6 +6,8 @@ import { QuoteFormFields } from '@/components/quotes/QuoteFormFields'
 import { QuoteCommercialTermsFields } from '@/components/quotes/QuoteCommercialTermsFields'
 import { QuoteLineItemsEditor } from '@/components/quotes/QuoteLineItemsEditor'
 import { QuoteLineItemsPanel } from '@/components/quotes/QuoteLineItemsPanel'
+import { DocumentGlobalDiscountField } from '@/components/shared/DocumentGlobalDiscountField'
+import { DocumentTotalsBreakdown } from '@/components/shared/DocumentTotalsBreakdown'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -38,9 +40,13 @@ export function EditQuoteDialog({ open, onOpenChange, quote, onSave }: EditQuote
   const { reloadFromApi: reloadProducts } = useProductsRegistry()
 
   const linesLocked = quoteLineItemsLocked(quote.status)
+  const globalDiscountPercent = form.globalDiscountPercent
   const totals = useMemo(
-    () => computeQuoteTotals(linesLocked ? quote.lineItems : lineItems),
-    [lineItems, linesLocked, quote.lineItems],
+    () =>
+      computeQuoteTotals(linesLocked ? quote.lineItems : lineItems, {
+        globalDiscountPercent,
+      }),
+    [lineItems, linesLocked, quote.lineItems, globalDiscountPercent],
   )
 
   useEffect(() => {
@@ -101,6 +107,24 @@ export function EditQuoteDialog({ open, onOpenChange, quote, onSave }: EditQuote
             <QuoteLineItemsEditor lineItems={lineItems} onChange={setLineItems} />
           )}
 
+          <DocumentGlobalDiscountField
+            id="edit-qt-global-discount"
+            value={form.globalDiscountPercent}
+            onChange={(globalDiscountPercent) =>
+              setForm((f) => ({ ...f, globalDiscountPercent }))
+            }
+          />
+
+          <DocumentTotalsBreakdown
+            subtotal={totals.subtotal}
+            discountPercent={totals.discountPercent}
+            discountAmount={totals.discountAmount}
+            taxLabel={`IVA (${totals.taxPercent})`}
+            taxAmount={totals.taxAmount}
+            total={totals.amount}
+            totalLabel="Total cotización (IVA incl.)"
+          />
+
           <QuoteCommercialTermsFields
             idPrefix="edit-qt"
             values={{
@@ -110,15 +134,6 @@ export function EditQuoteDialog({ open, onOpenChange, quote, onSave }: EditQuote
             }}
             onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
           />
-
-          <div className="rounded-lg border border-border bg-muted/20 px-4 py-3 text-sm">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-muted-foreground">Total cotización (IVA incl.)</span>
-              <span className="text-lg font-bold tabular-nums text-primary">
-                {totals.amount}
-              </span>
-            </div>
-          </div>
 
           <DialogFooter className="gap-2 border-t border-border pt-4 sm:gap-0">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

@@ -18,6 +18,9 @@ export type ProjectRow = {
   opportunity_name: string
   accepted_quote_id: string | null
   quote_code: string
+  solicitud_id: string | null
+  solicitud_code: string
+  solicitud_title: string
   progress_pct: number | string
   work_plan_json?: unknown
   deadline: Date | string | null
@@ -82,6 +85,9 @@ export function mapProjectRow(row: ProjectRow): ProjectListItem {
       customerKind === 'contacto' ? row.client_name?.trim() || undefined : undefined,
     opportunityId: row.opportunity_id ?? undefined,
     acceptedQuoteId: row.accepted_quote_id ?? undefined,
+    solicitudId: row.solicitud_id ?? undefined,
+    solicitudCode: row.solicitud_code || undefined,
+    solicitudTitle: row.solicitud_title || undefined,
     progress: formatPercent(progressPct),
     progressNum: progressPct,
     deadline: formatDateLabel(row.deadline),
@@ -109,6 +115,8 @@ export function mapProjectDetail(
     ...mapProjectRow(row),
     opportunityName: row.opportunity_name || undefined,
     acceptedQuoteCode: row.quote_code || undefined,
+    solicitudTitle: row.solicitud_title || undefined,
+    solicitudCode: row.solicitud_code || undefined,
     team: team.map(mapProjectTeamRow),
   }
 }

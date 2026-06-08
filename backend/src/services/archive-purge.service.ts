@@ -10,6 +10,7 @@ import * as productsRepo from '../repositories/products.repository.js'
 import * as projectsRepo from '../repositories/projects.repository.js'
 import * as purchasesRepo from '../repositories/purchases.repository.js'
 import * as quotesRepo from '../repositories/quotes.repository.js'
+import * as solicitudesRepo from '../repositories/solicitudes.repository.js'
 import * as stockReceiptsRepo from '../repositories/stock-receipts.repository.js'
 import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import type { AuditActor } from '../types/audit.js'
@@ -127,6 +128,13 @@ export async function purgeExpiredArchivedRecords(): Promise<ArchivePurgeRunResu
           `SELECT id FROM crm_purchases WHERE deleted_at IS NULL AND __CUTOFF__`,
         ),
         deleteFn: (id) => purchasesRepo.permanentlyDeletePurchase(id),
+      },
+      {
+        entity: 'solicitud',
+        ids: await listExpiredIds(
+          `SELECT id FROM crm_solicitudes WHERE deleted_at IS NULL AND __CUTOFF__`,
+        ),
+        deleteFn: (id) => solicitudesRepo.permanentlyDeleteSolicitud(id),
       },
       {
         entity: 'actividad',

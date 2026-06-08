@@ -68,6 +68,7 @@ type ContactActivitiesPanelProps = {
     | 'cotizacion'
     | 'factura'
     | 'proyecto'
+    | 'solicitud'
     | 'ingreso'
     | 'producto'
 }
@@ -184,7 +185,9 @@ export function ContactActivitiesPanel({
                 ? 'factura'
                 : entityKind === 'proyecto'
                   ? 'proyecto'
-                  : entityKind === 'ingreso'
+                  : entityKind === 'solicitud'
+                    ? 'solicitud'
+                    : entityKind === 'ingreso'
                     ? 'ingreso'
                     : entityKind === 'producto'
                       ? 'producto'

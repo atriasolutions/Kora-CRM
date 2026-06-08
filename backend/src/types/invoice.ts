@@ -55,6 +55,7 @@ export type InvoiceListItem = {
 
 export type InvoiceDetail = InvoiceListItem & {
   quoteCode?: string
+  globalDiscount?: string
   lineItems: InvoiceLineItemDto[]
   payments: InvoicePaymentDto[]
   exchangeRateDate?: string | null
@@ -92,6 +93,7 @@ export type CreateInvoiceInput = {
   ownerName?: string
   paymentMethod?: string
   siiNumber?: string
+  globalDiscount?: string
   lineItems?: InvoiceLineItemInput[]
 }
 

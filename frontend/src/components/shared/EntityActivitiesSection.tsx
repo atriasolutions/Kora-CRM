@@ -12,6 +12,7 @@ export type EntityActivityKind =
   | 'cotizacion'
   | 'factura'
   | 'proyecto'
+  | 'solicitud'
   | 'ingreso'
   | 'producto'
 

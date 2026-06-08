@@ -2,6 +2,7 @@ import { opportunityListSeed } from '@/data/opportunities.mock'
 import type { ProjectListItem } from '@/data/projects.mock'
 import type { QuoteListItem, QuoteStatus } from '@/data/quotes.mock'
 import { quoteListSeed } from '@/data/quotes.mock'
+import { findQuoteById as findQuoteInList } from '@/lib/quote-lookup'
 import { STORAGE_PREFIX } from '@/config/brand'
 import { isLocalDetailStorageActive } from '@/lib/local-detail-storage'
 
@@ -144,12 +145,13 @@ export function resolveAcceptedQuoteLink(
 export function validateProjectRelations(
   opportunityId: string,
   acceptedQuoteId: string,
+  allQuotes: QuoteListItem[] = [],
 ): string | null {
   if (!acceptedQuoteId) return null
   if (!opportunityId) {
     return 'Selecciona una oportunidad antes de vincular una cotización.'
   }
-  const quote = findQuoteById(acceptedQuoteId)
+  const quote = findQuoteInList(allQuotes, acceptedQuoteId)
   if (!quote) return 'La cotización seleccionada no existe.'
   if (quote.opportunityId !== opportunityId) {
     return 'La cotización debe pertenecer a la oportunidad seleccionada.'
@@ -165,6 +167,25 @@ export function projectsForOpportunityFromList(
     .filter((p) => resolveProjectRelations(p).opportunityId === opportunityId)
     .map(({ id, name, client, status, progress, deadline, health }) => ({
       id,
+      name,
+      client,
+      status,
+      progress,
+      deadline,
+      health,
+    }))
+}
+
+export function projectsForSolicitudFromList(
+  solicitudId: string,
+  allProjects: ProjectListItem[],
+): OpportunityProjectSummary[] {
+  const id = solicitudId.trim()
+  if (!id) return []
+  return allProjects
+    .filter((p) => p.solicitudId === id)
+    .map(({ id: projectId, name, client, status, progress, deadline, health }) => ({
+      id: projectId,
       name,
       client,
       status,

@@ -16,7 +16,8 @@ import type {
 
 const SELECT_COLUMNS = `
   id, legal_name, trade_name, tagline, rut, giro, address, city, region, commune,
-  phone, email, logo_url, default_vat_percent, invoicing_mode, economic_activity_code
+  phone, email, logo_url, default_vat_percent, invoicing_mode, economic_activity_code,
+  default_solicitud_assignee_user_id, default_solicitud_assignee_name
 `
 
 const DEFAULTS = {
@@ -139,6 +140,8 @@ export async function updateOrganizationSettings(
     ['defaultVatPercent', 'default_vat_percent'],
     ['invoicingMode', 'invoicing_mode'],
     ['economicActivityCode', 'economic_activity_code'],
+    ['defaultSolicitudAssigneeUserId', 'default_solicitud_assignee_user_id'],
+    ['defaultSolicitudAssigneeName', 'default_solicitud_assignee_name'],
   ]
 
   for (const [key, column] of fieldMap) {

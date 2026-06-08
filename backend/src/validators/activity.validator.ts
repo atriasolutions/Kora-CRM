@@ -8,6 +8,7 @@ const relatedTypeSchema = z.enum([
   'compra',
   'factura',
   'proyecto',
+  'solicitud',
   'ingreso',
   'producto',
   'inventario',

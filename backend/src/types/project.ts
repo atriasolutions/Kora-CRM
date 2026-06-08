@@ -22,6 +22,9 @@ export type ProjectListItem = {
   contactName?: string
   opportunityId?: string
   acceptedQuoteId?: string
+  solicitudId?: string
+  solicitudCode?: string
+  solicitudTitle?: string
   progress: string
   progressNum: number
   deadline: string
@@ -61,6 +64,7 @@ export type CreateProjectInput = {
   companyId?: string | null
   opportunityId?: string | null
   acceptedQuoteId?: string | null
+  solicitudId?: string | null
   progress?: string
   progressPct?: number
   progressNum?: number

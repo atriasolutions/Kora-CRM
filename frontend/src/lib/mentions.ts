@@ -6,6 +6,7 @@ import { resolveOpportunityListItem } from '@/data/opportunity-detail.mock'
 import { resolveProductListItem } from '@/data/product-detail.mock'
 import { resolveProjectListItem } from '@/data/project-detail.mock'
 import { resolveQuoteListItem } from '@/data/quote-detail.mock'
+import { resolveSolicitudListItem } from '@/data/solicitudes.mock'
 import { isApiEnabled } from '@/api/config'
 import { searchMentionsApi } from '@/api/mentions'
 import { registerUserInDisplayCache } from '@/lib/user-display-cache'
@@ -24,6 +25,7 @@ import { opportunityListSeed } from '@/data/opportunities.mock'
 import { productListSeed } from '@/data/products.mock'
 import { projectListSeed } from '@/data/projects.mock'
 import { quoteListSeed } from '@/data/quotes.mock'
+import { solicitudListSeed } from '@/data/solicitudes.mock'
 
 export type MentionKind =
   | 'user'
@@ -35,6 +37,7 @@ export type MentionKind =
   | 'product'
   | 'invoice'
   | 'activity'
+  | 'solicitud'
 
 export type MentionItem = {
   /** Identificador compuesto: `kind:recordId` */
@@ -65,6 +68,7 @@ export const MENTION_KIND_LABELS: Record<MentionKind, string> = {
   product: 'Productos',
   invoice: 'Facturas',
   activity: 'Actividades',
+  solicitud: 'Solicitudes',
 }
 
 const MENTION_KIND_ORDER: MentionKind[] = [
@@ -77,6 +81,7 @@ const MENTION_KIND_ORDER: MentionKind[] = [
   'product',
   'invoice',
   'activity',
+  'solicitud',
 ]
 
 function mentionUserId(label: string): string {
@@ -109,6 +114,8 @@ export function mentionRecordHref(kind: MentionKind, recordId: string): string {
       return `/facturacion/${recordId}`
     case 'activity':
       return `/actividades/${recordId}`
+    case 'solicitud':
+      return `/solicitudes/${recordId}`
     default:
       return ''
   }
@@ -136,9 +143,13 @@ export async function filterMentionItemsAsync(
   limit = 12,
 ): Promise<MentionItem[]> {
   if (!useApi) return filterMentionItems(query, limit)
-  const items = await searchMentionsApi(query, limit)
-  cacheMentionItems(items)
-  return items
+  try {
+    const items = await searchMentionsApi(query, limit)
+    cacheMentionItems(items)
+    return items
+  } catch {
+    return filterMentionItems(query, limit)
+  }
 }
 
 function buildUserMentions(): MentionItem[] {
@@ -230,6 +241,15 @@ function buildRegistry(): MentionItem[] {
     href: mentionRecordHref('activity', a.id),
   }))
 
+  const solicitudes: MentionItem[] = solicitudListSeed.map((s) => ({
+    id: compositeId('solicitud', s.id),
+    kind: 'solicitud',
+    recordId: s.id,
+    label: s.code,
+    subtitle: [s.title, s.status].filter(Boolean).join(' · '),
+    href: mentionRecordHref('solicitud', s.id),
+  }))
+
   return [
     ...users,
     ...contacts,
@@ -240,6 +260,7 @@ function buildRegistry(): MentionItem[] {
     ...products,
     ...invoices,
     ...activities,
+    ...solicitudes,
   ]
 }
 
@@ -350,6 +371,17 @@ function lookupMentionByRecord(
           recordId,
           label: a.title,
           subtitle: [a.typeLabel, a.relatedName].filter(Boolean).join(' · '),
+          href: mentionRecordHref(kind, recordId),
+        }
+      }
+      case 'solicitud': {
+        const s = resolveSolicitudListItem(recordId)
+        return {
+          id,
+          kind,
+          recordId,
+          label: s.code,
+          subtitle: [s.title, s.status].filter(Boolean).join(' · '),
           href: mentionRecordHref(kind, recordId),
         }
       }

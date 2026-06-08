@@ -16,6 +16,7 @@ import {
   validateCreateProjectForm,
   type CreateProjectFormValues,
 } from '@/lib/project-create'
+import { useQuotesRegistry } from '@/hooks/use-quotes-registry'
 
 type CreateProjectDialogProps = {
   open: boolean
@@ -23,6 +24,7 @@ type CreateProjectDialogProps = {
   title?: string
   description?: string
   initialValues?: Partial<CreateProjectFormValues>
+  lockSolicitud?: boolean
   onSubmit: (values: CreateProjectFormValues) => void
 }
 
@@ -32,8 +34,10 @@ export function CreateProjectDialog({
   title = 'Nuevo proyecto',
   description,
   initialValues,
+  lockSolicitud = false,
   onSubmit,
 }: CreateProjectDialogProps) {
+  const { allQuotes } = useQuotesRegistry()
   const [form, setForm] = useState(() => createDefaultProjectFormValues(initialValues))
 
   useEffect(() => {
@@ -49,7 +53,7 @@ export function CreateProjectDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    const validation = validateCreateProjectForm(form)
+    const validation = validateCreateProjectForm(form, allQuotes)
     if (validation) {
       toast.warning(validation)
       return
@@ -72,6 +76,7 @@ export function CreateProjectDialog({
             values={form}
             onChange={patch}
             idPrefix="create-pr"
+            lockSolicitud={lockSolicitud}
           />
           <DialogFooter className="gap-2 border-t border-border pt-4 sm:gap-0">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

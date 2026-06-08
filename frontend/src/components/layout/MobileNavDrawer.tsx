@@ -35,7 +35,7 @@ export function MobileNavDrawer() {
                   type="button"
                   variant="outline"
                   size="icon"
-                  className="shrink-0 border-sidebar-border bg-background shadow-sm"
+                  className="shrink-0 border-sidebar-border/60 bg-sidebar-accent text-sidebar-foreground hover:bg-sidebar-accent/80 hover:text-white"
                   aria-label="Cerrar menú"
                 >
                   <X aria-hidden className="size-4" />

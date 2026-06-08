@@ -19,7 +19,12 @@ import type {
 
 const PROFILE_SELECT = `
   p.id, p.name, p.description, p.is_system, p.updated_at,
-  (SELECT count(*)::int FROM crm_users u WHERE u.profile_id = p.id AND u.deleted_at IS NULL) AS user_count
+  (SELECT count(*)::int
+   FROM crm_tenant_memberships m
+   JOIN crm_users u ON u.id = m.user_id
+   WHERE m.profile_id = p.id
+     AND m.tenant_id = p.tenant_id
+     AND u.deleted_at IS NULL) AS user_count
 `
 
 async function loadPermissions(profileId: string): Promise<PermissionRow[]> {

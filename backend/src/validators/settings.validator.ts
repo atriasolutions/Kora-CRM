@@ -18,6 +18,8 @@ export const updateOrganizationSettingsSchema = z.object({
   defaultVatPercent: z.number().min(0).max(100).optional(),
   invoicingMode: invoicingModeSchema.optional(),
   economicActivityCode: z.number().int().positive().max(99999999).nullable().optional(),
+  defaultSolicitudAssigneeUserId: z.string().uuid().nullable().optional(),
+  defaultSolicitudAssigneeName: z.string().max(255).optional(),
 })
 
 export const createWarehouseSchema = z.object({

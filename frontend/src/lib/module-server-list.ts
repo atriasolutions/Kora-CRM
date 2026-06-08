@@ -9,6 +9,7 @@ import type { InvoiceListItem } from '@/data/invoices.mock'
 import type { OpportunityListItem } from '@/data/opportunities.mock'
 import type { ProductListItem } from '@/data/products.mock'
 import type { ProjectListItem } from '@/data/projects.mock'
+import type { SolicitudListItem } from '@/data/solicitudes.mock'
 import type { PurchaseListItem } from '@/data/purchases.mock'
 import type { QuoteListItem } from '@/data/quotes.mock'
 import type { StockReceiptListItem } from '@/data/stock-receipts.mock'
@@ -115,6 +116,15 @@ export function fetchProjectsServerPage(
   archived = false,
 ): Promise<ServerListFetchResult<ProjectListItem>> {
   return fetchModulePage(`${API_V1}/projects`, params, {
+    archived: archived ? 'true' : 'false',
+  })
+}
+
+export function fetchSolicitudesServerPage(
+  params: ServerListFetchParams,
+  archived = false,
+): Promise<ServerListFetchResult<SolicitudListItem>> {
+  return fetchModulePage(`${API_V1}/solicitudes`, params, {
     archived: archived ? 'true' : 'false',
   })
 }

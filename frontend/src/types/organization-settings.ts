@@ -19,4 +19,6 @@ export type OrganizationSettings = {
   defaultVatPercent: number
   invoicingMode: InvoicingMode
   economicActivityCode: number | null
+  defaultSolicitudAssigneeUserId: string | null
+  defaultSolicitudAssigneeName: string
 }

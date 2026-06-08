@@ -20,6 +20,7 @@ export type LoginCompleteResponse = {
   user: UserDetail
   profile: AccessProfile
   tenantId: string
+  isPlatformOperator?: boolean
   backupCodes?: string[]
 }
 
@@ -57,6 +58,7 @@ function parseLoginPayload(data: Record<string, unknown>): LoginApiResult {
     user: data.user as UserDetail,
     profile: data.profile as AccessProfile,
     tenantId: String(data.tenantId ?? ''),
+    isPlatformOperator: Boolean(data.isPlatformOperator),
     backupCodes: data.backupCodes as string[] | undefined,
   }
 }
@@ -157,6 +159,7 @@ export async function fetchMeApi(): Promise<{
   profile: AccessProfile
   tenantId: string
   tenantSlug: string
+  isPlatformOperator: boolean
 }> {
   const res = await fetchJSON<
     ApiItemResponse<{
@@ -164,9 +167,13 @@ export async function fetchMeApi(): Promise<{
       profile: AccessProfile
       tenantId: string
       tenantSlug: string
+      isPlatformOperator?: boolean
     }>
   >(`${BASE}/me`)
-  return res.data
+  return {
+    ...res.data,
+    isPlatformOperator: Boolean(res.data.isPlatformOperator),
+  }
 }
 
 export async function switchTenantApi(tenantId: string): Promise<LoginCompleteResponse> {

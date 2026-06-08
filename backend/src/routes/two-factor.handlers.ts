@@ -47,6 +47,7 @@ export async function handleVerifyTwoFactorLogin(
         user: result.user,
         profile: result.profile,
         tenantId: result.tenantId,
+        isPlatformOperator: result.isPlatformOperator,
       },
     })
   } catch (e) {
@@ -98,6 +99,7 @@ export async function handleEnrollmentConfirm(
         user: result.user,
         profile: result.profile,
         tenantId: result.tenantId,
+        isPlatformOperator: result.isPlatformOperator,
         backupCodes,
       },
     })

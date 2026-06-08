@@ -22,6 +22,10 @@ export type ProjectListItem = {
   opportunityId?: string
   /** Cotización aceptada que fija alcance y presupuesto (debe ser de la misma oportunidad) */
   acceptedQuoteId?: string
+  /** Solicitud que originó el proyecto (alternativa a oportunidad/cotización) */
+  solicitudId?: string
+  solicitudTitle?: string
+  solicitudCode?: string
   progress: string
   progressNum: number
   deadline: string

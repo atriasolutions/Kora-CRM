@@ -15,6 +15,7 @@ const ALLOWED_TAGS = [
   'ol',
   'li',
   'span',
+  'img',
 ]
 
 const ALLOWED_ATTR = [
@@ -24,6 +25,9 @@ const ALLOWED_ATTR = [
   'data-label',
   'data-mention-kind',
   'data-href',
+  'data-file-id',
+  'alt',
+  'src',
   'role',
   'tabindex',
   'style',

@@ -7,6 +7,7 @@ export type InvoicePaymentMethod =
   | 'Tarjeta'
   | 'Cheque'
   | 'Efectivo'
+  | 'Crédito'
   | 'Otro'
 
 import type { SaleCustomerKind } from '@/lib/sale-customer'
@@ -51,6 +52,7 @@ export const INVOICE_PAYMENT_METHOD_OPTIONS: InvoicePaymentMethod[] = [
   'Tarjeta',
   'Cheque',
   'Efectivo',
+  'Crédito',
   'Otro',
 ]
 

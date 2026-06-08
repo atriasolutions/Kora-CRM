@@ -71,11 +71,53 @@ export function resolveTenantSlugFromHost(
   return sub
 }
 
+export async function listActiveTenants(): Promise<TenantMembershipOption[]> {
+  const result = await platformQuery<{
+    tenant_id: string
+    slug: string
+    display_name: string
+    logo_url: string | null
+  }>(
+    `SELECT id AS tenant_id, slug, display_name, logo_url
+     FROM crm_tenants
+     WHERE status = 'active'
+     ORDER BY display_name ASC`,
+  )
+
+  return result.rows.map((row, index) => ({
+    tenantId: row.tenant_id,
+    slug: row.slug,
+    displayName: row.display_name,
+    logoUrl: row.logo_url?.trim() ?? '',
+    isDefault: index === 0,
+  }))
+}
+
+export async function isPlatformOperator(userId: string): Promise<boolean> {
+  const result = await platformQuery<{ is_platform_operator: boolean }>(
+    `SELECT COALESCE(is_platform_operator, false) AS is_platform_operator
+     FROM crm_users
+     WHERE id = $1 AND deleted_at IS NULL`,
+    [userId],
+  )
+  return Boolean(result.rows[0]?.is_platform_operator)
+}
+
 export async function listMembershipsForEmail(
   email: string,
 ): Promise<TenantMembershipOption[]> {
   const normalized = email.trim().toLowerCase()
   if (!normalized) return []
+
+  const userResult = await platformQuery<{ is_platform_operator: boolean }>(
+    `SELECT COALESCE(is_platform_operator, false) AS is_platform_operator
+     FROM crm_users
+     WHERE lower(email) = $1 AND deleted_at IS NULL`,
+    [normalized],
+  )
+  if (userResult.rows[0]?.is_platform_operator) {
+    return listActiveTenants()
+  }
 
   const result = await platformQuery<{
     tenant_id: string
@@ -125,7 +167,79 @@ export async function assertUserMembership(
   return { profileId: row.profile_id }
 }
 
+async function assertTenantActive(tenantId: string): Promise<void> {
+  const result = await platformQuery<{ status: TenantStatus }>(
+    `SELECT status FROM crm_tenants WHERE id = $1 AND status <> 'deleted'`,
+    [tenantId],
+  )
+  if (result.rows[0]?.status !== 'active') {
+    throw badRequest('Empresa no disponible.')
+  }
+}
+
+async function getSystemProfileIdForTenant(tenantId: string): Promise<string> {
+  const system = await platformQuery<{ id: string }>(
+    `SELECT id FROM crm_access_profiles
+     WHERE tenant_id = $1 AND is_system = true
+     LIMIT 1`,
+    [tenantId],
+  )
+  if (system.rows[0]?.id) return system.rows[0].id
+
+  const namedAdmin = await platformQuery<{ id: string }>(
+    `SELECT id FROM crm_access_profiles
+     WHERE tenant_id = $1 AND lower(name) = 'administrador'
+     ORDER BY is_system DESC, updated_at ASC
+     LIMIT 1`,
+    [tenantId],
+  )
+  if (namedAdmin.rows[0]?.id) return namedAdmin.rows[0].id
+
+  const anyProfile = await platformQuery<{ id: string }>(
+    `SELECT id FROM crm_access_profiles
+     WHERE tenant_id = $1
+     ORDER BY is_system DESC, updated_at ASC
+     LIMIT 1`,
+    [tenantId],
+  )
+  const id = anyProfile.rows[0]?.id
+  if (!id) {
+    throw badRequest('Esta empresa no tiene perfiles de acceso configurados.')
+  }
+  return id
+}
+
+export type TenantAccessResult = {
+  profileId: string
+  isPlatformOperator: boolean
+}
+
+/** Membresía normal o acceso de operador de plataforma al tenant activo. */
+export async function resolveTenantAccess(
+  userId: string,
+  tenantId: string,
+): Promise<TenantAccessResult> {
+  const trimmed = tenantId.trim()
+  if (!trimmed) throw badRequest('Empresa requerida.')
+
+  if (await isPlatformOperator(userId)) {
+    await assertTenantActive(trimmed)
+    const profileId = await getSystemProfileIdForTenant(trimmed)
+    return { profileId, isPlatformOperator: true }
+  }
+
+  const membership = await assertUserMembership(userId, trimmed)
+  return { profileId: membership.profileId, isPlatformOperator: false }
+}
+
 export async function getDefaultTenantIdForUser(userId: string): Promise<string> {
+  if (await isPlatformOperator(userId)) {
+    const tenants = await listActiveTenants()
+    const first = tenants[0]
+    if (!first) throw notFound('Sin empresas activas')
+    return first.tenantId
+  }
+
   const result = await platformQuery<{ tenant_id: string }>(
     `SELECT tenant_id FROM crm_tenant_memberships
      WHERE user_id = $1 AND status = 'active'

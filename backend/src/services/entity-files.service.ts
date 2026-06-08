@@ -27,6 +27,7 @@ const MODULE_BY_ENTITY: Record<EntityFileType, MenuModuleId> = {
   cotizacion: 'cotizaciones',
   oportunidad: 'oportunidades',
   proyecto: 'proyectos',
+  solicitud: 'solicitudes',
 }
 
 function assertModuleAccess(
@@ -88,6 +89,7 @@ export async function syncEntityFilesForRequest(
     uploadedById: auth.userId,
     uploadedByName: auth.userName,
     files: input.files.map((file) => ({
+      id: file.id?.trim() || undefined,
       name: file.name.trim(),
       size: file.size,
       mimeType: file.mimeType?.trim() || undefined,

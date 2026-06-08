@@ -26,6 +26,7 @@ export type QuoteApiBody = {
   paymentTerms?: string
   deliveryTerms?: string
   terms?: string
+  globalDiscount?: string
   lineItems?: {
     sku?: string
     productName?: string
@@ -86,6 +87,7 @@ export function quoteFormToApiBody(values: CreateQuoteFormValues): QuoteApiBody 
     paymentTerms: values.paymentTerms?.trim() || undefined,
     deliveryTerms: values.deliveryTerms?.trim() || undefined,
     terms: values.terms?.trim() || undefined,
+    globalDiscount: values.globalDiscountPercent.trim() || undefined,
     lineItems: quoteLinesToApi(values.lineItems),
   }
 }
@@ -106,6 +108,7 @@ export function quoteDetailToApiBody(detail: QuoteDetail): QuoteApiBody {
     paymentTerms: detail.paymentTerms?.trim() || undefined,
     deliveryTerms: detail.deliveryTerms?.trim() || undefined,
     terms: detail.terms?.trim() || undefined,
+    globalDiscount: detail.discountPercent?.trim() || undefined,
     lineItems: quoteLineItemsLocked(detail.status)
       ? undefined
       : quoteLinesToApi(detail.lineItems),

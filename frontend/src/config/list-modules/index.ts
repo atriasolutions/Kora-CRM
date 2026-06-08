@@ -9,6 +9,7 @@ import { opportunitiesListConfig } from './opportunities'
 import { quotesListConfig } from './quotes'
 import { productsListConfig } from './products'
 import { projectsListConfig } from './projects'
+import { solicitudesListConfig } from './solicitudes'
 import { reportsListConfig } from './reports'
 import { settingsListConfig } from './settings'
 import { usersListConfig } from './users'
@@ -20,6 +21,7 @@ export type ListModuleSlug =
   | 'cotizaciones'
   | 'actividades'
   | 'proyectos'
+  | 'solicitudes'
   | 'facturacion'
   | 'productos'
   | 'reportes'
@@ -39,6 +41,7 @@ export const listModuleSlugs: ListModuleSlug[] = [
   'cotizaciones',
   'actividades',
   'proyectos',
+  'solicitudes',
   'facturacion',
   'productos',
   'reportes',
@@ -62,6 +65,8 @@ export function getListModuleConfig(
       return asBaseConfig(activitiesListConfig)
     case 'proyectos':
       return asBaseConfig(projectsListConfig)
+    case 'solicitudes':
+      return asBaseConfig(solicitudesListConfig)
     case 'facturacion':
       return asBaseConfig(invoicingListConfig)
     case 'productos':

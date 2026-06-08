@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { toast } from '@/lib/toast'
 
 import {
@@ -6,6 +6,9 @@ import {
   ContactFormInput,
   ContactFormSelect,
 } from '@/components/contacts/ContactFormField'
+import { InvoiceLineItemsEditor } from '@/components/invoices/InvoiceLineItemsEditor'
+import { DocumentGlobalDiscountField } from '@/components/shared/DocumentGlobalDiscountField'
+import { DocumentTotalsBreakdown } from '@/components/shared/DocumentTotalsBreakdown'
 import { SaleCustomerFields } from '@/components/shared/SaleCustomerFields'
 import { Button } from '@/components/ui/button'
 import {
@@ -18,10 +21,12 @@ import {
 } from '@/components/ui/dialog'
 import type { InvoiceDetail } from '@/data/invoice-detail.mock'
 import { UserLookupField } from '@/components/shared/UserLookupField'
+import { computeInvoiceTotals } from '@/lib/invoice-line-item'
 import {
   applyFormValuesToInvoice,
   invoiceDetailToFormValues,
   INVOICE_PAYMENT_METHOD_OPTIONS,
+  syncInvoiceEditFormAmount,
   type InvoiceFormValues,
 } from '@/lib/invoice-form'
 import { validateSaleCustomer } from '@/lib/sale-customer'
@@ -56,8 +61,28 @@ export function EditInvoiceDialog({
     })
   }, [open, invoice])
 
+  const totals = useMemo(
+    () =>
+      computeInvoiceTotals(form.lineItems, {
+        globalDiscountPercent: form.globalDiscountPercent,
+      }),
+    [form.lineItems, form.globalDiscountPercent],
+  )
+
   const patch = (partial: Partial<InvoiceFormValues>) => {
-    setForm((prev) => ({ ...prev, ...partial }))
+    setForm((prev) => {
+      const next = { ...prev, ...partial }
+      if (partial.lineItems || partial.globalDiscountPercent !== undefined) {
+        const lineItems = partial.lineItems ?? next.lineItems
+        const globalDiscountPercent =
+          partial.globalDiscountPercent ?? next.globalDiscountPercent
+        return {
+          ...next,
+          ...syncInvoiceEditFormAmount(lineItems, globalDiscountPercent),
+        }
+      }
+      return next
+    })
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -65,6 +90,10 @@ export function EditInvoiceDialog({
     const customerError = validateSaleCustomer(form)
     if (customerError) {
       toast.warning(customerError)
+      return
+    }
+    if (form.lineItems.length === 0) {
+      toast.warning('Agrega al menos una línea a la factura.')
       return
     }
     if (invoiceRequiresSiiNumber(form.status)) {
@@ -82,11 +111,11 @@ export function EditInvoiceDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Editar factura</DialogTitle>
           <DialogDescription>
-            Modifica la factura de {invoice.client}: montos, fechas y cliente. El estado se
+            Modifica cliente, líneas, descuentos y fechas de {invoice.client}. El estado se
             gestiona en la ruta del éxito.
           </DialogDescription>
         </DialogHeader>
@@ -101,12 +130,36 @@ export function EditInvoiceDialog({
             }}
             onChange={(customerPatch) => patch(customerPatch)}
           />
+
+          <InvoiceLineItemsEditor
+            lineItems={form.lineItems}
+            onChange={(lineItems) => patch({ lineItems })}
+          />
+
+          <DocumentGlobalDiscountField
+            id="edit-inv-global-discount"
+            value={form.globalDiscountPercent}
+            onChange={(globalDiscountPercent) => patch({ globalDiscountPercent })}
+          />
+
+          <DocumentTotalsBreakdown
+            subtotal={totals.subtotal}
+            discountPercent={totals.discountPercent}
+            discountAmount={totals.discountAmount}
+            taxLabel={`IVA (${totals.taxPercent})`}
+            taxAmount={totals.taxAmount}
+            total={totals.amount}
+            totalLabel="Total (con IVA)"
+          />
+
           <ContactFormInput
             id="edit-inv-amount"
-            label="Monto"
+            label="Monto total (con IVA)"
             value={form.amount}
-            onChange={(amount) => patch({ amount })}
+            disabled
+            onChange={() => {}}
           />
+
           <div className="grid gap-4 sm:grid-cols-2">
             <ContactFormDateInput
               id="edit-inv-issue"

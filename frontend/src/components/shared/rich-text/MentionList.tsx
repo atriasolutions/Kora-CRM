@@ -1,5 +1,6 @@
 import {
   Building2,
+  ClipboardList,
   Contact,
   FileText,
   FolderKanban,
@@ -60,6 +61,8 @@ function KindIcon({ kind }: { kind: MentionKind }) {
       return <Receipt aria-hidden className={className} />
     case 'activity':
       return <Zap aria-hidden className={className} />
+    case 'solicitud':
+      return <ClipboardList aria-hidden className={className} />
     default:
       return <User aria-hidden className={className} />
   }

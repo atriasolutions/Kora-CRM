@@ -42,6 +42,7 @@ export type InvoiceRow = {
   exchange_rate_uf: string | number | null
   exchange_rate_usd: string | number | null
   exchange_rate_eur: string | number | null
+  global_discount_pct: string | number | null
   created_at: Date
   created_by_id: string | null
   created_by_name: string | null
@@ -165,6 +166,7 @@ export function mapInvoiceDetail(
   return {
     ...mapInvoiceRow(row),
     quoteCode: row.quote_code || undefined,
+    globalDiscount: formatDiscountPct(row.global_discount_pct),
     lineItems: lineItems.map(mapInvoiceLineRow),
     payments: payments.map(mapInvoicePaymentRow),
     exchangeRateDate: exchange.exchangeRateDate,

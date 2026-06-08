@@ -31,7 +31,7 @@ export function AppBrand({ className, variant = 'sidebar' }: AppBrandProps) {
         aria-label={`${displayName}, ir al inicio`}
       >
         <KoraLogoMark
-          size={isCompact ? 'sm' : 'md'}
+          size="sm"
           align="center"
           className={cn('w-full', isCompact ? '' : 'items-center')}
         />
@@ -49,11 +49,11 @@ export function AppBrand({ className, variant = 'sidebar' }: AppBrandProps) {
         )}
         aria-label={`${displayName}, ir al inicio`}
       >
-        <div className="flex h-[5.25rem] w-full items-center justify-center px-1">
+        <div className="flex h-11 w-full items-center justify-center px-0.5">
           <AppLogoImage
             logoUrl={settings.logoUrl}
             alt={displayName}
-            className="max-h-full max-w-full"
+            className="max-h-10 max-w-full object-contain"
           />
         </div>
       </Link>

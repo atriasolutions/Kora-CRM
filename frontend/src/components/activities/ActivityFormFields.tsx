@@ -22,6 +22,7 @@ const RELATED_OPTIONS: { value: ActivityRelatedType; label: string }[] = [
   { value: 'compra', label: 'Compra' },
   { value: 'factura', label: 'Factura' },
   { value: 'proyecto', label: 'Proyecto' },
+  { value: 'solicitud', label: 'Solicitud' },
   { value: 'ingreso', label: 'Ingreso' },
   { value: 'producto', label: 'Producto' },
   { value: 'inventario', label: 'Inventario' },

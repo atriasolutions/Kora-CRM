@@ -8,9 +8,14 @@ import {
 import { getTenantIdOrDefault, runWithTenantAsync } from '../lib/tenant-context.js'
 import { assertValidRegionCommune } from '../lib/validate-geo-fields.js'
 import { upsertCompanyHeadquarters } from '../repositories/company-locations.repository.js'
-import { createCompany } from '../repositories/companies.repository.js'
+import {
+  createCompany,
+  findActiveCompanyIdByName,
+} from '../repositories/companies.repository.js'
 import { createContact } from '../repositories/contacts.repository.js'
+import { createOpportunity } from '../repositories/opportunities.repository.js'
 import { env } from '../config/env.js'
+import { AppError } from '../middleware/errors.js'
 import { notifyByUserId } from '../services/notifications.service.js'
 import { ATRIA_TENANT_ID } from '../types/tenant.js'
 import type { AuditActor } from '../types/audit.js'
@@ -27,6 +32,10 @@ function marketingActor(owner: LeadOwner): AuditActor {
     userName: owner.userName,
     tenantId: ATRIA_TENANT_ID,
   }
+}
+
+function isConflictError(err: unknown): boolean {
+  return err instanceof AppError && err.statusCode === 409
 }
 
 async function lookupActiveMarketingLeadOwner(
@@ -114,12 +123,16 @@ async function notifyMarketingLeadAssignment(params: {
   href: string
   entityType: string
   entityId: string
+  title?: string
+  message?: string
 }): Promise<void> {
   try {
     await notifyByUserId(params.owner.userId, {
       type: 'assignment',
-      title: 'Nuevo lead desde la web',
-      message: `Nuevo contacto desde prueba gratis: ${params.recordTitle}`,
+      title: params.title ?? 'Nuevo lead desde la web',
+      message:
+        params.message ??
+        `Nuevo contacto desde prueba gratis: ${params.recordTitle}`,
       href: params.href,
       entityType: params.entityType,
       entityId: params.entityId,
@@ -162,77 +175,83 @@ async function findAtriaContactIdByEmail(email: string): Promise<string | null> 
   return result.rows[0]?.id ?? null
 }
 
-/** Crea (o reutiliza) empresa prospecto + contacto en tenant Atria Solutions. */
-export async function createAtriaProspectFromTrialLead(
+async function resolveAtriaCompany(
   input: TrialLeadInput,
-): Promise<{ companyId: string; contactId: string; createdCompany: boolean; createdContact: boolean }> {
-  await assertValidRegionCommune(input.region, input.commune)
-  const owner = await resolveMarketingLeadOwner()
-  const leadSource = env.marketingLeadSource
+  owner: LeadOwner,
+  actor: AuditActor,
+): Promise<{ companyId: string; created: boolean }> {
+  let companyId =
+    (await findAtriaCompanyIdByRut(input.rut)) ??
+    (await findActiveCompanyIdByName(input.company))
 
-  return runWithTenantAsync({ tenantId: ATRIA_TENANT_ID, tenantSlug: 'atriasolutions' }, async () => {
-    const actor = marketingActor(owner)
+  if (companyId) {
+    await assignRecordOwner('crm_companies', companyId, owner)
+    return { companyId, created: false }
+  }
 
-    let companyId = await findAtriaCompanyIdByRut(input.rut)
-    let createdCompany = false
-
-    if (!companyId) {
-      const company = await createCompany(
-        {
-          name: input.company.trim(),
-          rut: input.rut.trim(),
-          employees: input.employees.trim(),
-          headquartersStreet: input.address.trim(),
-          city: input.commune.trim(),
-          lifecycle: 'Prospecto',
-          operationalStatus: 'Activa',
-          industry: '',
-          ownerName: owner.userName,
-        },
-        actor,
-      )
-      companyId = company.id
-      createdCompany = true
-
-      await upsertCompanyHeadquarters(companyId, {
-        label: 'Casa matriz',
-        street: input.address.trim(),
+  try {
+    const company = await createCompany(
+      {
+        name: input.company.trim(),
+        rut: input.rut.trim(),
+        employees: input.employees.trim(),
+        headquartersStreet: input.address.trim(),
         city: input.commune.trim(),
-        commune: input.commune.trim(),
-        region: input.region.trim(),
-        country: 'Chile',
-        lat: -33.4489,
-        lng: -70.6693,
-      })
+        lifecycle: 'Prospecto',
+        operationalStatus: 'Activa',
+        industry: '',
+        ownerName: owner.userName,
+      },
+      actor,
+    )
+    companyId = company.id
 
-      await assignRecordOwner('crm_companies', companyId, owner)
-    } else {
-      await assignRecordOwner('crm_companies', companyId, owner)
-    }
+    await upsertCompanyHeadquarters(companyId, {
+      label: 'Casa matriz',
+      street: input.address.trim(),
+      city: input.commune.trim(),
+      commune: input.commune.trim(),
+      region: input.region.trim(),
+      country: 'Chile',
+      lat: -33.4489,
+      lng: -70.6693,
+    })
 
-    const existingContactId = await findAtriaContactIdByEmail(input.email)
-    if (existingContactId) {
-      await assignRecordOwner('crm_contacts', existingContactId, owner)
-      await notifyMarketingLeadAssignment({
-        owner,
-        recordTitle: input.name.trim(),
-        href: `/contactos/${existingContactId}`,
-        entityType: 'contacto',
-        entityId: existingContactId,
-      })
-      return {
-        companyId,
-        contactId: existingContactId,
-        createdCompany,
-        createdContact: false,
+    await assignRecordOwner('crm_companies', companyId, owner)
+    return { companyId, created: true }
+  } catch (err) {
+    if (isConflictError(err)) {
+      companyId =
+        (await findAtriaCompanyIdByRut(input.rut)) ??
+        (await findActiveCompanyIdByName(input.company))
+      if (companyId) {
+        await assignRecordOwner('crm_companies', companyId, owner)
+        return { companyId, created: false }
       }
     }
+    throw err
+  }
+}
 
-    const noteParts = [
-      input.message?.trim(),
-      `Canal: ${leadSource} (koracrm.cl/prueba-gratis)`,
-    ].filter(Boolean)
+async function resolveAtriaContact(
+  input: TrialLeadInput,
+  companyId: string,
+  owner: LeadOwner,
+  actor: AuditActor,
+  leadSource: string,
+): Promise<{ contactId: string; created: boolean }> {
+  let contactId = await findAtriaContactIdByEmail(input.email)
+  if (contactId) {
+    await assignRecordOwner('crm_contacts', contactId, owner)
+    return { contactId, created: false }
+  }
 
+  const noteParts = [
+    input.message?.trim(),
+    `Canal: ${leadSource} (koracrm.cl/prueba-gratis)`,
+  ].filter(Boolean)
+
+  try {
     const contact = await createContact(
       {
         name: input.name.trim(),
@@ -249,21 +268,126 @@ export async function createAtriaProspectFromTrialLead(
       },
       actor,
     )
-
     await assignRecordOwner('crm_contacts', contact.id, owner)
-    await notifyMarketingLeadAssignment({
+    return { contactId: contact.id, created: true }
+  } catch (err) {
+    if (isConflictError(err)) {
+      contactId = await findAtriaContactIdByEmail(input.email)
+      if (contactId) {
+        await assignRecordOwner('crm_contacts', contactId, owner)
+        return { contactId, created: false }
+      }
+    }
+    throw err
+  }
+}
+
+async function createLeadOpportunity(params: {
+  input: TrialLeadInput
+  owner: LeadOwner
+  actor: AuditActor
+  companyId: string
+  contactId: string
+  leadSource: string
+}): Promise<{ opportunityId: string }> {
+  const descriptionParts = [
+    params.input.message?.trim(),
+    `Empleados: ${params.input.employees.trim()}`,
+    `Canal: ${params.leadSource} (koracrm.cl/prueba-gratis)`,
+  ].filter(Boolean)
+
+  const opportunity = await createOpportunity(
+    {
+      name: `Demo gratis · ${params.input.company.trim()}`,
+      companyId: params.companyId,
+      contactId: params.contactId,
+      contactName: params.input.name.trim(),
+      contactEmail: params.input.email.trim(),
+      contactPhone: params.input.phone.trim(),
+      owner: params.owner.userName,
+      source: params.leadSource,
+      stage: 'Calificados',
+      type: 'Nuevo negocio',
+      priority: 'Media',
+      outcome: 'Abierta',
+      forecast: 'En pipeline',
+      description: descriptionParts.join('\n\n'),
+    },
+    params.actor,
+  )
+
+  await notifyMarketingLeadAssignment({
+    owner: params.owner,
+    recordTitle: opportunity.name,
+    href: `/oportunidades/${opportunity.id}`,
+    entityType: 'oportunidad',
+    entityId: opportunity.id,
+    title: 'Nueva oportunidad desde la web',
+    message: `Solicitud de demo gratis: ${params.input.company.trim()}`,
+  })
+
+  return { opportunityId: opportunity.id }
+}
+
+export type AtriaProspectFromTrialLeadResult = {
+  companyId: string
+  contactId: string
+  opportunityId: string
+  createdCompany: boolean
+  createdContact: boolean
+  createdOpportunity: boolean
+}
+
+/** Crea (o reutiliza) empresa + contacto + oportunidad en tenant Atria Solutions. */
+export async function createAtriaProspectFromTrialLead(
+  input: TrialLeadInput,
+): Promise<AtriaProspectFromTrialLeadResult> {
+  await assertValidRegionCommune(input.region, input.commune)
+  const owner = await resolveMarketingLeadOwner()
+  const leadSource = env.marketingLeadSource
+
+  return runWithTenantAsync({ tenantId: ATRIA_TENANT_ID, tenantSlug: 'atriasolutions' }, async () => {
+    const actor = marketingActor(owner)
+
+    const { companyId, created: createdCompany } = await resolveAtriaCompany(
+      input,
       owner,
-      recordTitle: contact.name,
-      href: `/contactos/${contact.id}`,
-      entityType: 'contacto',
-      entityId: contact.id,
+      actor,
+    )
+    const { contactId, created: createdContact } = await resolveAtriaContact(
+      input,
+      companyId,
+      owner,
+      actor,
+      leadSource,
+    )
+
+    const { opportunityId } = await createLeadOpportunity({
+      input,
+      owner,
+      actor,
+      companyId,
+      contactId,
+      leadSource,
     })
+
+    if (createdContact) {
+      await notifyMarketingLeadAssignment({
+        owner,
+        recordTitle: input.name.trim(),
+        href: `/contactos/${contactId}`,
+        entityType: 'contacto',
+        entityId: contactId,
+      })
+    }
 
     return {
       companyId,
-      contactId: contact.id,
+      contactId,
+      opportunityId,
       createdCompany,
-      createdContact: true,
+      createdContact,
+      createdOpportunity: true,
     }
   })
 }

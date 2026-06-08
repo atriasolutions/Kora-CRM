@@ -1,5 +1,6 @@
 import { platformQuery, tenantQuery } from '../db/tenant-query.js'
-import { pushTenantCondition, tenantWhereParam } from '../lib/tenant-sql.js'
+import { tenantWhereParam } from '../lib/tenant-sql.js'
+import { USER_DIRECTORY_VISIBLE_CONDITION_U } from '../lib/user-directory.js'
 import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import { mapUserDetail, mapUserRow, type UserRow } from '../mappers/user.mapper.js'
 import {
@@ -15,20 +16,30 @@ import type { AuditActor } from '../types/audit.js'
 import type { CreateUserInput, UpdateUserInput, UserDetail, UserListItem } from '../types/user.js'
 import { paginationOffset } from '../utils/pagination.js'
 
-const SELECT_COLUMNS = `
-  id, email, name, role, profile_id, status, avatar_url,
-  phone, department, job_title, timezone, language,
-  two_factor_enabled, totp_secret_encrypted, totp_verified_at,
-  bio, last_login_at, created_at
+const SELECT_DETAIL_COLUMNS = `
+  u.id, u.email, u.name, u.role, mem.profile_id AS profile_id, u.status, u.avatar_url,
+  u.phone, u.department, u.job_title, u.timezone, u.language,
+  u.two_factor_enabled, u.totp_secret_encrypted, u.totp_verified_at,
+  u.bio, u.last_login_at, u.created_at
 `
 
 const SELECT_LIST_COLUMNS = `
-  u.id, u.email, u.name, u.role, u.profile_id, u.status, u.avatar_url,
+  u.id, u.email, u.name, u.role, mem.profile_id AS profile_id, u.status, u.avatar_url,
   u.phone, u.department, u.job_title, u.timezone, u.language,
   u.two_factor_enabled, u.totp_secret_encrypted, u.totp_verified_at,
   u.bio, u.last_login_at, u.created_at,
   p.name AS profile_name
 `
+
+const MEMBERSHIP_JOIN = `
+  INNER JOIN crm_tenant_memberships mem
+    ON mem.user_id = u.id
+   AND mem.tenant_id = $1
+`
+
+function membershipStatusesForList(): string {
+  return `('active', 'invited')`
+}
 
 export type ListUsersParams = {
   page: number
@@ -40,11 +51,15 @@ export type ListUsersParams = {
 export async function listUsers(
   params: ListUsersParams,
 ): Promise<{ items: UserListItem[]; total: number }> {
-  const conditions: string[] = ['u.deleted_at IS NULL']
-  const values: unknown[] = []
-  let idx = 1
+  const tenantId = getTenantIdOrDefault()
+  const conditions: string[] = [
+    'u.deleted_at IS NULL',
+    USER_DIRECTORY_VISIBLE_CONDITION_U,
+    `mem.status IN ${membershipStatusesForList()}`,
+  ]
+  const values: unknown[] = [tenantId]
+  let idx = 2
 
-  idx = pushTenantCondition(conditions, values, idx, 'u')
   if (params.status) {
     conditions.push(`u.status = $${idx++}`)
     values.push(params.status)
@@ -58,11 +73,14 @@ export async function listUsers(
   }
 
   const where = `WHERE ${conditions.join(' AND ')}`
+  const fromClause = `
+     FROM crm_users u
+     ${MEMBERSHIP_JOIN}
+     LEFT JOIN crm_access_profiles p ON p.id = mem.profile_id`
 
   const countResult = await tenantQuery<{ count: string }>(
     `SELECT count(*)::text AS count
-     FROM crm_users u
-     LEFT JOIN crm_access_profiles p ON p.id = u.profile_id
+     ${fromClause}
      ${where}`,
     values,
   )
@@ -73,8 +91,7 @@ export async function listUsers(
 
   const result = await tenantQuery<UserRow>(
     `SELECT ${SELECT_LIST_COLUMNS}
-     FROM crm_users u
-     LEFT JOIN crm_access_profiles p ON p.id = u.profile_id
+     ${fromClause}
      ${where}
      ORDER BY u.name ASC
      LIMIT $${idx++} OFFSET $${idx}`,
@@ -86,20 +103,31 @@ export async function listUsers(
 
 /** Directorio mínimo para asignar responsables (sin permiso al módulo Usuarios). */
 export async function listUsersForAssignee(): Promise<UserListItem[]> {
+  const tenantId = getTenantIdOrDefault()
   const result = await tenantQuery<UserRow>(
     `SELECT ${SELECT_LIST_COLUMNS}
      FROM crm_users u
-     LEFT JOIN crm_access_profiles p ON p.id = u.profile_id
-     WHERE u.deleted_at IS NULL AND u.status = 'Activo'
+     ${MEMBERSHIP_JOIN}
+     LEFT JOIN crm_access_profiles p ON p.id = mem.profile_id
+     WHERE u.deleted_at IS NULL
+       AND u.status = 'Activo'
+       AND mem.status = 'active'
+       AND ${USER_DIRECTORY_VISIBLE_CONDITION_U}
      ORDER BY u.name ASC`,
+    [tenantId],
   )
   return result.rows.map(mapUserRow)
 }
 
 export async function getUserById(id: string): Promise<UserDetail> {
+  const tenantId = getTenantIdOrDefault()
   const result = await tenantQuery<UserRow>(
-    `SELECT ${SELECT_COLUMNS} FROM crm_users WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
-    [id, getTenantIdOrDefault()],
+    `SELECT ${SELECT_DETAIL_COLUMNS}
+     FROM crm_users u
+     ${MEMBERSHIP_JOIN}
+     WHERE u.id = $2 AND u.deleted_at IS NULL
+       AND mem.status IN ('active', 'invited', 'disabled')`,
+    [tenantId, id],
   )
   const row = result.rows[0]
   if (!row) throw notFound('Usuario no encontrado')

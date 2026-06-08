@@ -9,8 +9,13 @@ import { NavLink } from 'react-router-dom'
 
 function Logo({ headerTrailing }: { headerTrailing?: ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-2 border-b border-sidebar-border/80 bg-gradient-to-r from-primary/[0.07] via-sidebar to-sidebar px-3 py-3.5">
-      <AppBrand className="min-w-0 flex-1" />
+    <div className="shell-sidebar-header flex shrink-0 items-center justify-between gap-2 px-3 py-2.5">
+      <div className="min-w-0 flex-1 rounded-lg border border-white/10 bg-white px-2 py-1.5 shadow-sm shadow-black/15">
+        <AppBrand
+          className="min-w-0 [&>a>div]:border-0 [&>a>div]:bg-transparent [&>a>div]:p-0 [&>a>div]:shadow-none"
+          variant="sidebar"
+        />
+      </div>
       {headerTrailing ?? null}
     </div>
   )
@@ -35,22 +40,14 @@ function SectionItems({
             onClick={onNavigate}
             className={({ isActive }) =>
               cn(
-                'group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground transition-all',
-                'hover:bg-sidebar-accent/90 hover:text-sidebar-accent-foreground hover:shadow-sm',
-                isActive &&
-                  'bg-sidebar-accent font-semibold text-sidebar-accent-foreground shadow-sm ring-1 ring-primary/15',
-                isActive &&
-                  'before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-r-full before:bg-primary',
+                'shell-nav-link group relative flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium leading-none',
+                isActive && 'shell-nav-link-active font-semibold',
               )
             }
           >
-            <Icon
-              aria-hidden
-              className={cn(
-                'size-[18px] shrink-0 transition-opacity',
-                'opacity-75 group-hover:opacity-100',
-              )}
-            />
+            <span className="shell-nav-icon grid size-7 shrink-0 place-items-center rounded-md">
+              <Icon aria-hidden className="size-4" />
+            </span>
             <span className="truncate">{item.label}</span>
           </NavLink>
         )
@@ -68,8 +65,8 @@ function renderSection(sec: NavSectionDef, onNavigate?: () => void) {
     )
   }
   return (
-    <div key={sec.heading} className="mt-7 space-y-2 first:mt-4">
-      <p className="px-4 text-[10px] font-bold uppercase tracking-[0.14em] text-primary/65">
+    <div key={sec.heading} className="mt-4 space-y-1 first:mt-1">
+      <p className="px-3 pb-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-sidebar-primary/75">
         {sec.heading}
       </p>
       <SectionItems items={sec.items} onNavigate={onNavigate} />
@@ -87,11 +84,11 @@ export function SidebarPanel({
   sections: NavSectionDef[]
 }) {
   return (
-    <div className="flex h-full min-h-0 w-full flex-col bg-gradient-to-b from-sidebar via-sidebar to-secondary/25">
+    <div className="shell-sidebar flex h-full min-h-0 w-full flex-col">
       <Logo headerTrailing={headerTrailing} />
       <div className="min-h-0 flex-1 overflow-hidden">
         <ScrollArea className="h-full">
-          <div className="pb-5 pt-2">
+          <div className="pb-2 pt-1.5">
             {sections.map((section) => renderSection(section, onNavigate))}
           </div>
         </ScrollArea>
@@ -103,7 +100,7 @@ export function SidebarPanel({
 export function Sidebar() {
   const { filteredNavSections } = useMenuAccess()
   return (
-    <aside className="fixed inset-y-0 left-0 z-40 hidden h-svh w-56 flex-col overflow-hidden border-r border-sidebar-border/90 bg-sidebar shadow-[4px_0_28px_-16px_rgba(15,23,42,0.14)] lg:flex">
+    <aside className="fixed inset-y-0 left-0 z-40 hidden h-svh w-56 flex-col overflow-hidden border-r border-sidebar-border shadow-[6px_0_32px_-12px_rgba(15,23,42,0.45)] lg:flex">
       <SidebarPanel sections={filteredNavSections} />
     </aside>
   )

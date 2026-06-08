@@ -1,6 +1,7 @@
 import { tenantQuery } from '../db/tenant-query.js'
 import { tenantWhereParam } from '../lib/tenant-sql.js'
 import { getTenantIdOrDefault } from '../lib/tenant-context.js'
+import { USER_DIRECTORY_VISIBLE_CONDITION } from '../lib/user-directory.js'
 import type { MentionKind, MentionSearchItem } from '../types/mentions.js'
 
 const ACTIVE_NOT_ARCHIVED = `deleted_at IS NULL AND archived_at IS NULL`
@@ -30,6 +31,8 @@ function hrefFor(kind: MentionKind, recordId: string): string {
       return `/facturacion/${recordId}`
     case 'activity':
       return `/actividades/${recordId}`
+    case 'solicitud':
+      return `/solicitudes/${recordId}`
     default:
       return ''
   }
@@ -78,6 +81,7 @@ const KIND_ORDER: MentionKind[] = [
   'product',
   'invoice',
   'activity',
+  'solicitud',
 ]
 
 export async function searchMentions(
@@ -94,13 +98,13 @@ export async function searchMentions(
         ? `SELECT 'user'::text AS kind, id::text AS record_id, name AS label,
                   coalesce(nullif(trim(email), ''), role, status::text) AS subtitle
            FROM crm_users
-           WHERE deleted_at IS NULL AND status = 'Activo'
+           WHERE deleted_at IS NULL AND status = 'Activo' AND ${USER_DIRECTORY_VISIBLE_CONDITION}
              AND (name ILIKE $1 OR email ILIKE $1 OR role ILIKE $1)
            ORDER BY name ASC LIMIT $2`
         : `SELECT 'user'::text AS kind, id::text AS record_id, name AS label,
                   coalesce(nullif(trim(email), ''), role) AS subtitle
            FROM crm_users
-           WHERE deleted_at IS NULL AND status = 'Activo'
+           WHERE deleted_at IS NULL AND status = 'Activo' AND ${USER_DIRECTORY_VISIBLE_CONDITION}
            ORDER BY name ASC LIMIT $1`,
       pattern,
       perKind,
@@ -230,6 +234,22 @@ export async function searchMentions(
            FROM crm_activities
            WHERE ${ACTIVE_ONLY}
            ORDER BY scheduled_at DESC NULLS LAST LIMIT $1`,
+      pattern,
+      perKind,
+    ),
+    searchKind(
+      pattern
+        ? `SELECT 'solicitud'::text AS kind, id::text AS record_id, code AS label,
+                  coalesce(nullif(trim(title), ''), status::text) AS subtitle
+           FROM crm_solicitudes
+           WHERE ${ACTIVE_NOT_ARCHIVED}
+             AND (code ILIKE $1 OR title ILIKE $1)
+           ORDER BY updated_at DESC LIMIT $2`
+        : `SELECT 'solicitud'::text AS kind, id::text AS record_id, code AS label,
+                  coalesce(nullif(trim(title), ''), status::text) AS subtitle
+           FROM crm_solicitudes
+           WHERE ${ACTIVE_NOT_ARCHIVED}
+           ORDER BY updated_at DESC LIMIT $1`,
       pattern,
       perKind,
     ),

@@ -28,6 +28,7 @@ export const createQuoteSchema = z.object({
   paymentTerms: z.string().max(255).optional(),
   deliveryTerms: z.string().max(255).optional(),
   terms: z.string().max(10000).optional(),
+  globalDiscount: z.string().max(16).optional(),
   lineItems: z.array(lineItemSchema).optional(),
 })
 

@@ -21,6 +21,8 @@ export type OrganizationSettingsRow = {
   default_vat_percent: string | number | null
   invoicing_mode: string | null
   economic_activity_code: number | null
+  default_solicitud_assignee_user_id: string | null
+  default_solicitud_assignee_name: string | null
 }
 
 export type WarehouseRow = {
@@ -61,6 +63,8 @@ export function mapOrganizationSettings(
     invoicingMode: row.invoicing_mode === 'sii' ? 'sii' : 'manual',
     economicActivityCode:
       row.economic_activity_code != null ? Number(row.economic_activity_code) : null,
+    defaultSolicitudAssigneeUserId: row.default_solicitud_assignee_user_id ?? null,
+    defaultSolicitudAssigneeName: row.default_solicitud_assignee_name ?? '',
   }
 }
 

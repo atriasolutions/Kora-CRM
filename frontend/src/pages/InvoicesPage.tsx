@@ -136,7 +136,13 @@ export function InvoicesPage() {
   const handleDuplicateSelect = useCallback(async (source: InvoiceListItem) => {
     try {
       const detail = await loadInvoiceDetail(source.id)
-      setCreateInitial(duplicateInvoiceFormValues(source, detail.lineItems))
+      setCreateInitial(
+        duplicateInvoiceFormValues(
+          source,
+          detail.lineItems,
+          detail.discountPercent ?? detail.globalDiscount,
+        ),
+      )
       setCreateTitle('Duplicar factura')
       setCreateOpen(true)
     } catch {

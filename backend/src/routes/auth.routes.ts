@@ -84,6 +84,7 @@ authRouter.post('/login', async (req, res, next) => {
           user: step.result.user,
           profile: step.result.profile,
           tenantId: step.result.tenantId,
+          isPlatformOperator: step.result.isPlatformOperator,
         },
       })
       return
@@ -177,6 +178,7 @@ authRouter.post('/switch-tenant', async (req, res, next) => {
         user: result.user,
         profile: result.profile,
         tenantId: result.tenantId,
+        isPlatformOperator: result.isPlatformOperator,
       },
     })
   } catch (e) {
@@ -207,6 +209,7 @@ authRouter.get('/me', async (req, res, next) => {
         profile: result.profile,
         tenantId: result.tenantId,
         tenantSlug: tenant?.slug ?? '',
+        isPlatformOperator: result.isPlatformOperator,
       },
     })
   } catch (e) {

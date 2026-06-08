@@ -56,3 +56,15 @@ export const HELP_PROJECT_JOURNEY_CONCEPTS = [
   '· Al reanudar desde una detención, vuelves a la etapa principal desde la que saliste.',
   'Acciones en el sistema: mover etapa en el camino de éxito; el encabezado muestra salud, prioridad, presupuesto, fechas y avance del plan de trabajo.',
 ]
+
+export const HELP_SOLICITUD_JOURNEY_CONCEPTS = [
+  'En la ficha, la «ruta del éxito» muestra la etapa actual y las transiciones permitidas (con permiso de edición). Al cambiar etapa se guarda el estado y queda registro en el historial de la sesión.',
+  'Ruta principal:',
+  '· Nuevo → Planificación → En Proceso → Entregado a Cliente → Cerrado.',
+  '· Puedes retroceder un paso en la ruta principal cuando el flujo lo permite.',
+  'Fuera de ruta (desde Planificación o En Proceso):',
+  '· Detenido por cliente, Detenido Internamente o En espera de Cliente pausan el avance.',
+  '· Al reanudar, vuelves a la etapa principal desde la que saliste.',
+  'Prioridad (Baja, Media, Alta, Urgente): clasifica urgencia operativa; no bloquea transiciones de etapa.',
+  'Acciones en el sistema: mover etapa en la ruta del éxito; kanban y segmentos agrupan por Activos, Detenidos y Cierre.',
+]

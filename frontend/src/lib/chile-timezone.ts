@@ -170,6 +170,28 @@ export function formatChileSessionWhen(iso: string | Date | null | undefined): s
   return `${dateLabel}, ${time}`
 }
 
+/** Fecha-hora legible para listados (ej. `08-06-2026 12:30:32`, hora Chile). */
+export function formatChileDateTimeDisplay(iso: string | Date | null | undefined): string {
+  if (!iso) return '—'
+  const date = typeof iso === 'string' ? new Date(iso) : iso
+  if (Number.isNaN(date.getTime())) {
+    return typeof iso === 'string' && iso.trim() ? iso : '—'
+  }
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: CHILE_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).formatToParts(date)
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === type)?.value ?? '00'
+  return `${get('day')}-${get('month')}-${get('year')} ${get('hour')}:${get('minute')}:${get('second')}`
+}
+
 /** Fecha corta en calendario Chile (ej. `30 jun 2024`). */
 export function formatChileDateLabel(iso: string | Date | null | undefined): string {
   if (!iso) return '—'

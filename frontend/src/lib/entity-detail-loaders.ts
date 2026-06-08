@@ -7,6 +7,7 @@ import { getQuoteApi, listQuotesForOpportunityApi } from '@/api/quotes'
 import { normalizeQuoteDetailFromApi } from '@/lib/quote-detail-normalize'
 import { getInvoiceApi } from '@/api/invoices'
 import { getProjectApi } from '@/api/projects'
+import { getSolicitudApi } from '@/api/solicitudes'
 import { getActivityApi } from '@/api/activities'
 import { getUserApi } from '@/api/users'
 import { getPurchaseApi } from '@/api/purchases'
@@ -25,6 +26,7 @@ import { buildDetailFromList } from '@/data/product-detail.mock'
 import type { QuoteDetail } from '@/data/quote-detail.mock'
 import type { InvoiceDetail } from '@/data/invoice-detail.mock'
 import type { ProjectDetail } from '@/data/project-detail.mock'
+import type { SolicitudDetail } from '@/data/solicitudes.mock'
 import type { ActivityDetail } from '@/data/activity-detail.mock'
 import type { PurchaseDetail } from '@/data/purchase-detail.mock'
 import { getCompanyLocationsApi } from '@/api/companies'
@@ -51,6 +53,9 @@ import { mergeOutreachIntoContact } from '@/lib/contact-outreach-storage'
 import { mergeContactListAvatar } from '@/lib/entity-list-image-cache'
 import { mergeEntityNotes } from '@/lib/entity-notes-storage'
 import { buildJourneyHistory } from '@/lib/project-journey'
+import { buildSolicitudActivitiesForDetail } from '@/lib/solicitud-activities'
+import { statusHistoryFor } from '@/lib/solicitud-journey'
+import { loadRelatedActivitiesForDetail } from '@/lib/entity-related-activities'
 import { enrichProjectCommercialLinks } from '@/lib/project-relations'
 import { computeInvoiceTotals } from '@/lib/invoice-line-item'
 import { formatAmount } from '@/lib/invoice-display'
@@ -70,6 +75,7 @@ import { getPurchaseFiles } from '@/lib/purchase-files'
 import { getQuoteFiles } from '@/lib/quote-files'
 import { getOpportunityFiles } from '@/lib/opportunity-files'
 import { getProjectFiles } from '@/lib/project-files'
+import { getSolicitudFiles } from '@/lib/solicitud-files'
 import type { ContactActivityType } from '@/data/contact-detail.mock'
 import { loadCatalogSettings } from '@/lib/catalog-settings'
 import {
@@ -427,7 +433,12 @@ export async function loadQuoteDetail(id: string): Promise<QuoteDetail> {
 export async function loadInvoiceDetail(id: string): Promise<InvoiceDetail> {
   const api = await getInvoiceApi(id)
   const lineItems = api.lineItems ?? []
-  const totals = computeInvoiceTotals(lineItems)
+  const globalDiscount =
+    (api as InvoiceDetail & { globalDiscount?: string }).globalDiscount ??
+    api.discountPercent
+  const totals = computeInvoiceTotals(lineItems, {
+    globalDiscountPercent: globalDiscount,
+  })
   const paidAmountNum = api.payments?.length
     ? api.payments
         .filter((p) => p.status === 'Confirmado')
@@ -445,8 +456,11 @@ export async function loadInvoiceDetail(id: string): Promise<InvoiceDetail> {
     subtotal: totals.subtotal,
     taxableSubtotal: totals.taxableSubtotal,
     exemptSubtotal: totals.exemptSubtotal,
+    discountPercent: totals.discountPercent,
+    discountAmount: totals.discountAmount,
     taxPercent: totals.taxPercent,
     taxAmount: totals.taxAmount,
+    globalDiscount,
     paidAmountNum,
     balanceDue:
       api.status === 'Pagada'
@@ -493,6 +507,47 @@ export async function loadProjectDetail(id: string): Promise<ProjectDetail> {
     getProjectFiles(id, project.manager),
   )
   return project
+}
+
+export async function loadSolicitudDetail(id: string): Promise<SolicitudDetail> {
+  if (isApiEnabled()) {
+    const api = await getSolicitudApi(id)
+    const solicitud: SolicitudDetail = {
+      ...api,
+      id: api.id,
+      team: api.team ?? [],
+      activities: await loadRelatedActivitiesForDetail('solicitud', id),
+      notes: await mergeEntityNotes('solicitud', id, []),
+      files: [],
+      statusHistory: statusHistoryFor(id, api.status),
+    }
+    solicitud.files = await mergeEntityFiles(
+      'solicitud',
+      id,
+      getSolicitudFiles(id, solicitud.assignee),
+    )
+    return solicitud
+  }
+
+  const base = (await import('@/data/solicitudes.mock')).resolveSolicitudListItem(id)
+  const detail: SolicitudDetail = {
+    ...base,
+    team: base.teamMembers?.map((m) => ({
+      id: m.id,
+      name: m.name,
+      userId: m.userId,
+      role: m.role ?? 'Miembro del equipo',
+    })) ?? [],
+    activities: buildSolicitudActivitiesForDetail(base),
+    notes: await mergeEntityNotes('solicitud', id, []),
+    files: await mergeEntityFiles(
+      'solicitud',
+      id,
+      getSolicitudFiles(id, base.assignee),
+    ),
+    statusHistory: statusHistoryFor(id, base.status),
+  }
+  return detail
 }
 
 export async function loadActivityDetail(id: string): Promise<ActivityDetail> {

@@ -19,6 +19,7 @@ import { organizationSettingsRouter } from './organization-settings.routes.js'
 import { productCategoriesRouter } from './product-categories.routes.js'
 import { productsRouter } from './products.routes.js'
 import { projectsRouter } from './projects.routes.js'
+import { solicitudesRouter } from './solicitudes.routes.js'
 import { quotesRouter } from './quotes.routes.js'
 import { usersRouter } from './users.routes.js'
 import { warehousesRouter } from './warehouses.routes.js'
@@ -52,6 +53,7 @@ apiRouter.use('/quotes', quotesRouter)
 apiRouter.use('/invoices', invoicesRouter)
 apiRouter.use('/sii', siiRouter)
 apiRouter.use('/projects', projectsRouter)
+apiRouter.use('/solicitudes', solicitudesRouter)
 apiRouter.use('/reports', reportsRouter)
 apiRouter.use('/search', searchRouter)
 apiRouter.use('/notifications', notificationsRouter)

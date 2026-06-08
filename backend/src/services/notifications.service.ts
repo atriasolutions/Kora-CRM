@@ -159,6 +159,48 @@ export async function notifyProjectTeamMemberAdded(params: {
   })
 }
 
+/** Notifica a un miembro nuevo del equipo de la solicitud. */
+export async function notifySolicitudTeamMemberAdded(params: {
+  actor: AuditActor
+  memberName: string
+  solicitudId: string
+  solicitudTitle: string
+}): Promise<void> {
+  const memberName = params.memberName?.trim()
+  if (!memberName) return
+  if (isSamePersonName(memberName, params.actor.userName)) return
+
+  await notifyByUserName(memberName, {
+    type: 'assignment',
+    title: 'Te agregaron a una solicitud',
+    message: `${params.actor.userName} te agregó al equipo de la solicitud: ${params.solicitudTitle}`,
+    href: `/solicitudes/${params.solicitudId}`,
+    entityType: 'solicitud',
+    entityId: params.solicitudId,
+  })
+}
+
+/** Notifica al responsable de una solicitud. */
+export async function notifySolicitudAssignment(params: {
+  actor: AuditActor
+  assigneeName: string
+  solicitudId: string
+  solicitudTitle: string
+}): Promise<void> {
+  const assigneeName = params.assigneeName?.trim()
+  if (!assigneeName) return
+  if (isSamePersonName(assigneeName, params.actor.userName)) return
+
+  await notifyByUserName(assigneeName, {
+    type: 'assignment',
+    title: 'Te asignaron una solicitud',
+    message: `Se te asignó la solicitud: ${params.solicitudTitle}`,
+    href: `/solicitudes/${params.solicitudId}`,
+    entityType: 'solicitud',
+    entityId: params.solicitudId,
+  })
+}
+
 /** Notifica al gerente de proyecto (usuario activo con el mismo nombre en CRM). */
 export async function notifyProjectAssignment(params: {
   actor: AuditActor

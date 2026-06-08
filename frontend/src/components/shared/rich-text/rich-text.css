@@ -138,3 +138,39 @@
 .rich-text-content .mention-link:hover {
   opacity: 0.85;
 }
+
+/* Imágenes inline en descripción de solicitudes (miniatura; clic para ampliar) */
+.rich-text-editor .tiptap .solicitud-inline-image,
+.rich-text-content .solicitud-inline-image {
+  display: inline-block;
+  max-width: min(220px, 100%);
+  max-height: 140px;
+  width: auto;
+  height: auto;
+  margin: 0.5rem 0.25rem 0.5rem 0;
+  border-radius: 0.375rem;
+  border: 1px solid hsl(var(--border));
+  box-shadow: 0 1px 2px hsl(var(--foreground) / 0.06);
+  object-fit: contain;
+  vertical-align: middle;
+}
+
+.rich-text-content .solicitud-inline-image-clickable {
+  cursor: zoom-in;
+  transition: opacity 0.15s ease, box-shadow 0.15s ease;
+}
+
+.rich-text-content .solicitud-inline-image-clickable:hover {
+  opacity: 0.92;
+  box-shadow: 0 4px 12px hsl(var(--foreground) / 0.12);
+}
+
+.rich-text-content .solicitud-inline-image-clickable:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+/* Dropdown de @menciones (tippy.js) */
+.tippy-box {
+  z-index: 9999 !important;
+}

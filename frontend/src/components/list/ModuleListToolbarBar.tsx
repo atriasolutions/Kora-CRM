@@ -29,7 +29,7 @@ export function ModuleListToolbarBar({
       </div>
 
       <div className="hidden overflow-hidden rounded-xl border border-border bg-card shadow-sm md:block">
-        <div className="flex min-h-[3.5rem] flex-wrap items-stretch lg:flex-nowrap">
+        <div className="flex min-h-[3.5rem] min-w-0 flex-wrap items-stretch">
           {viewSwitcher ? (
             <div className="flex shrink-0 items-center px-4 py-2.5">{viewSwitcher}</div>
           ) : null}

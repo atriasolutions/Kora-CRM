@@ -13,6 +13,7 @@ import {
   SettingsOverviewIcon,
   type SettingsSectionId,
 } from '@/components/settings/settings-sections'
+import { SolicitudesSettingsPanel } from '@/components/settings/SolicitudesSettingsPanel'
 import { WarehousesSettingsPanel } from '@/components/settings/WarehousesSettingsPanel'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -28,6 +29,8 @@ function SettingsSectionPanel({ sectionId }: { sectionId: SettingsSectionId }) {
       return <ProductCategoriesSettingsPanel />
     case 'impuestos':
       return <TaxCurrencySettingsPanel />
+    case 'solicitudes':
+      return <SolicitudesSettingsPanel />
     default:
       return null
   }

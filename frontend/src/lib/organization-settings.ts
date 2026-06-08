@@ -22,6 +22,8 @@ export function defaultOrganizationSettings(): OrganizationSettings {
     defaultVatPercent: 19,
     invoicingMode: 'manual',
     economicActivityCode: null,
+    defaultSolicitudAssigneeUserId: null,
+    defaultSolicitudAssigneeName: '',
   }
 }
 

@@ -7,8 +7,8 @@ import { badRequest, notFound } from '../middleware/errors.js'
 import { getAccessProfileById } from './access-profiles.repository.js'
 import * as twoFactorRepo from './two-factor.repository.js'
 import {
-  assertUserMembership,
   getDefaultTenantIdForUser,
+  resolveTenantAccess,
 } from './tenants.repository.js'
 import { listRecentUserSessions, recordUserSession } from './user-sessions.repository.js'
 import type { AccessProfile } from '../types/access-profile.js'
@@ -27,6 +27,7 @@ export type AuthLoginResult = {
   user: UserDetail
   profile: AccessProfile
   tenantId: string
+  isPlatformOperator: boolean
 }
 
 export type AuthLoginStepUser = {
@@ -92,10 +93,14 @@ async function findUserRowByCredentials(
 async function resolveTenantForLogin(
   userId: string,
   tenantId?: string,
-): Promise<{ tenantId: string; profileId: string }> {
+): Promise<{ tenantId: string; profileId: string; isPlatformOperator: boolean }> {
   const resolvedTenantId = tenantId?.trim() || (await getDefaultTenantIdForUser(userId))
-  const membership = await assertUserMembership(userId, resolvedTenantId)
-  return { tenantId: resolvedTenantId, profileId: membership.profileId }
+  const access = await resolveTenantAccess(userId, resolvedTenantId)
+  return {
+    tenantId: resolvedTenantId,
+    profileId: access.profileId,
+    isPlatformOperator: access.isPlatformOperator,
+  }
 }
 
 export async function createAuthSessionForUser(
@@ -104,7 +109,7 @@ export async function createAuthSessionForUser(
   client?: LoginClientInfo,
 ): Promise<AuthLoginResult> {
   return runWithTenantAsync({ tenantId }, async () => {
-    const { profileId } = await assertUserMembership(userId, tenantId)
+    const { profileId, isPlatformOperator } = await resolveTenantAccess(userId, tenantId)
 
     const result = await platformQuery<UserRow>(
       `SELECT ${USER_COLUMNS} FROM crm_users WHERE id = $1 AND deleted_at IS NULL`,
@@ -144,7 +149,7 @@ export async function createAuthSessionForUser(
     user.recentSessions = await listRecentUserSessions(row.id)
     const profile = await getAccessProfileById(profileId)
 
-    return { token, user, profile, tenantId }
+    return { token, user, profile, tenantId, isPlatformOperator }
   })
 }
 
@@ -201,6 +206,7 @@ export async function resolveSessionUser(token: string): Promise<{
   user: UserDetail
   profile: AccessProfile
   tenantId: string
+  isPlatformOperator: boolean
 } | null> {
   const trimmed = token.trim()
   if (!trimmed) return null
@@ -227,7 +233,7 @@ export async function resolveSessionUser(token: string): Promise<{
     }
   }
 
-  const { profileId } = await assertUserMembership(userId, tenantId)
+  const { profileId, isPlatformOperator } = await resolveTenantAccess(userId, tenantId)
 
   return runWithTenantAsync({ tenantId }, async () => {
     const result = await platformQuery<UserRow>(
@@ -240,7 +246,7 @@ export async function resolveSessionUser(token: string): Promise<{
     const user = mapUserDetail(row)
     user.profileId = profileId
     const profile = await getAccessProfileById(profileId)
-    return { user, profile, tenantId }
+    return { user, profile, tenantId, isPlatformOperator }
   })
 }
 
@@ -256,7 +262,7 @@ export async function switchTenantSession(
   currentToken: string,
   client?: LoginClientInfo,
 ): Promise<AuthLoginResult> {
-  await assertUserMembership(userId, tenantId)
+  await resolveTenantAccess(userId, tenantId)
   await logoutSession(currentToken)
   return createAuthSessionForUser(userId, tenantId, client)
 }
@@ -268,9 +274,10 @@ export async function getUserByIdForAuth(
   user: UserDetail
   profile: AccessProfile
   tenantId: string
+  isPlatformOperator: boolean
 }> {
   return runWithTenantAsync({ tenantId }, async () => {
-    const { profileId } = await assertUserMembership(id, tenantId)
+    const { profileId, isPlatformOperator } = await resolveTenantAccess(id, tenantId)
     const result = await platformQuery<UserRow>(
       `SELECT ${USER_COLUMNS} FROM crm_users WHERE id = $1 AND deleted_at IS NULL`,
       [id],
@@ -280,6 +287,6 @@ export async function getUserByIdForAuth(
     const user = mapUserDetail(row)
     user.profileId = profileId
     const profile = await getAccessProfileById(profileId)
-    return { user, profile, tenantId }
+    return { user, profile, tenantId, isPlatformOperator }
   })
 }

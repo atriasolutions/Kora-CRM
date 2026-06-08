@@ -135,7 +135,11 @@ export function TrialLeadForm({ onSuccess }: TrialLeadFormProps) {
       setShowValidation(false)
       onSuccess?.()
     } catch (err) {
-      toast.error(apiActionErrorMessage(err, 'No se pudo enviar la solicitud.'))
+      const message = apiActionErrorMessage(
+        err,
+        'No pudimos enviar tu solicitud. Intenta nuevamente en unos minutos.',
+      )
+      toast.error(message)
     } finally {
       setSaving(false)
     }

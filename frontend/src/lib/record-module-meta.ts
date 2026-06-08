@@ -5,6 +5,7 @@ export type RecordModuleKey =
   | 'cotizaciones'
   | 'actividades'
   | 'proyectos'
+  | 'solicitudes'
   | 'compras'
   | 'ingresos'
   | 'inventario'
@@ -56,6 +57,11 @@ export const RECORD_MODULE_META: Record<RecordModuleKey, RecordModuleMeta> = {
     entityLabel: 'Proyecto',
     listPath: '/proyectos',
     listLabel: 'Proyectos',
+  },
+  solicitudes: {
+    entityLabel: 'Solicitud',
+    listPath: '/solicitudes',
+    listLabel: 'Solicitudes',
   },
   compras: {
     entityLabel: 'Compra',

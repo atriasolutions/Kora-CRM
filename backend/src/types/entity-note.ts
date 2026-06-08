@@ -11,6 +11,7 @@ export const ENTITY_NOTE_TYPES = [
   'recepcion',
   'actividad',
   'proyecto',
+  'solicitud',
   'usuario',
 ] as const
 

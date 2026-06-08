@@ -18,6 +18,27 @@ type StoredListColumnPrefsV2 = {
 export const LIST_COL_MIN_WIDTH = 72
 export const LIST_COL_MAX_WIDTH = 520
 export const LIST_COL_DEFAULT_WIDTH = 140
+export const LIST_TABLE_SELECTION_COL_WIDTH = 44
+export const LIST_TABLE_ACTIONS_COL_WIDTH = 104
+
+export function parseListTableMinWidth(value?: string | number): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (!value) return 940
+  const match = String(value).match(/(\d+)/)
+  return match ? Number.parseInt(match[1]!, 10) : 940
+}
+
+export function computeListTableMinWidth(
+  columnWidths: number[],
+  configMinWidth?: string | number,
+  options?: { includeActionsColumn?: boolean },
+): number {
+  const columnsTotal = columnWidths.reduce((sum, width) => sum + width, 0)
+  const actionsWidth =
+    options?.includeActionsColumn === false ? 0 : LIST_TABLE_ACTIONS_COL_WIDTH
+  const floor = columnsTotal + LIST_TABLE_SELECTION_COL_WIDTH + actionsWidth
+  return Math.max(floor, parseListTableMinWidth(configMinWidth))
+}
 
 export function listColumnKey(index: number, header: string): string {
   return `${index}:${header}`

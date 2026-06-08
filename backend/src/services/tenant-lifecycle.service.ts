@@ -50,8 +50,53 @@ function slugifyCompanyName(name: string): string {
   )
 }
 
-function buildTenantLoginUrl(slug: string): string {
+export function buildTenantLoginUrl(slug: string): string {
   return `https://${slug}.${env.platformDomain}/login`
+}
+
+export type ActiveTrialForEmail = {
+  tenantId: string
+  slug: string
+  loginUrl: string
+  trialEndsAt: Date | null
+}
+
+/** Demo trial vigente asociada al correo del solicitante (máx. una instancia activa). */
+export async function findActiveTrialForEmail(
+  email: string,
+): Promise<ActiveTrialForEmail | null> {
+  const normalized = email.trim().toLowerCase()
+  if (!normalized) return null
+
+  const result = await platformQuery<{
+    tenant_id: string
+    slug: string
+    trial_ends_at: Date | string | null
+  }>(
+    `SELECT t.id AS tenant_id, t.slug, t.trial_ends_at
+     FROM crm_tenants t
+     INNER JOIN crm_tenant_memberships m ON m.tenant_id = t.id
+     INNER JOIN crm_users u ON u.id = m.user_id
+     WHERE lower(trim(u.email)) = $1
+       AND u.deleted_at IS NULL
+       AND m.status IN ('active', 'invited')
+       AND t.kind = 'trial'
+       AND t.status IN ('active', 'provisioning')
+       AND (t.trial_ends_at IS NULL OR t.trial_ends_at > now())
+     ORDER BY t.created_at DESC
+     LIMIT 1`,
+    [normalized],
+  )
+
+  const row = result.rows[0]
+  if (!row) return null
+
+  return {
+    tenantId: row.tenant_id,
+    slug: row.slug,
+    loginUrl: buildTenantLoginUrl(row.slug),
+    trialEndsAt: row.trial_ends_at ? new Date(row.trial_ends_at) : null,
+  }
 }
 
 export async function generateUniqueTrialSlug(company: string): Promise<string> {
@@ -73,8 +118,8 @@ export async function provisionTrialTenant(
   try {
     await runWithTenantAsync({ tenantId, tenantSlug: slug }, async () => {
       const profileResult = await tenantQuery<{ id: string }>(
-        `INSERT INTO crm_access_profiles (name, tenant_id)
-         VALUES ($1, $2)
+        `INSERT INTO crm_access_profiles (name, description, is_system, updated_at, tenant_id)
+         VALUES ($1, 'Acceso total al tenant de prueba', true, now(), $2)
          RETURNING id`,
         [TRIAL_PROFILE_NAME, tenantId],
       )
@@ -83,7 +128,7 @@ export async function provisionTrialTenant(
 
       const modules = [
         'dashboard', 'contactos', 'empresas', 'oportunidades', 'cotizaciones',
-        'facturacion', 'actividades', 'proyectos', 'compras', 'ingresos',
+        'facturacion', 'actividades', 'proyectos', 'solicitudes', 'compras', 'ingresos',
         'inventario', 'productos', 'reportes', 'usuarios', 'perfiles', 'configuracion',
       ]
       for (const moduleId of modules) {
@@ -255,6 +300,17 @@ export async function provisionTrialFromLead(input: {
     ? env.marketingTrialDays
     : 14
 
+  const existingTrial = await findActiveTrialForEmail(input.email)
+  if (existingTrial) {
+    return {
+      provisioned: false,
+      slug: existingTrial.slug,
+      loginUrl: existingTrial.loginUrl,
+      trialDays,
+      error: 'Ya existe una demo activa para este correo.',
+    }
+  }
+
   try {
     const slug = await generateUniqueTrialSlug(input.company)
     const { tenantId, loginUrl } = await provisionTrialTenant({
@@ -364,6 +420,8 @@ export async function purgeExpiredTrialTenants(): Promise<number> {
       'crm_project_work_groups',
       'crm_project_team_members',
       'crm_projects',
+      'crm_solicitud_team_members',
+      'crm_solicitudes',
       'crm_activities',
       'crm_contacts',
       'crm_company_branches',

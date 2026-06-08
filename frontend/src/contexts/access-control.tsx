@@ -11,14 +11,17 @@ import {
   canModule,
   filterNavSections,
   getProfilePermissionMap,
+  permissionMap,
 } from '@/lib/access-control'
 import { getCurrentUser } from '@/lib/current-user'
+import { createFullModulePermissions } from '@/lib/menu-modules'
 import type { MenuModuleId, PermissionAction } from '@/lib/menu-modules'
 import { navSections } from '@/navigation'
 
 export function AccessControlProvider({ children }: { children: ReactNode }) {
   const { findById, profiles } = useProfilesRegistry()
   const { session, profile: authProfile } = useAuth()
+  const isPlatformOperator = Boolean(session?.isPlatformOperator)
 
   const profileId = useMemo(() => {
     if (authProfile?.id) return authProfile.id
@@ -36,17 +39,19 @@ export function AccessControlProvider({ children }: { children: ReactNode }) {
       authProfile ??
       findById(profileId) ??
       findById(DEFAULT_PROFILE_ID)
-    const map = getProfilePermissionMap(profile)
+    const map = isPlatformOperator
+      ? permissionMap(createFullModulePermissions())
+      : getProfilePermissionMap(profile)
 
     return {
       profileId: profile?.id ?? profileId,
-      profileName: profile?.name ?? 'Sin perfil',
+      profileName: isPlatformOperator ? 'Soporte plataforma' : (profile?.name ?? 'Sin perfil'),
       can: (moduleId: MenuModuleId | null, action: PermissionAction) =>
         canModule(map, moduleId, action),
       canAccessPath: (pathname: string) => checkPath(pathname, map),
       filteredNavSections: filterNavSections(navSections, map),
     }
-  }, [authProfile, findById, profileId, profiles])
+  }, [authProfile, findById, profileId, profiles, isPlatformOperator])
 
   return (
     <AccessControlContext.Provider value={value}>

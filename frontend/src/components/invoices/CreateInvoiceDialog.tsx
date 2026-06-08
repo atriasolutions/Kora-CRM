@@ -8,6 +8,8 @@ import {
   ContactFormSelect,
 } from '@/components/contacts/ContactFormField'
 import { InvoiceLineItemsEditor } from '@/components/invoices/InvoiceLineItemsEditor'
+import { DocumentGlobalDiscountField } from '@/components/shared/DocumentGlobalDiscountField'
+import { DocumentTotalsBreakdown } from '@/components/shared/DocumentTotalsBreakdown'
 import { QuoteLookupField } from '@/components/shared/QuoteLookupField'
 import { SaleCustomerFields } from '@/components/shared/SaleCustomerFields'
 import { Button } from '@/components/ui/button'
@@ -29,6 +31,7 @@ import {
   type CreateInvoiceFormValues,
   type InvoiceSourceMode,
 } from '@/lib/invoice-create'
+import { computeInvoiceTotals } from '@/lib/invoice-line-item'
 import { cn } from '@/lib/utils'
 
 type CreateInvoiceDialogProps = {
@@ -82,8 +85,14 @@ export function CreateInvoiceDialog({
   const patch = (partial: Partial<CreateInvoiceFormValues>) => {
     setForm((prev) => {
       const next = { ...prev, ...partial }
-      if (partial.lineItems) {
-        return { ...next, ...syncInvoiceFormAmount(partial.lineItems) }
+      if (partial.lineItems || partial.globalDiscountPercent !== undefined) {
+        const lineItems = partial.lineItems ?? next.lineItems
+        const globalDiscountPercent =
+          partial.globalDiscountPercent ?? next.globalDiscountPercent
+        return {
+          ...next,
+          ...syncInvoiceFormAmount(lineItems, globalDiscountPercent),
+        }
       }
       return next
     })
@@ -111,7 +120,13 @@ export function CreateInvoiceDialog({
   const showCustomerFields = form.invoiceSource === 'directa' || !form.lockQuote
   const customerDisabled = form.invoiceSource === 'cotizacion' && Boolean(form.lockQuote)
 
-  const totalsHint = useMemo(() => form.amount, [form.amount])
+  const totals = useMemo(
+    () =>
+      computeInvoiceTotals(form.lineItems, {
+        globalDiscountPercent: form.globalDiscountPercent,
+      }),
+    [form.lineItems, form.globalDiscountPercent],
+  )
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -194,10 +209,26 @@ export function CreateInvoiceDialog({
             onChange={(lineItems) => patch({ lineItems })}
           />
 
+          <DocumentGlobalDiscountField
+            id="inv-global-discount"
+            value={form.globalDiscountPercent}
+            onChange={(globalDiscountPercent) => patch({ globalDiscountPercent })}
+          />
+
+          <DocumentTotalsBreakdown
+            subtotal={totals.subtotal}
+            discountPercent={totals.discountPercent}
+            discountAmount={totals.discountAmount}
+            taxLabel={`IVA (${totals.taxPercent})`}
+            taxAmount={totals.taxAmount}
+            total={totals.amount}
+            totalLabel="Total (con IVA)"
+          />
+
           <ContactFormInput
             id="inv-amount"
             label="Monto total (con IVA)"
-            value={totalsHint}
+            value={form.amount}
             disabled
             onChange={() => {}}
           />

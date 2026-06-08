@@ -33,7 +33,7 @@ import type {
   UpdateInvoiceInput,
 } from '../types/invoice.js'
 import { parseDateInput } from '../utils/format.js'
-import { parseMoneyToCents } from '../utils/money.js'
+import { parseMoneyToCents, parsePercentToInt } from '../utils/money.js'
 import { paginationOffset } from '../utils/pagination.js'
 import { purgeEntityNotesAndFiles } from '../services/entity-purge.service.js'
 import { broadcastInventoryUpdated } from '../services/notifications.service.js'
@@ -49,10 +49,17 @@ const INVOICE_COLUMNS = `
   company_id, company_name, quote_id, quote_code, amount_cents,
   issue_date, due_date, status, owner_name, payment_method, sii_number,
   dte_type, sii_track_id, dte_status, dte_xml, sii_emitted_at,
+  global_discount_pct,
   exchange_rate_uf, exchange_rate_usd, exchange_rate_eur, exchange_rate_date,
   created_at, created_by_id, created_by_name,
   updated_at, updated_by_id, updated_by_name
 `
+
+function resolveGlobalDiscountPct(input: {
+  globalDiscount?: string
+}): number {
+  return parsePercentToInt(input.globalDiscount) ?? 0
+}
 
 const LINE_COLUMNS = `
   id, invoice_id, product_id, product_name, sku, description, quantity,
@@ -364,6 +371,7 @@ export async function createInvoice(
   const lineTotal = sumLineTotals(lines)
   const amountCents = resolveAmountCents(input, lineTotal)
   const number = input.number?.trim() || (await nextInvoiceNumber())
+  const globalDiscountPct = resolveGlobalDiscountPct(input)
   const clientName = clientNameFromCustomer(
     customerKind,
     customer.companyName,
@@ -377,14 +385,16 @@ export async function createInvoice(
         number, client_name, customer_kind, contact_id, contact_name,
         company_id, company_name, quote_id, quote_code, amount_cents,
         issue_date, due_date, status, owner_name, payment_method, sii_number,
+        global_discount_pct,
         exchange_rate_uf, exchange_rate_usd, exchange_rate_eur, exchange_rate_date,
         created_by_id, created_by_name, updated_by_id, updated_by_name, tenant_id
       ) VALUES (
         $1, $2, $3, $4, $5,
         $6, $7, $8, $9, $10,
         $11, $12, $13, $14, $15, $16,
-        $17, $18, $19, $20,
-        $21, $22, $21, $22, $23
+        $17,
+        $18, $19, $20, $21,
+        $22, $23, $22, $23, $24
       )
       RETURNING ${INVOICE_COLUMNS}`,
       [
@@ -404,6 +414,7 @@ export async function createInvoice(
         input.ownerName?.trim() || actor.userName,
         input.paymentMethod ?? 'Transferencia',
         input.siiNumber?.trim() || null,
+        globalDiscountPct,
         exchangeRates.exchangeRateUf,
         exchangeRates.exchangeRateUsd,
         exchangeRates.exchangeRateEur,
@@ -522,6 +533,10 @@ export async function updateInvoice(
     input,
     lineTotal ?? parseMoneyToCents(existing.amount),
   )
+  const globalDiscountPct =
+    input.globalDiscount !== undefined
+      ? resolveGlobalDiscountPct(input)
+      : parsePercentToInt(existingRow.global_discount_pct) ?? 0
 
   const clientName = clientNameFromCustomer(customerKind, companyName, contactName)
 
@@ -544,14 +559,15 @@ export async function updateInvoice(
         owner_name = COALESCE($14, owner_name),
         payment_method = COALESCE($15, payment_method),
         sii_number = COALESCE($16, sii_number),
-        exchange_rate_uf = COALESCE($17, exchange_rate_uf),
-        exchange_rate_usd = COALESCE($18, exchange_rate_usd),
-        exchange_rate_eur = COALESCE($19, exchange_rate_eur),
-        exchange_rate_date = COALESCE($20, exchange_rate_date),
-        updated_by_id = $21,
-        updated_by_name = $22,
+        global_discount_pct = $17,
+        exchange_rate_uf = COALESCE($18, exchange_rate_uf),
+        exchange_rate_usd = COALESCE($19, exchange_rate_usd),
+        exchange_rate_eur = COALESCE($20, exchange_rate_eur),
+        exchange_rate_date = COALESCE($21, exchange_rate_date),
+        updated_by_id = $22,
+        updated_by_name = $23,
         updated_at = now()
-      WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(23)}
+      WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(24)}
       RETURNING ${INVOICE_COLUMNS}`,
       [
         id,
@@ -570,6 +586,7 @@ export async function updateInvoice(
         input.ownerName?.trim() || null,
         input.paymentMethod ?? null,
         input.siiNumber !== undefined ? input.siiNumber?.trim() || null : null,
+        globalDiscountPct,
         exchangeRates?.exchangeRateUf ?? null,
         exchangeRates?.exchangeRateUsd ?? null,
         exchangeRates?.exchangeRateEur ?? null,

@@ -7,6 +7,7 @@ import {
   computeQuoteTotals,
   defaultQuoteLineItem,
 } from '@/lib/quote-line-item'
+import { DEFAULT_GLOBAL_DISCOUNT } from '@/lib/document-global-discount'
 import { loadCatalogSettings } from '@/lib/catalog-settings'
 import {
   defaultWarehouseFromCatalog,
@@ -44,6 +45,7 @@ export type CreateQuoteFormValues = SaleCustomerValues & {
   paymentTerms: string
   deliveryTerms: string
   terms: string
+  globalDiscountPercent: string
 }
 
 export function createDefaultQuoteFormValues(
@@ -82,7 +84,12 @@ export function createDefaultQuoteFormValues(
       : DEFAULT_QUOTE_DELIVERY_TERMS,
     terms: partial?.terms ?? '',
     lineItems,
-    amount: partial?.amount ?? computeQuoteTotals(lineItems).amount,
+    globalDiscountPercent: partial?.globalDiscountPercent ?? DEFAULT_GLOBAL_DISCOUNT,
+    amount:
+      partial?.amount ??
+      computeQuoteTotals(lineItems, {
+        globalDiscountPercent: partial?.globalDiscountPercent,
+      }).amount,
   }
 }
 
@@ -155,7 +162,9 @@ export function formValuesToListItem(values: CreateQuoteFormValues): QuoteListIt
     month: 'short',
     year: 'numeric',
   })
-  const amount = computeQuoteTotals(values.lineItems).amount
+  const amount = computeQuoteTotals(values.lineItems, {
+    globalDiscountPercent: values.globalDiscountPercent,
+  }).amount
 
   return stampRecordAuditOnCreate({
     id,

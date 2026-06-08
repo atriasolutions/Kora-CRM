@@ -31,6 +31,7 @@ const MODULE_BY_ENTITY: Record<EntityNoteType, MenuModuleId> = {
   recepcion: 'ingresos',
   actividad: 'actividades',
   proyecto: 'proyectos',
+  solicitud: 'solicitudes',
   usuario: 'usuarios',
 }
 

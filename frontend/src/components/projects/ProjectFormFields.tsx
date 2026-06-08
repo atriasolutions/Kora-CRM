@@ -22,6 +22,7 @@ type ProjectFormFieldsProps = {
   onChange: (patch: Partial<ProjectFormValues>) => void
   idPrefix?: string
   disabled?: boolean
+  lockSolicitud?: boolean
 }
 
 export function ProjectFormFields({
@@ -29,6 +30,7 @@ export function ProjectFormFields({
   onChange,
   idPrefix = 'pr',
   disabled = false,
+  lockSolicitud = false,
 }: ProjectFormFieldsProps) {
   const patch = (partial: Partial<ProjectFormValues>) => onChange(partial)
 
@@ -81,7 +83,7 @@ export function ProjectFormFields({
 
       <ContactFormSection
         title="Origen comercial"
-        description="Vincula oportunidad ganada y cotización de referencia"
+        description="Oportunidad con cotización o solicitud de origen"
         icon={Link2}
         className="border-dashed bg-muted/10"
       >
@@ -90,6 +92,7 @@ export function ProjectFormFields({
           values={values}
           onChange={patch}
           disabled={disabled}
+          lockSolicitud={lockSolicitud}
           idPrefix={`${idPrefix}-rel`}
         />
       </ContactFormSection>

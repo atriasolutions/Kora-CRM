@@ -15,6 +15,7 @@ export type ActivityRelatedType =
   | 'compra'
   | 'factura'
   | 'proyecto'
+  | 'solicitud'
   | 'ingreso'
   | 'producto'
   | 'inventario'

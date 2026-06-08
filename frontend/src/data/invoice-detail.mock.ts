@@ -57,6 +57,9 @@ export type InvoiceDetail = InvoiceListItem & {
   exemptSubtotal?: string
   taxPercent: string
   taxAmount: string
+  discountPercent?: string
+  discountAmount?: string
+  globalDiscount?: string
   balanceDue: string
   paidAmountNum: number
   internalNotes: string

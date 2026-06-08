@@ -5,6 +5,7 @@ import {
   Receipt,
   SlidersHorizontal,
   Warehouse,
+  ClipboardList,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -14,6 +15,7 @@ export type SettingsSectionId =
   | 'bodegas'
   | 'categorias'
   | 'impuestos'
+  | 'solicitudes'
 
 export type SettingsSection = {
   id: SettingsSectionId
@@ -52,6 +54,12 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     label: 'Impuestos y moneda',
     description: 'Indicadores UF, USD y EUR, e IVA por defecto del sistema.',
     Icon: Receipt,
+  },
+  {
+    id: 'solicitudes',
+    label: 'Solicitudes',
+    description: 'Responsable predeterminado al crear nuevas solicitudes.',
+    Icon: ClipboardList,
   },
 ]
 
