@@ -22,6 +22,8 @@ export type UserRow = {
   bio: string | null
   last_login_at: Date | null
   created_at: Date
+  guest_company_id?: string | null
+  guest_company_name?: string | null
 }
 
 const MODULE_LABELS: Record<string, string> = {
@@ -74,6 +76,8 @@ export function mapUserDetail(row: UserRow): UserDetail {
     ),
     bio: row.bio ?? '',
     recentSessions: [],
+    guestCompanyId: row.guest_company_id ?? undefined,
+    guestCompanyName: row.guest_company_name?.trim() || undefined,
   }
 }
 

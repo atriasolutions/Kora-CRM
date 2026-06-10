@@ -9,6 +9,7 @@ export type MenuModuleId =
   | 'actividades'
   | 'proyectos'
   | 'solicitudes'
+  | 'bitacora'
   | 'compras'
   | 'ingresos'
   | 'inventario'
@@ -38,6 +39,7 @@ export const MODULE_LABELS: Record<MenuModuleId, string> = {
   actividades: 'Actividades',
   proyectos: 'Proyectos',
   solicitudes: 'Solicitudes',
+  bitacora: 'Bitácora',
   compras: 'Compras',
   ingresos: 'Ingresos',
   inventario: 'Inventario',

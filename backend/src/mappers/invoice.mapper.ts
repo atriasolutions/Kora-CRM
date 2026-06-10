@@ -65,6 +65,9 @@ export type InvoiceLineRow = {
   sort_order: number
   price_currency: string | null
   unit_price_original: string | number | null
+  subject_to_vat: boolean | null
+  deferred_payment: boolean | null
+  deferred_payment_text: string | null
 }
 
 export type InvoicePaymentRow = {
@@ -106,6 +109,9 @@ export function mapInvoiceLineRow(row: InvoiceLineRow): InvoiceLineItemDto {
     priceCurrency: priceCurrency !== 'CLP' ? priceCurrency : undefined,
     discount: formatDiscountPct(row.discount_pct),
     total: formatCentsToMoney(row.total_cents),
+    subjectToVat: row.subject_to_vat !== false,
+    deferredPayment: row.deferred_payment === true,
+    deferredPaymentText: row.deferred_payment_text?.trim() || undefined,
   }
 }
 

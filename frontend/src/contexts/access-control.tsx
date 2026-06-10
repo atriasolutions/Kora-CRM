@@ -30,7 +30,7 @@ export function AccessControlProvider({ children }: { children: ReactNode }) {
       const user = getUserDetail(session?.userId ?? getCurrentUser().id)
       return user.profileId ?? DEFAULT_PROFILE_ID
     }
-    const admin = profiles.find((p) => p.isSystem)
+    const admin = profiles.find((p) => p.systemKey === 'admin' || p.isSystem)
     return admin?.id ?? profiles[0]?.id ?? DEFAULT_PROFILE_ID
   }, [authProfile?.id, session?.profileId, session?.userId, profiles])
 

@@ -111,7 +111,9 @@ export function invoiceLinesFromQuote(quote: QuoteDetail): InvoiceLineItem[] {
         unitPrice: li.unitPrice,
         discount: li.discount,
         total: li.total,
-        subjectToVat: true,
+        subjectToVat: li.subjectToVat !== false,
+        deferredPayment: li.deferredPayment ?? false,
+        deferredPaymentText: li.deferredPaymentText ?? '',
       }),
     ),
   )

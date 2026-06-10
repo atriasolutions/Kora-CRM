@@ -6,9 +6,10 @@ export function sessionTenantSlug(session: AuthSession | null | undefined): stri
   return session?.tenantSlug ?? null
 }
 
-/** Sesión activa en un subdominio distinto al tenant de la sesión. */
+/** Sesión activa en un subdominio distinto al tenant de la sesión (excepto operador de plataforma). */
 export function isSessionOnWrongTenantHost(session: AuthSession | null | undefined): boolean {
   if (!session?.tenantSlug) return false
+  if (session.isPlatformOperator) return false
   const hostSlug = resolveTenantSlugFromHostname(window.location.hostname)
   if (!hostSlug) return false
   return hostSlug !== session.tenantSlug

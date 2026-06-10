@@ -27,6 +27,8 @@ import { ProjectDetailPage } from '@/pages/ProjectDetailPage'
 import { ProjectsPage } from '@/pages/ProjectsPage'
 import { SolicitudesPage } from '@/pages/SolicitudesPage'
 import { SolicitudDetailPage } from '@/pages/SolicitudDetailPage'
+import { BitacoraPage } from '@/pages/BitacoraPage'
+import { BitacoraDetailPage } from '@/pages/BitacoraDetailPage'
 import { InventoryDetailPage } from '@/pages/InventoryDetailPage'
 import { InventoryPage } from '@/pages/InventoryPage'
 import { PurchaseDetailPage } from '@/pages/PurchaseDetailPage'
@@ -104,6 +106,8 @@ export default function App() {
                   <Route path="proyectos/:projectId" element={<ProjectDetailPage />} />
                   <Route path="solicitudes" element={<SolicitudesPage />} />
                   <Route path="solicitudes/:solicitudId" element={<SolicitudDetailPage />} />
+                  <Route path="bitacora" element={<BitacoraPage />} />
+                  <Route path="bitacora/:bitacoraId" element={<BitacoraDetailPage />} />
                   <Route path="compras" element={<PurchasesPage />} />
                   <Route path="compras/:purchaseId" element={<PurchaseDetailPage />} />
                   <Route path="ingresos" element={<StockReceiptsPage />} />
@@ -130,6 +134,7 @@ export default function App() {
                         slug !== 'actividades' &&
                         slug !== 'proyectos' &&
                         slug !== 'solicitudes' &&
+                        slug !== 'bitacora' &&
                         slug !== 'productos' &&
                         slug !== 'facturacion' &&
                         slug !== 'usuarios' &&

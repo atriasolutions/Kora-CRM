@@ -105,10 +105,16 @@ export function QuotesRegistryProvider({ children }: { children: ReactNode }) {
   )
 
   const updateQuoteFromDetail = useCallback(
-    async (detail: QuoteDetail): Promise<QuoteDetail> => {
+    async (
+      detail: QuoteDetail,
+      options?: { previousStatus?: string },
+    ): Promise<QuoteDetail> => {
       const list = listItemFromQuoteDetail(detail)
       if (useApi) {
-        const updated = await updateQuoteApi(detail.id, quoteDetailToApiBody(detail))
+        const updated = await updateQuoteApi(
+          detail.id,
+          quoteDetailToApiBody(detail, options),
+        )
         const normalized = normalizeQuoteDetailFromApi({
           ...detail,
           ...(updated as QuoteDetail),

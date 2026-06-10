@@ -1,4 +1,4 @@
-import { Mail, MoreHorizontal, Pencil, Phone, Shield } from 'lucide-react'
+import { Mail, MoreHorizontal, Pencil, Phone, Shield, Trash2 } from 'lucide-react'
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import type { UserDetail } from '@/data/user-detail.mock'
 import { CURRENT_USER } from '@/lib/current-user'
-import { userRoleLabel, userStatusVariant } from '@/lib/user-display'
+import { isGuestUserDetail, userRoleLabel, userStatusVariant } from '@/lib/user-display'
 import { initialsFromLabel } from '@/lib/image-upload'
 import { getTelHref } from '@/lib/phone'
 import { useDetailHeaderPermissions } from '@/hooks/use-detail-header-permissions'
@@ -23,6 +23,7 @@ type UserDetailHeaderProps = {
   onStartEdit?: () => void
   onResendInvite?: () => void
   onDeactivate?: () => void
+  onDelete?: () => void
 }
 
 export function UserDetailHeader({
@@ -30,16 +31,23 @@ export function UserDetailHeader({
   onStartEdit,
   onResendInvite,
   onDeactivate,
+  onDelete,
 }: UserDetailHeaderProps) {
   const { showEdit } = useDetailHeaderPermissions('usuarios', { onStartEdit })
   const { canEdit, canDelete } = useModulePermissions('usuarios')
   const showResendInvite = canEdit && Boolean(onResendInvite)
   const showDeactivate = canDelete && Boolean(onDeactivate)
+  const showDelete = Boolean(onDelete)
 
   const isSelf = user.id === CURRENT_USER.id
   const metrics = [
     { label: 'Último acceso', value: user.lastLogin },
-    { label: 'Departamento', value: user.department },
+    isGuestUserDetail(user)
+      ? {
+          label: 'Cliente de la empresa',
+          value: user.guestCompanyName?.trim() || '—',
+        }
+      : { label: 'Departamento', value: user.department },
     { label: 'Miembro desde', value: user.memberSince },
     {
       label: '2FA',
@@ -138,6 +146,19 @@ export function UserDetailHeader({
                     onClick={onDeactivate}
                   >
                     Desactivar usuario
+                  </DropdownMenuItem>
+                </>
+              ) : null}
+              {showDelete ? (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    disabled={isSelf}
+                    onClick={onDelete}
+                  >
+                    <Trash2 aria-hidden className="size-4" />
+                    Eliminar usuario
                   </DropdownMenuItem>
                 </>
               ) : null}

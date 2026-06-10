@@ -1,16 +1,24 @@
 import { z } from 'zod'
 
-const lineItemSchema = z.object({
-  productId: z.string().uuid().nullable().optional(),
-  sku: z.string().max(64).optional(),
-  productName: z.string().max(255).optional(),
-  description: z.string().max(2000).optional(),
-  quantity: z.coerce.number().positive().optional(),
-  unitPrice: z.string().max(32).optional(),
-  unitPriceOriginal: z.coerce.number().optional(),
-  priceCurrency: z.string().max(8).optional(),
-  discount: z.string().max(16).optional(),
-})
+const lineItemSchema = z
+  .object({
+    productId: z.string().uuid().nullable().optional(),
+    sku: z.string().max(64).optional(),
+    productName: z.string().max(255).optional(),
+    description: z.string().max(2000).optional(),
+    quantity: z.coerce.number().positive().optional(),
+    unitPrice: z.string().max(32).optional(),
+    unitPriceOriginal: z.coerce.number().optional(),
+    priceCurrency: z.string().max(8).optional(),
+    discount: z.string().max(16).optional(),
+    subjectToVat: z.boolean().optional(),
+    deferredPayment: z.boolean().optional(),
+    deferredPaymentText: z.string().max(500).optional(),
+  })
+  .refine(
+    (line) => !line.deferredPayment || Boolean(line.deferredPaymentText?.trim()),
+    { message: 'Indica el texto de plazo diferido en la línea.' },
+  )
 
 export const createQuoteSchema = z.object({
   code: z.string().min(1).max(64).optional(),
@@ -29,6 +37,8 @@ export const createQuoteSchema = z.object({
   deliveryTerms: z.string().max(255).optional(),
   terms: z.string().max(10000).optional(),
   globalDiscount: z.string().max(16).optional(),
+  includeBankDetails: z.boolean().optional(),
+  bankAccountId: z.string().uuid().nullable().optional(),
   lineItems: z.array(lineItemSchema).optional(),
 })
 

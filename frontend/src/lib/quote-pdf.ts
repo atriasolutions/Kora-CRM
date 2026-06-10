@@ -1,8 +1,9 @@
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
+import type { BankAccount } from '@/api/bank-accounts'
 import type { CompanyListItem } from '@/data/companies.mock'
-import type { QuoteDetail } from '@/data/quote-detail.mock'
+import type { QuoteDetail, QuoteLineItem } from '@/data/quote-detail.mock'
 import { amountInWordsSpanish } from '@/lib/amount-in-words-es'
 import type { CompanyAddressRecord } from '@/lib/company-location'
 import { drawDocumentPdfBlueBox } from '@/lib/document-pdf-blue-box'
@@ -12,6 +13,7 @@ import {
   type QuoteCustomerPdfFields,
 } from '@/lib/quote-customer-pdf'
 import { resolveOrganizationLogoUrl } from '@/lib/organization-logo'
+import { quoteLineSubjectToVat } from '@/lib/quote-line-item'
 import type { OrganizationSettings } from '@/types/organization-settings'
 
 const TEXT: [number, number, number] = [15, 23, 42]
@@ -27,6 +29,11 @@ function parseMoney(value: string): number {
 
 function formatAmount(value: number): string {
   return value.toLocaleString('es-CL')
+}
+
+function parseDiscountPercent(discount: string): number {
+  const n = Number.parseInt(discount.replace(/[^\d]/g, ''), 10)
+  return Number.isNaN(n) ? 0 : n
 }
 
 function logoFormat(logoUrl: string): 'PNG' | 'JPEG' | 'WEBP' | null {
@@ -135,11 +142,78 @@ function addLogo(doc: jsPDF, logoUrl: string, x: number, y: number, maxW: number
   }
 }
 
+function lineHasDiscount(li: QuoteLineItem): boolean {
+  return parseDiscountPercent(li.discount) > 0
+}
+
+function buildQuoteLineTable(lineItems: QuoteLineItem[]) {
+  const showDiscountCol = lineItems.some(lineHasDiscount)
+  const showDeferredCol = lineItems.some((li) => li.deferredPayment === true)
+
+  const head = ['SKU', 'Descripción', 'Cant.', 'P. unit.']
+  if (showDiscountCol) head.push('Desc.')
+  if (showDeferredCol) head.push('Plazo diferido')
+  head.push('Total')
+
+  const body =
+    lineItems.length > 0
+      ? lineItems.map((li) => {
+          const row: string[] = [
+            pdfText(li.sku, ''),
+            pdfText(li.description, 'Ítem'),
+            String(li.quantity ?? 1),
+            pdfText(li.unitPrice, '$0'),
+          ]
+          if (showDiscountCol) row.push(pdfText(li.discount, '0%'))
+          if (showDeferredCol) {
+            row.push(
+              li.deferredPayment
+                ? pdfText(li.deferredPaymentText, '—')
+                : '—',
+            )
+          }
+          row.push(pdfText(li.total, '$0'))
+          return row
+        })
+      : [['—', 'Sin líneas de detalle', '—', '—', ...(showDiscountCol ? ['—'] : []), ...(showDeferredCol ? ['—'] : []), '—']]
+
+  return { head: [head], body }
+}
+
+function drawBankDetailsBlock(
+  doc: jsPDF,
+  account: BankAccount,
+  margin: number,
+  pageW: number,
+  startY: number,
+): number {
+  let y = startY
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(8)
+  doc.text('Datos para transferencia', margin, y)
+  y += 5
+  doc.setFont('helvetica', 'normal')
+  const rows = [
+    `Cuenta: ${account.accountName}`,
+    `Banco: ${account.bankName}`,
+    `Tipo: ${account.accountType}`,
+    `Número: ${account.accountNumber}`,
+  ]
+  if (account.email?.trim()) rows.push(`Correo: ${account.email.trim()}`)
+  for (const line of rows) {
+    const wrapped = doc.splitTextToSize(line, pageW - margin * 2)
+    doc.text(wrapped, margin, y)
+    y += wrapped.length * 3.8 + 1
+  }
+  return y + 4
+}
+
 export type QuotePdfInput = {
   quote: QuoteDetail
   organization: OrganizationSettings
   customerCompany?: CompanyListItem
   customerHeadquarters?: CompanyAddressRecord
+  bankAccount?: BankAccount
 }
 
 export function buildQuotePdf(
@@ -148,6 +222,7 @@ export function buildQuotePdf(
   organization: OrganizationSettings,
   customerCompany?: CompanyListItem,
   customerHeadquarters?: CompanyAddressRecord,
+  bankAccount?: BankAccount,
 ): void {
   const customer = resolveQuoteCustomerPdfFields(
     quote,
@@ -205,22 +280,11 @@ export function buildQuotePdf(
 
   y = drawCustomerBlock(doc, customer, margin, pageW, y)
 
-  const lineRows =
-    (quote.lineItems ?? []).length > 0
-      ? (quote.lineItems ?? []).map((li) => [
-          pdfText(li.sku, ''),
-          pdfText(li.description, 'Ítem'),
-          String(li.quantity ?? 1),
-          pdfText(li.unitPrice, '$0'),
-          pdfText(li.discount, '0%'),
-          pdfText(li.total, '$0'),
-        ])
-      : [['—', 'Sin líneas de detalle', '—', '—', '—', '—']]
-
+  const lineTable = buildQuoteLineTable(quote.lineItems ?? [])
   autoTable(doc, {
     startY: y,
-    head: [['SKU', 'Descripción', 'Cant.', 'P. unit.', 'Desc.', 'Total']],
-    body: lineRows,
+    head: lineTable.head,
+    body: lineTable.body,
     styles: { fontSize: 8, cellPadding: 2 },
     headStyles: { fillColor: [229, 231, 235], textColor: TEXT, fontStyle: 'bold' },
     margin: { left: margin, right: margin },
@@ -235,18 +299,32 @@ export function buildQuotePdf(
   const vat = parseMoney(quote.taxAmount ?? '$0')
   const total = parseMoney(quote.amount ?? '$0')
 
+  const hasMixedVat = (quote.lineItems ?? []).some(
+    (li) => quoteLineSubjectToVat(li),
+  ) && (quote.lineItems ?? []).some((li) => !quoteLineSubjectToVat(li))
+
+  const totalsBody: string[][] = [['Subtotal', `$ ${formatAmount(subtotal)}`]]
+  if (hasMixedVat) {
+    totalsBody.push(
+      ['Neto afecto', `$ ${formatAmount(parseMoney(quote.taxableSubtotal ?? quote.subtotal ?? '$0'))}`],
+      ['Neto exento', `$ ${formatAmount(parseMoney(quote.exemptSubtotal ?? '$0'))}`],
+    )
+  }
+  if (discount > 0) {
+    totalsBody.push(['Descuento', `$ ${formatAmount(discount)}`])
+  }
+  totalsBody.push(
+    ['Neto', `$ ${formatAmount(net)}`],
+    [pdfText(quote.taxPercent, 'IVA'), `$ ${formatAmount(vat)}`],
+    ['TOTAL CLP', `$ ${formatAmount(total)}`],
+  )
+
   const totalsX = pageW - margin - 58
   autoTable(doc, {
     startY: y,
     margin: { left: totalsX },
     tableWidth: 58,
-    body: [
-      ['Subtotal', `$ ${formatAmount(subtotal)}`],
-      ['Descuento', `$ ${formatAmount(discount)}`],
-      ['Neto', `$ ${formatAmount(net)}`],
-      [pdfText(quote.taxPercent, 'IVA'), `$ ${formatAmount(vat)}`],
-      ['TOTAL CLP', `$ ${formatAmount(total)}`],
-    ],
+    body: totalsBody,
     styles: { fontSize: 8 },
     theme: 'grid',
   })
@@ -278,6 +356,11 @@ export function buildQuotePdf(
     }
     y += 4
   }
+
+  if (quote.includeBankDetails && bankAccount) {
+    y = drawBankDetailsBlock(doc, bankAccount, margin, pageW, y)
+  }
+
   doc.setFontSize(7)
   doc.setTextColor(100, 116, 139)
   doc.text(
@@ -295,6 +378,7 @@ export function generateQuotePdf(input: QuotePdfInput): Blob {
     input.organization,
     input.customerCompany,
     input.customerHeadquarters,
+    input.bankAccount,
   )
   return doc.output('blob')
 }

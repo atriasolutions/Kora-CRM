@@ -11,6 +11,7 @@ export type AccessProfileRow = {
   name: string
   description: string
   is_system: boolean
+  system_key: 'admin' | 'guest' | null
   updated_at: Date
   user_count: string | number
 }
@@ -46,6 +47,7 @@ export function mapAccessProfileListRow(row: AccessProfileRow): AccessProfileLis
     userCount: Number(row.user_count ?? 0),
     updatedAt: formatDateLabel(row.updated_at),
     isSystem: row.is_system,
+    systemKey: row.system_key ?? undefined,
   }
 }
 

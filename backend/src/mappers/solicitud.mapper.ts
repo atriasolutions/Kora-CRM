@@ -22,6 +22,8 @@ export type SolicitudRow = {
   updated_at: Date
   updated_by_id: string | null
   updated_by_name: string | null
+  company_id: string | null
+  company_name: string | null
 }
 
 export type SolicitudTeamRow = {
@@ -57,6 +59,8 @@ export function mapSolicitudRow(row: SolicitudRow): SolicitudListItem {
     updatedAt: toIsoString(row.updated_at),
     updatedById: row.updated_by_id ?? '',
     updatedByName: row.updated_by_name ?? '',
+    companyId: row.company_id ?? undefined,
+    companyName: row.company_name?.trim() || undefined,
   }
 }
 

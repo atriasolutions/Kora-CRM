@@ -19,6 +19,7 @@ export type AccessProfileListItem = {
   userCount: number
   updatedAt: string
   isSystem?: boolean
+  systemKey?: 'admin' | 'guest' | null
 }
 
 export type AccessProfile = AccessProfileListItem & {

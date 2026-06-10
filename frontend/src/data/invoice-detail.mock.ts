@@ -38,6 +38,8 @@ export type InvoiceLineItem = {
   total: string
   /** Si es true (por defecto), la línea suma al neto afecto y al cálculo de IVA. */
   subjectToVat?: boolean
+  deferredPayment?: boolean
+  deferredPaymentText?: string
 }
 
 export type InvoicePayment = {

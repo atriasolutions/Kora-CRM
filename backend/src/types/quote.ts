@@ -10,6 +10,9 @@ export type QuoteLineItemDto = {
   priceCurrency?: string
   discount: string
   total: string
+  subjectToVat?: boolean
+  deferredPayment?: boolean
+  deferredPaymentText?: string
 }
 
 export type QuoteListItem = {
@@ -39,6 +42,8 @@ export type QuoteListItem = {
 export type QuoteDetail = QuoteListItem & {
   lineItems: QuoteLineItemDto[]
   globalDiscount?: string
+  includeBankDetails?: boolean
+  bankAccountId?: string | null
   paymentTerms: string
   deliveryTerms: string
   terms: string
@@ -58,6 +63,9 @@ export type QuoteLineItemInput = {
   unitPriceOriginal?: number | string
   priceCurrency?: string
   discount?: string
+  subjectToVat?: boolean
+  deferredPayment?: boolean
+  deferredPaymentText?: string
 }
 
 export type CreateQuoteInput = {
@@ -77,6 +85,8 @@ export type CreateQuoteInput = {
   deliveryTerms?: string
   terms?: string
   globalDiscount?: string
+  includeBankDetails?: boolean
+  bankAccountId?: string | null
   lineItems?: QuoteLineItemInput[]
 }
 

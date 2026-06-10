@@ -6,7 +6,7 @@ import {
   StickyNote,
 } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import { PageScrollArea } from '@/components/layout/PageScrollArea'
 import { EntityNotesPanel } from '@/components/shared/EntityNotesPanel'
@@ -28,6 +28,7 @@ import { recordEntityView } from '@/lib/entity-recently-viewed'
 import { parseUserDetailTab, type UserDetailTab } from '@/lib/user-routes'
 import { CURRENT_USER_NAME, getCurrentUser } from '@/lib/current-user'
 import { useModulePermissions } from '@/hooks/use-module-permissions'
+import { useAuth } from '@/hooks/use-auth'
 import { resendInvitationApi } from '@/api/users'
 import { apiActionErrorMessage } from '@/api/errors'
 import { isApiEnabled } from '@/api/config'
@@ -41,10 +42,13 @@ const tabs: { id: UserDetailTab; label: string; Icon: typeof LayoutList }[] = [
 ]
 
 export function UserDetailPage() {
+  const navigate = useNavigate()
   const { userId } = useParams<{ userId: string }>()
   const [searchParams, setSearchParams] = useSearchParams()
+  const { session } = useAuth()
   const { canEdit, canDelete } = useModulePermissions('usuarios')
-  const { updateUserFromDetail } = useUsersRegistry()
+  const canRemoveUser = Boolean(session?.isPlatformOperator)
+  const { updateUserFromDetail, removeUser } = useUsersRegistry()
   const tab: UserDetailTab = parseUserDetailTab(searchParams) ?? 'detalle'
   const [user, setUser] = useState<UserDetail | null>(null)
   const { loadState, reason, unavailableDetail, reload } = useRecordDetail({
@@ -133,6 +137,22 @@ export function UserDetailPage() {
     toast.success(`Usuario «${user.name}» desactivado.`)
   }, [updateUserFromDetail, user])
 
+  const handleDelete = useCallback(async () => {
+    if (!user || !canRemoveUser) return
+    const confirmed = window.confirm(
+      `¿Eliminar a «${user.name}» de esta instancia?\n\n` +
+        'Se quitará su acceso a esta empresa. Si no pertenece a otras instancias, la cuenta se eliminará por completo.',
+    )
+    if (!confirmed) return
+    try {
+      await removeUser(user.id)
+      toast.success(`Usuario «${user.name}» eliminado.`)
+      navigate('/usuarios')
+    } catch (err) {
+      toast.error(apiActionErrorMessage(err, 'No se pudo eliminar el usuario.'))
+    }
+  }, [canRemoveUser, navigate, removeUser, user])
+
   const isOwnProfile = useMemo(
     () => (user ? getCurrentUser().id === user.id : false),
     [user?.id],
@@ -185,6 +205,7 @@ export function UserDetailPage() {
         onStartEdit={canEdit ? () => setEditOpen(true) : undefined}
         onResendInvite={handleResendInvite}
         onDeactivate={canDelete ? handleDeactivate : undefined}
+        onDelete={canRemoveUser ? handleDelete : undefined}
       />
 
       <div className="flex flex-wrap gap-1 border-b border-border">

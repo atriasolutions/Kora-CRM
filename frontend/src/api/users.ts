@@ -43,6 +43,7 @@ export type UserApiBody = {
   password?: string
   sendInvite?: boolean
   twoFactorEnabled?: boolean
+  guestCompanyId?: string | null
 }
 
 export function userFormToApiBody(
@@ -67,6 +68,7 @@ export function userFormToApiBody(
     language: values.language,
     bio: values.bio?.trim() || undefined,
     twoFactorEnabled: values.twoFactorEnabled,
+    guestCompanyId: values.guestCompanyId.trim() || null,
   }
 }
 
@@ -85,6 +87,7 @@ export function userDetailToApiBody(detail: UserDetail): UserApiBody {
     language: detail.language,
     bio: detail.bio,
     twoFactorEnabled: detail.twoFactorEnabled,
+    guestCompanyId: detail.guestCompanyId ?? null,
   }
 }
 

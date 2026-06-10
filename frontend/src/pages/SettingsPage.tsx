@@ -7,6 +7,8 @@ import { SiiInvoicingSettingsPanel } from '@/components/settings/SiiInvoicingSet
 import { ProductCategoriesSettingsPanel } from '@/components/settings/ProductCategoriesSettingsPanel'
 import { TaxCurrencySettingsPanel } from '@/components/settings/TaxCurrencySettingsPanel'
 import { SettingsNav } from '@/components/settings/SettingsNav'
+import { TenantQuotasSettingsPanel } from '@/components/settings/TenantQuotasSettingsPanel'
+import { TenantUsageSettingsPanel } from '@/components/settings/TenantUsageSettingsPanel'
 import {
   DEFAULT_SETTINGS_SECTION,
   settingsSectionById,
@@ -14,7 +16,9 @@ import {
   type SettingsSectionId,
 } from '@/components/settings/settings-sections'
 import { SolicitudesSettingsPanel } from '@/components/settings/SolicitudesSettingsPanel'
+import { BankAccountsSettingsPanel } from '@/components/settings/BankAccountsSettingsPanel'
 import { WarehousesSettingsPanel } from '@/components/settings/WarehousesSettingsPanel'
+import { useAuth } from '@/hooks/use-auth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 function SettingsSectionPanel({ sectionId }: { sectionId: SettingsSectionId }) {
@@ -25,25 +29,45 @@ function SettingsSectionPanel({ sectionId }: { sectionId: SettingsSectionId }) {
       return <SiiInvoicingSettingsPanel />
     case 'bodegas':
       return <WarehousesSettingsPanel />
+    case 'datos-bancarios':
+      return <BankAccountsSettingsPanel />
     case 'categorias':
       return <ProductCategoriesSettingsPanel />
     case 'impuestos':
       return <TaxCurrencySettingsPanel />
     case 'solicitudes':
       return <SolicitudesSettingsPanel />
+    case 'informacion-instancia':
+      return <TenantUsageSettingsPanel />
+    case 'instancia':
+      return <TenantQuotasSettingsPanel />
     default:
       return null
   }
 }
 
+function isSectionAccessible(
+  id: SettingsSectionId,
+  isPlatformOperator: boolean,
+): boolean {
+  const section = settingsSectionById(id)
+  if (!section || section.comingSoon) return false
+  if (section.platformOperatorOnly && !isPlatformOperator) return false
+  return true
+}
+
 export function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
+  const { session } = useAuth()
+  const isPlatformOperator = Boolean(session?.isPlatformOperator)
   const paramSection = searchParams.get('seccion') as SettingsSectionId | null
 
   const initialSection = useMemo(() => {
-    const section = paramSection ? settingsSectionById(paramSection) : undefined
-    return section?.id ?? DEFAULT_SETTINGS_SECTION
-  }, [paramSection])
+    if (paramSection && isSectionAccessible(paramSection, isPlatformOperator)) {
+      return paramSection
+    }
+    return DEFAULT_SETTINGS_SECTION
+  }, [paramSection, isPlatformOperator])
 
   const [activeSection, setActiveSection] = useState<SettingsSectionId>(initialSection)
 
@@ -54,6 +78,9 @@ export function SettingsPage() {
   const activeMeta = settingsSectionById(activeSection) ?? settingsSectionById('empresa')!
 
   const selectSection = (id: SettingsSectionId) => {
+    const section = settingsSectionById(id)
+    if (section?.comingSoon) return
+    if (section?.platformOperatorOnly && !isPlatformOperator) return
     setActiveSection(id)
     setSearchParams({ seccion: id }, { replace: true })
   }

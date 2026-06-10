@@ -11,7 +11,9 @@ import {
   type PermissionAction,
 } from '@/lib/menu-modules'
 import {
+  isAdminAccessProfile,
   isSystemAccessProfile,
+  ADMIN_PROFILE_LOCKED_MESSAGE,
   SYSTEM_PROFILE_ACCESS_MESSAGE,
 } from '@/lib/access-profile-admin'
 import { getProfileDetailPath } from '@/lib/profile-routes'
@@ -40,9 +42,9 @@ export function UserPermissionsPanel({ user }: UserPermissionsPanelProps) {
   const enabledCount = (action: PermissionAction) =>
     profile.permissions.filter((p) => p.flags[action]).length
 
-  const isSystemProfile = isSystemAccessProfile(profile)
+  const isUnrestrictedSystemProfile = isSystemAccessProfile(profile)
 
-  if (isSystemProfile) {
+  if (isUnrestrictedSystemProfile) {
     return (
       <Card className="border-border shadow-sm">
         <CardHeader className="border-b border-border/60 pb-4">
@@ -70,8 +72,9 @@ export function UserPermissionsPanel({ user }: UserPermissionsPanelProps) {
           </Badge>
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          {profile.description || 'Sin descripción.'} Los permisos se gestionan en el
-          módulo Perfiles.
+          {isAdminAccessProfile(profile)
+            ? ADMIN_PROFILE_LOCKED_MESSAGE
+            : `${profile.description || 'Sin descripción.'} Los permisos se gestionan en el módulo Perfiles.`}
         </p>
         <Button variant="outline" size="sm" className="mt-2 w-fit" asChild>
           <Link to={getProfileDetailPath(profile.id)}>Editar perfil</Link>

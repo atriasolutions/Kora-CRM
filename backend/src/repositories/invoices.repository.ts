@@ -1,4 +1,5 @@
 import type { PoolClient } from 'pg'
+import { enforceRecordQuota } from '../lib/tenant-quota-enforce.js'
 
 import { sumLineTotals } from '../lib/line-items.js'
 import {
@@ -64,7 +65,8 @@ function resolveGlobalDiscountPct(input: {
 const LINE_COLUMNS = `
   id, invoice_id, product_id, product_name, sku, description, quantity,
   unit_price_cents, discount_pct, total_cents, sort_order,
-  price_currency, unit_price_original
+  price_currency, unit_price_original,
+  subject_to_vat, deferred_payment, deferred_payment_text
 `
 
 const PAYMENT_COLUMNS = `
@@ -169,8 +171,9 @@ async function insertInvoiceLineItems(
       `INSERT INTO crm_invoice_line_items (
         invoice_id, product_id, product_name, sku, description, quantity,
         unit_price_cents, discount_pct, total_cents, sort_order,
-        price_currency, unit_price_original
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+        price_currency, unit_price_original,
+        subject_to_vat, deferred_payment, deferred_payment_text
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
       [
         invoiceId,
         line.productId ?? null,
@@ -184,6 +187,9 @@ async function insertInvoiceLineItems(
         i,
         line.priceCurrency,
         line.unitPriceOriginal,
+        line.subjectToVat,
+        line.deferredPayment,
+        line.deferredPaymentText,
       ],
     )
   }
@@ -336,6 +342,7 @@ export async function createInvoice(
   input: CreateInvoiceInput,
   actor: AuditActor,
 ): Promise<InvoiceDetail> {
+  await enforceRecordQuota(actor)
   if (!input.dueDate?.trim()) throw badRequest('La fecha de vencimiento es obligatoria')
 
   const quote = await resolveQuoteSnapshot(input.quoteId)
@@ -540,6 +547,28 @@ export async function updateInvoice(
 
   const clientName = clientNameFromCustomer(customerKind, companyName, contactName)
 
+  const nextStatus = input.status ?? previousStatus
+  const clearingSiiOnDraft =
+    nextStatus === 'Borrador' && previousStatus !== 'Borrador'
+  const siiNumberForUpdate = clearingSiiOnDraft
+    ? null
+    : input.siiNumber !== undefined
+      ? input.siiNumber?.trim() || null
+      : existingRow.sii_number
+
+  if (
+    nextStatus === 'Pendiente' &&
+    previousStatus === 'Borrador' &&
+    !siiNumberForUpdate
+  ) {
+    const org = await orgSettingsRepo.getOrganizationSettings()
+    if (org.invoicingMode !== 'sii') {
+      throw badRequest(
+        'Indica el folio SII para emitir la factura por primera vez.',
+      )
+    }
+  }
+
   let inventoryChanged = false
   const detail = await withStockTransaction(pool, async (dbClient) => {
     const result = await dbClient.query<InvoiceRow>(
@@ -558,7 +587,7 @@ export async function updateInvoice(
         status = COALESCE($13, status),
         owner_name = COALESCE($14, owner_name),
         payment_method = COALESCE($15, payment_method),
-        sii_number = COALESCE($16, sii_number),
+        sii_number = $16,
         global_discount_pct = $17,
         exchange_rate_uf = COALESCE($18, exchange_rate_uf),
         exchange_rate_usd = COALESCE($19, exchange_rate_usd),
@@ -585,7 +614,7 @@ export async function updateInvoice(
         input.status ?? null,
         input.ownerName?.trim() || null,
         input.paymentMethod ?? null,
-        input.siiNumber !== undefined ? input.siiNumber?.trim() || null : null,
+        siiNumberForUpdate,
         globalDiscountPct,
         exchangeRates?.exchangeRateUf ?? null,
         exchangeRates?.exchangeRateUsd ?? null,

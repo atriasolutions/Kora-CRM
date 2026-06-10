@@ -9,6 +9,7 @@ export type UsersRegistryValue = {
   userUsers: UserListItem[]
   addUser: (values: UserFormValues) => Promise<UserListItem>
   updateUserFromDetail: (detail: UserDetail) => Promise<UserDetail>
+  removeUser: (id: string) => Promise<void>
   findById: (id: string) => UserListItem | undefined
   reloadFromApi: () => Promise<void>
   usersDirectoryLoaded: boolean

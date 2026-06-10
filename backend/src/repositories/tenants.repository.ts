@@ -209,6 +209,34 @@ async function getSystemProfileIdForTenant(tenantId: string): Promise<string> {
   return id
 }
 
+/** Garantiza membresía activa del operador en el tenant (perfil Administrador del sistema). */
+export async function ensurePlatformOperatorMembership(
+  userId: string,
+  tenantId: string,
+): Promise<{ profileId: string }> {
+  const profileId = await getSystemProfileIdForTenant(tenantId)
+  await platformQuery(
+    `INSERT INTO crm_tenant_memberships (tenant_id, user_id, profile_id, status, is_default)
+     VALUES ($1, $2, $3, 'active', false)
+     ON CONFLICT (tenant_id, user_id) DO UPDATE
+       SET status = 'active'::crm_membership_status,
+           profile_id = EXCLUDED.profile_id`,
+    [tenantId, userId, profileId],
+  )
+  return { profileId }
+}
+
+/** Añade o reactiva a todos los operadores de plataforma en un tenant recién creado. */
+export async function ensureAllPlatformOperatorsInTenant(tenantId: string): Promise<void> {
+  const operators = await platformQuery<{ id: string }>(
+    `SELECT id FROM crm_users
+     WHERE is_platform_operator = true AND deleted_at IS NULL`,
+  )
+  for (const row of operators.rows) {
+    await ensurePlatformOperatorMembership(row.id, tenantId)
+  }
+}
+
 export type TenantAccessResult = {
   profileId: string
   isPlatformOperator: boolean
@@ -224,7 +252,7 @@ export async function resolveTenantAccess(
 
   if (await isPlatformOperator(userId)) {
     await assertTenantActive(trimmed)
-    const profileId = await getSystemProfileIdForTenant(trimmed)
+    const { profileId } = await ensurePlatformOperatorMembership(userId, trimmed)
     return { profileId, isPlatformOperator: true }
   }
 
@@ -254,6 +282,66 @@ export async function getDefaultTenantIdForUser(userId: string): Promise<string>
 
 export { ATRIA_TENANT_ID }
 
+const RESERVED_TENANT_SLUGS = new Set([
+  'atriasolutions',
+  'atria',
+  'www',
+  'api',
+  'admin',
+  'app',
+  'mail',
+  'smtp',
+  'cdn',
+  'static',
+])
+
+export function normalizeTenantSlug(raw: string): string {
+  return (
+    raw
+      .normalize('NFD')
+      .replace(/\p{M}/gu, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9-]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 56) || ''
+  )
+}
+
+export function assertTenantSlugAvailable(slug: string): void {
+  if (!slug) throw badRequest('El identificador (slug) es inválido.')
+  if (RESERVED_TENANT_SLUGS.has(slug)) {
+    throw badRequest(`El identificador «${slug}» está reservado.`)
+  }
+}
+
+export type CreateBlankTenantInput = {
+  slug: string
+  displayName: string
+}
+
+/** Instancia vacía de producción (sin datos demo ni usuario inicial). */
+export async function createBlankTenant(
+  input: CreateBlankTenantInput,
+): Promise<{ tenantId: string; slug: string }> {
+  const slug = normalizeTenantSlug(input.slug || input.displayName)
+  assertTenantSlugAvailable(slug)
+  if (!input.displayName.trim()) throw badRequest('El nombre de la instancia es obligatorio.')
+
+  const existing = await getTenantBySlug(slug)
+  if (existing) throw badRequest('Ya existe una instancia con ese identificador.')
+
+  const result = await platformQuery<{ id: string }>(
+    `INSERT INTO crm_tenants (id, slug, display_name, status, kind, plan)
+     VALUES (gen_random_uuid(), $1, $2, 'provisioning', 'production', 'production')
+     RETURNING id`,
+    [slug, input.displayName.trim()],
+  )
+  const tenantId = result.rows[0]?.id
+  if (!tenantId) throw badRequest('No se pudo crear la instancia.')
+  return { tenantId, slug }
+}
+
 export type CreateTrialTenantInput = {
   slug: string
   displayName: string
@@ -265,7 +353,8 @@ export type CreateTrialTenantInput = {
 export async function createTrialTenant(
   input: CreateTrialTenantInput,
 ): Promise<{ tenantId: string; slug: string }> {
-  const slug = input.slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-')
+  const slug = normalizeTenantSlug(input.slug)
+  assertTenantSlugAvailable(slug)
   if (!slug) throw badRequest('Slug de tenant inválido')
 
   const existing = await getTenantBySlug(slug)

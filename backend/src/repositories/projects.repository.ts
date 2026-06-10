@@ -1,4 +1,5 @@
 import type { PoolClient } from 'pg'
+import { enforceRecordQuota } from '../lib/tenant-quota-enforce.js'
 
 import { getCompanyLinkById } from '../repositories/companies.repository.js'
 import {
@@ -6,6 +7,10 @@ import {
 } from '../lib/relation-snapshots.js'
 import { pool } from '../db/pool.js'
 import { setTenantLocal, tenantQuery } from '../db/tenant-query.js'
+import {
+  TEAM_MEMBER_USER_NAME_SQL,
+  teamMemberUserJoins,
+} from '../lib/tenant-user-display-name-sql.js'
 import { pushTenantCondition, tenantWhereParam } from '../lib/tenant-sql.js'
 import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import {
@@ -48,7 +53,11 @@ const PROJECT_COLUMNS = `
   updated_at, updated_by_id, updated_by_name
 `
 
-const TEAM_COLUMNS = `id, project_id, user_id, user_name, role_label`
+const TEAM_SELECT = `
+  tm.id, tm.project_id, tm.user_id,
+  ${TEAM_MEMBER_USER_NAME_SQL} AS user_name,
+  tm.role_label
+`
 
 export type ListProjectsParams = {
   page: number
@@ -91,12 +100,14 @@ export function assertProjectTeamAccess(
 }
 
 async function loadProjectTeam(projectId: string): Promise<ProjectTeamRow[]> {
+  const tenantId = getTenantIdOrDefault()
   const result = await tenantQuery<ProjectTeamRow>(
-    `SELECT ${TEAM_COLUMNS}
-     FROM crm_project_team_members
-     WHERE project_id = $1
-     ORDER BY user_name ASC, id ASC`,
-    [projectId],
+    `SELECT ${TEAM_SELECT}
+     FROM crm_project_team_members tm
+     ${teamMemberUserJoins(2)}
+     WHERE tm.project_id = $1
+     ORDER BY user_name ASC, tm.id ASC`,
+    [projectId, tenantId],
   )
   return result.rows
 }
@@ -106,12 +117,14 @@ async function loadTeamsByProjectIds(
 ): Promise<Map<string, ProjectTeamRow[]>> {
   const map = new Map<string, ProjectTeamRow[]>()
   if (projectIds.length === 0) return map
+  const tenantId = getTenantIdOrDefault()
   const result = await tenantQuery<ProjectTeamRow>(
-    `SELECT ${TEAM_COLUMNS}
-     FROM crm_project_team_members
-     WHERE project_id = ANY($1::uuid[])
-     ORDER BY project_id, user_name ASC, id ASC`,
-    [projectIds],
+    `SELECT ${TEAM_SELECT}
+     FROM crm_project_team_members tm
+     ${teamMemberUserJoins(2)}
+     WHERE tm.project_id = ANY($1::uuid[])
+     ORDER BY tm.project_id, user_name ASC, tm.id ASC`,
+    [projectIds, tenantId],
   )
   for (const row of result.rows) {
     const list = map.get(row.project_id) ?? []
@@ -489,6 +502,7 @@ export async function createProject(
   input: CreateProjectInput,
   actor: AuditActor,
 ): Promise<ProjectDetail> {
+  await enforceRecordQuota(actor)
   if (!input.name?.trim()) throw badRequest('El nombre del proyecto es obligatorio')
   if (!input.deadline?.trim()) throw badRequest('La fecha de entrega es obligatoria')
 

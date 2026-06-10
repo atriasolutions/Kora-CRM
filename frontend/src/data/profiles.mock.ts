@@ -60,6 +60,7 @@ export const profileListSeed: AccessProfileListItem[] = [
     userCount: 1,
     updatedAt: '18 may 2026',
     isSystem: true,
+    systemKey: 'admin',
   },
   {
     id: 'p-ventas',
@@ -84,10 +85,11 @@ export const profileListSeed: AccessProfileListItem[] = [
   },
   {
     id: 'p-invitado',
-    name: 'Cliente Invitado',
-    description: 'Acceso limitado a proyectos donde figura en el equipo.',
+    name: 'Invitado',
+    description: 'Acceso limitado a proyectos (solo lectura) y solicitudes.',
     userCount: 1,
     updatedAt: '20 may 2026',
+    systemKey: 'guest',
   },
 ]
 
@@ -151,7 +153,30 @@ export const profileDetailSeed: Record<string, AccessProfile> = {
   },
   'p-invitado': {
     ...profileListSeed[4]!,
-    permissions: createViewOnlyModulePermissions(['proyectos']),
+    permissions: createFullModulePermissions().map((p) => {
+      if (p.moduleId === 'proyectos') {
+        return {
+          ...p,
+          flags: { menu: true, view: true, create: false, edit: false, delete: false },
+        }
+      }
+      if (p.moduleId === 'solicitudes') {
+        return {
+          ...p,
+          flags: { menu: true, view: true, create: true, edit: true, delete: false },
+        }
+      }
+      if (p.moduleId === 'bitacora') {
+        return {
+          ...p,
+          flags: { menu: true, view: true, create: false, edit: false, delete: false },
+        }
+      }
+      return {
+        ...p,
+        flags: { menu: false, view: false, create: false, edit: false, delete: false },
+      }
+    }),
   },
 }
 

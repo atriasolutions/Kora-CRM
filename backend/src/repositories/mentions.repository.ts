@@ -1,7 +1,7 @@
 import { tenantQuery } from '../db/tenant-query.js'
-import { tenantWhereParam } from '../lib/tenant-sql.js'
+import { TENANT_USER_DISPLAY_NAME_SQL } from '../lib/tenant-user-display-name-sql.js'
 import { getTenantIdOrDefault } from '../lib/tenant-context.js'
-import { USER_DIRECTORY_VISIBLE_CONDITION } from '../lib/user-directory.js'
+import { USER_DIRECTORY_VISIBLE_CONDITION_U } from '../lib/user-directory.js'
 import type { MentionKind, MentionSearchItem } from '../types/mentions.js'
 
 const ACTIVE_NOT_ARCHIVED = `deleted_at IS NULL AND archived_at IS NULL`
@@ -60,15 +60,38 @@ async function searchKind(
   sql: string,
   pattern: string | null,
   limit: number,
+  extraParams: unknown[] = [],
 ): Promise<MentionSearchItem[]> {
-  const tenantSql = sql.includes('tenant_id')
-    ? sql
-    : sql.replace(/LIMIT \$\d+/, (m) => `AND tenant_id = ${pattern ? '$3' : '$2'} ${m}`)
-  const params = pattern
-    ? [pattern, limit, getTenantIdOrDefault()]
-    : [limit, getTenantIdOrDefault()]
-  const result = await tenantQuery<Row>(tenantSql, params)
+  const params = pattern ? [pattern, limit, ...extraParams] : [limit, ...extraParams]
+  const result = await tenantQuery<Row>(sql, params)
   return result.rows.map(mapRow)
+}
+
+const USER_MENTION_MEMBERSHIP_JOIN = `
+  INNER JOIN crm_tenant_memberships mem
+    ON mem.user_id = u.id AND mem.tenant_id = $TENANT$::uuid
+   AND mem.status = 'active'`
+
+function userMentionSearchSql(pattern: string | null, tenantParam: string): string {
+  const membershipJoin = USER_MENTION_MEMBERSHIP_JOIN.replace('$TENANT$', tenantParam)
+  const nameExpr = TENANT_USER_DISPLAY_NAME_SQL
+  const roleExpr = `COALESCE(NULLIF(trim(mem.role), ''), u.role)`
+  const baseFrom = `
+    FROM crm_users u
+    ${membershipJoin}
+    WHERE u.deleted_at IS NULL AND u.status = 'Activo' AND ${USER_DIRECTORY_VISIBLE_CONDITION_U}`
+
+  if (pattern) {
+    return `SELECT 'user'::text AS kind, u.id::text AS record_id, ${nameExpr} AS label,
+                  coalesce(nullif(trim(u.email), ''), ${roleExpr}, u.status::text) AS subtitle
+           ${baseFrom}
+             AND (${nameExpr} ILIKE $1 OR u.email ILIKE $1 OR ${roleExpr} ILIKE $1)
+           ORDER BY label ASC LIMIT $2`
+  }
+  return `SELECT 'user'::text AS kind, u.id::text AS record_id, ${nameExpr} AS label,
+                coalesce(nullif(trim(u.email), ''), ${roleExpr}) AS subtitle
+         ${baseFrom}
+         ORDER BY label ASC LIMIT $1`
 }
 
 const KIND_ORDER: MentionKind[] = [
@@ -91,23 +114,15 @@ export async function searchMentions(
   const trimmed = query.trim()
   const pattern = trimmed ? `%${trimmed}%` : null
   const perKind = trimmed ? limit : 2
+  const tenantId = getTenantIdOrDefault()
+  const userTenantParam = pattern ? '$3' : '$2'
 
   const batches = await Promise.all([
     searchKind(
-      pattern
-        ? `SELECT 'user'::text AS kind, id::text AS record_id, name AS label,
-                  coalesce(nullif(trim(email), ''), role, status::text) AS subtitle
-           FROM crm_users
-           WHERE deleted_at IS NULL AND status = 'Activo' AND ${USER_DIRECTORY_VISIBLE_CONDITION}
-             AND (name ILIKE $1 OR email ILIKE $1 OR role ILIKE $1)
-           ORDER BY name ASC LIMIT $2`
-        : `SELECT 'user'::text AS kind, id::text AS record_id, name AS label,
-                  coalesce(nullif(trim(email), ''), role) AS subtitle
-           FROM crm_users
-           WHERE deleted_at IS NULL AND status = 'Activo' AND ${USER_DIRECTORY_VISIBLE_CONDITION}
-           ORDER BY name ASC LIMIT $1`,
+      userMentionSearchSql(pattern, userTenantParam),
       pattern,
       perKind,
+      [tenantId],
     ),
     searchKind(
       pattern
@@ -284,10 +299,14 @@ export async function getUserNamesByIds(
   const unique = [...new Set(userIds.filter(Boolean))]
   if (unique.length === 0) return new Map()
 
+  const tenantId = getTenantIdOrDefault()
   const result = await tenantQuery<{ id: string; name: string }>(
-    `SELECT id::text, name FROM crm_users
-     WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
-    [unique, getTenantIdOrDefault()],
+    `SELECT u.id::text, ${TENANT_USER_DISPLAY_NAME_SQL} AS name
+     FROM crm_users u
+     INNER JOIN crm_tenant_memberships mem
+       ON mem.user_id = u.id AND mem.tenant_id = $2::uuid
+     WHERE u.id = ANY($1::uuid[]) AND u.deleted_at IS NULL`,
+    [unique, tenantId],
   )
   return new Map(result.rows.map((row) => [row.id, row.name]))
 }

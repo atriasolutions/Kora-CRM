@@ -1,6 +1,6 @@
 import { Router } from 'express'
 
-import { isSystemAccessProfile } from '../lib/access-profile-admin.js'
+import { hasElevatedTenantScope } from '../lib/access-profile-admin.js'
 import { getAuditActor, getAuthProfile } from '../middleware/audit-actor.js'
 import * as searchRepo from '../repositories/search.repository.js'
 import { globalSearchQuerySchema } from '../validators/search.validator.js'
@@ -14,7 +14,7 @@ searchRouter.get('/', async (req, res, next) => {
     const actor = getAuditActor(req)
     const data = await searchRepo.globalSearch(query.q, query.limit, {
       profile,
-      memberAccess: isSystemAccessProfile(profile)
+      memberAccess: hasElevatedTenantScope(profile)
         ? undefined
         : { userId: actor.userId, userName: actor.userName },
     })

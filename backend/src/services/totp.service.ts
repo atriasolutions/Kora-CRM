@@ -42,6 +42,15 @@ export function decryptSecretFromStorage(encrypted: string): string {
   return decryptTotpSecret(encrypted)
 }
 
+/** Devuelve null si el secreto no puede descifrarse (p. ej. clave de cifrado distinta). */
+export function tryDecryptSecretFromStorage(encrypted: string): string | null {
+  try {
+    return decryptTotpSecret(encrypted)
+  } catch {
+    return null
+  }
+}
+
 export function hashBackupCode(plain: string): string {
   const norm = plain.replace(/\s/g, '').toUpperCase()
   return createHash('sha256').update(norm).digest('hex')

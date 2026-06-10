@@ -126,7 +126,7 @@ export function ProductDetailSidebar({
           label="Impuesto"
           value={
             product.taxRate
-              ? `${product.taxRate}%${product.taxIncluded ? ' (incluido)' : ' + IVA'}`
+              ? `${product.taxRate}%`
               : ''
           }
         />

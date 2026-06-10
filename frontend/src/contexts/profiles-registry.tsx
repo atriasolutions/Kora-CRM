@@ -11,6 +11,7 @@ import { isApiEnabled } from '@/api/config'
 import { ProfilesRegistryContext } from '@/contexts/profiles-registry-context'
 import { useAuth } from '@/hooks/use-auth'
 import { profileDetailSeed } from '@/data/profiles.mock'
+import { isLockedAccessProfile } from '@/lib/access-profile-admin'
 import type { AccessProfile } from '@/types/access-profile'
 import { useRegistryApiBootstrap } from '@/hooks/use-registry-api-bootstrap'
 const useApi = isApiEnabled()
@@ -105,7 +106,7 @@ export function ProfilesRegistryProvider({ children }: { children: ReactNode }) 
   const removeProfile = useCallback(
     async (id: string) => {
       const target = profiles.find((p) => p.id === id)
-      if (!target || target.isSystem) return false
+      if (!target || isLockedAccessProfile(target)) return false
       if (useApi) {
         await deleteAccessProfileApi(id)
         persist(profiles.filter((p) => p.id !== id))

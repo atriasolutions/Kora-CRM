@@ -1,7 +1,7 @@
 import type { SolicitudListItem } from '@/data/solicitudes.mock'
 import type { EntityRecentSlug } from '@/lib/entity-recently-viewed'
 import { loadRecentlyViewedIds } from '@/lib/entity-recently-viewed'
-import { isSystemAccessProfile } from '@/lib/access-profile-admin'
+import { hasElevatedTenantScope } from '@/lib/access-profile-admin'
 import type { AccessProfile } from '@/types/access-profile'
 import {
   createListScopeOptions,
@@ -32,7 +32,7 @@ export const SOLICITUD_SCOPE_SHORT_LABELS: Record<SolicitudListScope, string> = 
 export function canViewAllSolicitudes(
   profile: Pick<AccessProfile, 'isSystem'> | null | undefined,
 ): boolean {
-  return isSystemAccessProfile(profile)
+  return hasElevatedTenantScope(profile)
 }
 
 export function solicitudListScopeOptionsForProfile(

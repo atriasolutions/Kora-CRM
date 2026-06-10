@@ -37,6 +37,8 @@ export type UserDetail = UserListItem & {
   permissions: UserPermissionModule[]
   recentSessions: UserSessionEntry[]
   notes: ContactNote[]
+  guestCompanyId?: string
+  guestCompanyName?: string
 }
 
 const DEFAULT_PERMISSIONS: UserPermissionModule[] = [

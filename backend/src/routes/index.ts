@@ -19,19 +19,23 @@ import { organizationSettingsRouter } from './organization-settings.routes.js'
 import { productCategoriesRouter } from './product-categories.routes.js'
 import { productsRouter } from './products.routes.js'
 import { projectsRouter } from './projects.routes.js'
+import { bitacoraRouter } from './bitacora.routes.js'
 import { solicitudesRouter } from './solicitudes.routes.js'
 import { quotesRouter } from './quotes.routes.js'
 import { usersRouter } from './users.routes.js'
 import { warehousesRouter } from './warehouses.routes.js'
+import { bankAccountsRouter } from './bank-accounts.routes.js'
 import { exchangeRatesRouter } from './exchange-rates.routes.js'
 import { entityFilesRouter } from './entity-files.routes.js'
 import { entityNotesRouter } from './entity-notes.routes.js'
 import { mentionsRouter } from './mentions.routes.js'
 import { notificationsRouter } from './notifications.routes.js'
 import { marketingRouter } from './marketing.routes.js'
+import { tenantQuotasRouter } from './tenant-quotas.routes.js'
 
 export const apiRouter = Router()
 
+apiRouter.use('/tenant', tenantQuotasRouter)
 apiRouter.use('/marketing', marketingRouter)
 apiRouter.use('/auth', authRouter)
 apiRouter.use('/dashboard', dashboardRouter)
@@ -41,6 +45,7 @@ apiRouter.use('/users', usersRouter)
 apiRouter.use('/geo', geoRouter)
 apiRouter.use('/organization-settings', organizationSettingsRouter)
 apiRouter.use('/warehouses', warehousesRouter)
+apiRouter.use('/bank-accounts', bankAccountsRouter)
 apiRouter.use('/product-categories', productCategoriesRouter)
 apiRouter.use('/products', productsRouter)
 apiRouter.use('/contacts', contactsRouter)
@@ -54,6 +59,7 @@ apiRouter.use('/invoices', invoicesRouter)
 apiRouter.use('/sii', siiRouter)
 apiRouter.use('/projects', projectsRouter)
 apiRouter.use('/solicitudes', solicitudesRouter)
+apiRouter.use('/bitacora', bitacoraRouter)
 apiRouter.use('/reports', reportsRouter)
 apiRouter.use('/search', searchRouter)
 apiRouter.use('/notifications', notificationsRouter)

@@ -40,7 +40,7 @@ export async function fetchJSON<T>(
   let res: Response
   try {
     res = await fetch(url, {
-      credentials: auth ? 'include' : 'same-origin',
+      credentials: auth ? 'include' : 'omit',
       ...requestInit,
       headers: {
         Accept: 'application/json',

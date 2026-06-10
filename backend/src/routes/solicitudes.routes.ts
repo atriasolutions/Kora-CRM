@@ -1,12 +1,9 @@
 import { Router } from 'express'
 
-import { isSystemAccessProfile } from '../lib/access-profile-admin.js'
+import { hasElevatedTenantScope } from '../lib/access-profile-admin.js'
 import { getAuditActor, getAuthProfile } from '../middleware/audit-actor.js'
 import { requirePermission } from '../middleware/require-permission.js'
 import { routeParam } from '../lib/route-params.js'
-import {
-  assertSolicitudTeamAccess,
-} from '../repositories/solicitudes.repository.js'
 import * as solicitudesRepo from '../repositories/solicitudes.repository.js'
 import type {
   CreateSolicitudInput,
@@ -34,9 +31,10 @@ solicitudesRouter.get(
         q: query.q,
         status: query.status,
         archivedOnly: query.archived === true,
-        memberAccess: isSystemAccessProfile(profile)
-          ? undefined
-          : { userId: actor.userId, userName: actor.userName },
+        memberAccess:
+          hasElevatedTenantScope(profile) || actor.isPlatformOperator
+            ? undefined
+            : { userId: actor.userId, userName: actor.userName },
       })
       res.json({
         data: result.items,
@@ -59,9 +57,16 @@ solicitudesRouter.get(
   async (req, res, next) => {
     try {
       const profile = getAuthProfile(req)
+      const actor = getAuditActor(req)
       const item = await solicitudesRepo.getSolicitudById(routeParam(req))
-      if (!isSystemAccessProfile(profile)) {
-        assertSolicitudTeamAccess(item.assignee, item.team, getAuditActor(req))
+      if (!hasElevatedTenantScope(profile) && !actor.isPlatformOperator) {
+        solicitudesRepo.assertSolicitudTeamAccess(
+          item.assignee,
+          item.team,
+          actor,
+          { userId: item.createdById, userName: item.createdByName },
+          item.assigneeUserId ?? null,
+        )
       }
       res.json({ data: item })
     } catch (e) {

@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import type { QuoteDetail } from '@/data/quote-detail.mock'
 import { UserLookupField } from '@/components/shared/UserLookupField'
+import { QuoteBankPdfFields } from '@/components/quotes/QuoteBankPdfFields'
 import { QuoteCommercialTermsFields } from '@/components/quotes/QuoteCommercialTermsFields'
 import { QuoteInternalInventorySection } from '@/components/quotes/QuoteInternalInventorySection'
 import type { QuoteFormValues } from '@/lib/quote-form'
@@ -89,6 +90,14 @@ export function QuoteDetailSidebar({
                 paymentTerms: form.paymentTerms,
                 deliveryTerms: form.deliveryTerms,
                 terms: form.terms,
+              }}
+              onChange={(patch) => onFormChange?.(patch)}
+            />
+            <QuoteBankPdfFields
+              idPrefix="sidebar-qt-bank"
+              values={{
+                includeBankDetails: form.includeBankDetails,
+                bankAccountId: form.bankAccountId,
               }}
               onChange={(patch) => onFormChange?.(patch)}
             />

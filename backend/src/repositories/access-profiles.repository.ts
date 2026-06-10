@@ -2,13 +2,18 @@ import { tenantQuery } from '../db/tenant-query.js'
 import { tenantWhereParam } from '../lib/tenant-sql.js'
 import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import {
+  canEditProfilePermissions,
+  canModifyLockedProfile,
+  canRenameProfile,
+  isLockedAccessProfile,
+} from '../lib/access-profile-admin.js'
+import {
   mapAccessProfile,
   mapAccessProfileListRow,
   type AccessProfileRow,
   type PermissionRow,
 } from '../mappers/access-profile.mapper.js'
-import { isSystemAccessProfile } from '../lib/access-profile-admin.js'
-import { badRequest, notFound } from '../middleware/errors.js'
+import { forbidden, badRequest, notFound } from '../middleware/errors.js'
 import type {
   AccessProfile,
   AccessProfileListItem,
@@ -16,16 +21,45 @@ import type {
   MenuModulePermission,
   UpdateAccessProfileInput,
 } from '../types/access-profile.js'
+import type { AuditActor } from '../types/audit.js'
+
+/** Usuarios activos del tenant que tienen este perfil (membresía o referencia legacy en crm_users). */
+const PROFILE_USER_COUNT_SQL = `
+  (SELECT count(DISTINCT u.id)::int
+   FROM crm_users u
+   INNER JOIN crm_tenant_memberships m
+     ON m.user_id = u.id AND m.tenant_id = p.tenant_id
+   WHERE u.deleted_at IS NULL
+     AND (m.profile_id = p.id OR u.profile_id = p.id)) AS user_count
+`
 
 const PROFILE_SELECT = `
-  p.id, p.name, p.description, p.is_system, p.updated_at,
-  (SELECT count(*)::int
-   FROM crm_tenant_memberships m
-   JOIN crm_users u ON u.id = m.user_id
-   WHERE m.profile_id = p.id
-     AND m.tenant_id = p.tenant_id
-     AND u.deleted_at IS NULL) AS user_count
+  p.id, p.name, p.description, p.is_system, p.system_key, p.updated_at,
+  ${PROFILE_USER_COUNT_SQL}
 `
+
+async function countUsersAssignedToProfile(
+  tenantId: string,
+  profileId: string,
+): Promise<number> {
+  const result = await tenantQuery<{ count: number }>(
+    `SELECT count(DISTINCT u.id)::int AS count
+     FROM crm_users u
+     INNER JOIN crm_tenant_memberships m
+       ON m.user_id = u.id AND m.tenant_id = $1
+     WHERE u.deleted_at IS NULL
+       AND (m.profile_id = $2 OR u.profile_id = $2)`,
+    [tenantId, profileId],
+  )
+  return Number(result.rows[0]?.count ?? 0)
+}
+
+function profileInUseMessage(count: number): string {
+  if (count === 1) {
+    return 'No se puede eliminar el perfil: 1 usuario lo tiene asignado. Reasígnalo antes de eliminar.'
+  }
+  return `No se puede eliminar el perfil: ${count} usuarios lo tienen asignado. Reasígnalos antes de eliminar.`
+}
 
 async function loadPermissions(profileId: string): Promise<PermissionRow[]> {
   const result = await tenantQuery<PermissionRow>(
@@ -63,9 +97,18 @@ async function upsertPermissions(
   }
 }
 
+function assertCanModifyProfile(existing: AccessProfile, actor: AuditActor): void {
+  if (!isLockedAccessProfile(existing)) return
+  if (!canModifyLockedProfile(existing, Boolean(actor.isPlatformOperator))) {
+    throw forbidden(
+      'Los perfiles Administrador e Invitado solo pueden modificarlos operadores de plataforma.',
+    )
+  }
+}
+
 export async function listAccessProfiles(): Promise<AccessProfileListItem[]> {
   const result = await tenantQuery<AccessProfileRow>(
-    `SELECT ${PROFILE_SELECT} FROM crm_access_profiles p WHERE ${tenantWhereParam(1, 'p')} ORDER BY p.name ASC`,
+    `SELECT ${PROFILE_SELECT} FROM crm_access_profiles p WHERE ${tenantWhereParam(1, 'p')} ORDER BY p.system_key NULLS LAST, p.name ASC`,
     [getTenantIdOrDefault()],
   )
   return result.rows.map(mapAccessProfileListRow)
@@ -101,14 +144,15 @@ export async function createAccessProfile(
 export async function updateAccessProfile(
   id: string,
   input: UpdateAccessProfileInput,
+  actor: AuditActor,
 ): Promise<AccessProfile> {
   const existing = await getAccessProfileById(id)
-
-  if (existing.isSystem && input.name && input.name.trim() !== existing.name) {
-    throw badRequest('No se puede renombrar un perfil de sistema')
-  }
+  assertCanModifyProfile(existing, actor)
 
   if (input.name !== undefined) {
+    if (!canRenameProfile(existing, Boolean(actor.isPlatformOperator))) {
+      throw badRequest('No se puede renombrar este perfil de sistema')
+    }
     await tenantQuery(
       `UPDATE crm_access_profiles SET name = $2, updated_at = now() WHERE id = $1 AND ${tenantWhereParam(3)}`,
       [id, input.name.trim(), getTenantIdOrDefault()],
@@ -121,8 +165,8 @@ export async function updateAccessProfile(
     )
   }
   if (input.permissions) {
-    if (isSystemAccessProfile(existing)) {
-      throw badRequest('Los permisos del perfil Administrador no son configurables')
+    if (!canEditProfilePermissions(existing, Boolean(actor.isPlatformOperator))) {
+      throw badRequest('Los permisos de este perfil no son configurables')
     }
     await upsertPermissions(id, input.permissions)
   }
@@ -130,12 +174,21 @@ export async function updateAccessProfile(
   return getAccessProfileById(id)
 }
 
-export async function deleteAccessProfile(id: string): Promise<void> {
+export async function deleteAccessProfile(id: string, actor: AuditActor): Promise<void> {
   const profile = await getAccessProfileById(id)
-  if (profile.isSystem) throw badRequest('No se puede eliminar un perfil de sistema')
-  if (profile.userCount > 0) {
-    throw badRequest('No se puede eliminar un perfil con usuarios asignados')
+  if (isLockedAccessProfile(profile)) {
+    if (!actor.isPlatformOperator) {
+      throw forbidden('Los perfiles Administrador e Invitado no pueden eliminarse.')
+    }
+    throw badRequest('Los perfiles de sistema no pueden eliminarse')
   }
+
+  const tenantId = getTenantIdOrDefault()
+  const assigned = await countUsersAssignedToProfile(tenantId, id)
+  if (assigned > 0) {
+    throw badRequest(profileInUseMessage(assigned))
+  }
+
   await tenantQuery(`DELETE FROM crm_access_profile_permissions WHERE profile_id = $1`, [id])
   const result = await tenantQuery(`DELETE FROM crm_access_profiles WHERE id = $1 AND ${tenantWhereParam(2)}`, [id, getTenantIdOrDefault()])
   if (result.rowCount === 0) throw notFound('Perfil no encontrado')

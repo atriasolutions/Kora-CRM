@@ -1,7 +1,12 @@
 import type { PoolClient } from 'pg'
+import { enforceRecordQuota } from '../lib/tenant-quota-enforce.js'
 
 import { pool } from '../db/pool.js'
 import { setTenantLocal, tenantQuery } from '../db/tenant-query.js'
+import {
+  TEAM_MEMBER_USER_NAME_SQL,
+  teamMemberUserJoins,
+} from '../lib/tenant-user-display-name-sql.js'
 import { pushTenantCondition, tenantWhereParam } from '../lib/tenant-sql.js'
 import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import {
@@ -20,6 +25,7 @@ import {
 } from '../mappers/solicitud.mapper.js'
 import { badRequest, forbidden, notFound } from '../middleware/errors.js'
 import { getOrganizationSettings } from '../repositories/organization-settings.repository.js'
+import { getActorGuestCompany } from '../repositories/users.repository.js'
 import { notifySolicitudAssignment } from '../services/notifications.service.js'
 import { notifyAndEmailNewSolicitudTeamMembers } from '../services/solicitud-team-member.service.js'
 import { purgeEntityNotesAndFiles } from '../services/entity-purge.service.js'
@@ -37,11 +43,16 @@ import { paginationOffset } from '../utils/pagination.js'
 const SOLICITUD_COLUMNS = `
   id, code, title, description, status, priority,
   assignee_user_id, assignee_name,
+  company_id, company_name,
   created_at, created_by_id, created_by_name,
   updated_at, updated_by_id, updated_by_name
 `
 
-const TEAM_COLUMNS = `id, solicitud_id, user_id, user_name, role_label`
+const TEAM_SELECT = `
+  tm.id, tm.solicitud_id, tm.user_id,
+  ${TEAM_MEMBER_USER_NAME_SQL} AS user_name,
+  tm.role_label
+`
 
 export type ListSolicitudesParams = {
   page: number
@@ -56,11 +67,21 @@ export function userHasSolicitudTeamAccess(
   assigneeName: string,
   team: SolicitudTeamMemberDto[],
   actor: AuditActor,
+  createdBy?: { userId?: string | null; userName?: string | null },
+  assigneeUserId?: string | null,
 ): boolean {
+  const actorId = actor.userId.trim().toLowerCase()
   const actorName = actor.userName.trim().toLowerCase()
+  const creatorId = createdBy?.userId?.trim().toLowerCase()
+  const creatorName = createdBy?.userName?.trim().toLowerCase()
+  if (creatorId && creatorId === actorId) return true
+  if (creatorName && creatorName === actorName) return true
+
+  const assigneeId = assigneeUserId?.trim().toLowerCase()
+  if (assigneeId && assigneeId === actorId) return true
   const assignee = assigneeName.trim().toLowerCase()
   if (assignee && assignee === actorName) return true
-  const actorId = actor.userId.trim().toLowerCase()
+
   return team.some((member) => {
     const memberId = member.userId?.trim().toLowerCase()
     const memberName = member.name?.trim().toLowerCase()
@@ -73,19 +94,88 @@ export function assertSolicitudTeamAccess(
   assigneeName: string,
   team: SolicitudTeamMemberDto[],
   actor: AuditActor,
+  createdBy?: { userId?: string | null; userName?: string | null },
+  assigneeUserId?: string | null,
 ): void {
-  if (!userHasSolicitudTeamAccess(assigneeName, team, actor)) {
+  if (!userHasSolicitudTeamAccess(assigneeName, team, actor, createdBy, assigneeUserId)) {
     throw forbidden('No tienes acceso a esta solicitud.')
   }
 }
 
+function teamMemberInputKey(member: SolicitudTeamMemberInput): string {
+  const id = member.userId?.trim().toLowerCase()
+  if (id) return `id:${id}`
+  return `name:${member.userName?.trim().toLowerCase() ?? ''}`
+}
+
+/** Responsable y creador siempre forman parte del equipo con acceso al registro. */
+function buildSolicitudTeamMembersForInsert(
+  team: SolicitudTeamMemberInput[] | undefined,
+  assigneeName: string,
+  assigneeUserId: string | null,
+  creator: { userId: string; userName: string },
+): SolicitudTeamMemberInput[] {
+  const assignee = assigneeName.trim()
+  const byKey = new Map<string, SolicitudTeamMemberInput>()
+
+  const add = (member: SolicitudTeamMemberInput, preferRole?: string) => {
+    const name = member.userName?.trim()
+    if (!name) return
+    const key = teamMemberInputKey(member)
+    if (!key || key === 'name:') return
+    const existing = byKey.get(key)
+    if (!existing) {
+      byKey.set(key, {
+        ...member,
+        userName: name,
+        roleLabel: preferRole ?? member.roleLabel?.trim() ?? undefined,
+      })
+      return
+    }
+    const role = preferRole ?? existing.roleLabel ?? member.roleLabel
+    byKey.set(key, {
+      userId: existing.userId ?? member.userId ?? undefined,
+      userName: name,
+      roleLabel: role?.trim() || undefined,
+    })
+  }
+
+  for (const member of dedupeTeamMemberInputs(team, assignee)) {
+    add(member)
+  }
+  if (assignee) {
+    add(
+      {
+        userId: assigneeUserId,
+        userName: assignee,
+        roleLabel: 'Responsable',
+      },
+      'Responsable',
+    )
+  }
+  add(
+    {
+      userId: creator.userId,
+      userName: creator.userName,
+      roleLabel: 'Creador',
+    },
+    creator.userId === assigneeUserId && assignee.toLowerCase() === creator.userName.trim().toLowerCase()
+      ? 'Responsable'
+      : 'Creador',
+  )
+
+  return Array.from(byKey.values())
+}
+
 async function loadSolicitudTeam(solicitudId: string): Promise<SolicitudTeamMemberDto[]> {
+  const tenantId = getTenantIdOrDefault()
   const result = await tenantQuery<SolicitudTeamRow>(
-    `SELECT ${TEAM_COLUMNS}
-     FROM crm_solicitud_team_members
-     WHERE solicitud_id = $1
+    `SELECT ${TEAM_SELECT}
+     FROM crm_solicitud_team_members tm
+     ${teamMemberUserJoins(2)}
+     WHERE tm.solicitud_id = $1
      ORDER BY user_name ASC`,
-    [solicitudId],
+    [solicitudId, tenantId],
   )
   return result.rows.map(mapSolicitudTeamRow)
 }
@@ -96,12 +186,14 @@ async function loadTeamsBySolicitudIds(
   const map = new Map<string, SolicitudTeamMemberDto[]>()
   if (solicitudIds.length === 0) return map
 
+  const tenantId = getTenantIdOrDefault()
   const result = await tenantQuery<SolicitudTeamRow>(
-    `SELECT ${TEAM_COLUMNS}
-     FROM crm_solicitud_team_members
-     WHERE solicitud_id = ANY($1::uuid[])
-     ORDER BY solicitud_id, user_name ASC`,
-    [solicitudIds],
+    `SELECT ${TEAM_SELECT}
+     FROM crm_solicitud_team_members tm
+     ${teamMemberUserJoins(2)}
+     WHERE tm.solicitud_id = ANY($1::uuid[])
+     ORDER BY tm.solicitud_id, user_name ASC`,
+    [solicitudIds, tenantId],
   )
 
   for (const row of result.rows) {
@@ -202,14 +294,14 @@ async function insertSolicitudTeam(
   team: SolicitudTeamMemberInput[] | undefined,
   assigneeName: string,
   assigneeUserId: string | null,
+  creator: { userId: string; userName: string },
 ): Promise<void> {
-  const deduped = dedupeTeamMemberInputs(team, assigneeName)
-  const members =
-    deduped.length > 0
-      ? deduped
-      : assigneeName.trim()
-        ? [{ userId: assigneeUserId, userName: assigneeName, roleLabel: 'Responsable' }]
-        : []
+  const members = buildSolicitudTeamMembersForInsert(
+    team,
+    assigneeName,
+    assigneeUserId,
+    creator,
+  )
 
   for (const member of members) {
     const userName = member.userName?.trim()
@@ -247,7 +339,7 @@ export async function listSolicitudes(
   }
   if (params.q) {
     conditions.push(
-      `(code ILIKE $${idx} OR title ILIKE $${idx} OR description ILIKE $${idx} OR assignee_name ILIKE $${idx})`,
+      `(code ILIKE $${idx} OR title ILIKE $${idx} OR description ILIKE $${idx} OR assignee_name ILIKE $${idx} OR company_name ILIKE $${idx})`,
     )
     values.push(`%${params.q}%`)
     idx++
@@ -259,7 +351,8 @@ export async function listSolicitudes(
     const idIdx = idx++
     conditions.push(
       `(
-        lower(trim(assignee_name)) = lower($${nameIdx})
+        created_by_id = $${idIdx}::uuid
+        OR lower(trim(assignee_name)) = lower($${nameIdx})
         OR EXISTS (
           SELECT 1 FROM crm_solicitud_team_members tm
           WHERE tm.solicitud_id = crm_solicitudes.id
@@ -319,11 +412,14 @@ export async function createSolicitud(
   input: CreateSolicitudInput,
   actor: AuditActor,
 ): Promise<SolicitudDetail> {
+  await enforceRecordQuota(actor)
   if (!input.title?.trim()) throw badRequest('El título es obligatorio')
 
   const defaultAssignee = await resolveDefaultAssignee(actor)
   const assignee = await resolveAssignee(input, actor, defaultAssignee)
   const code = await nextSolicitudCode()
+  const tenantId = getTenantIdOrDefault()
+  const guestCompany = await getActorGuestCompany(actor.userId, tenantId)
 
   const client = await pool.connect()
   try {
@@ -333,11 +429,13 @@ export async function createSolicitud(
       `INSERT INTO crm_solicitudes (
         code, title, description, status, priority,
         assignee_user_id, assignee_name,
+        company_id, company_name,
         created_by_id, created_by_name, updated_by_id, updated_by_name, tenant_id
       ) VALUES (
         $1, $2, $3, $4, $5,
         $6, $7,
-        $8, $9, $8, $9, $10
+        $8, $9,
+        $10, $11, $10, $11, $12
       )
       RETURNING ${SOLICITUD_COLUMNS}`,
       [
@@ -348,9 +446,11 @@ export async function createSolicitud(
         input.priority ?? 'Media',
         assignee.userId,
         assignee.userName,
+        guestCompany.companyId,
+        guestCompany.companyName,
         actor.userId,
         actor.userName,
-        getTenantIdOrDefault(),
+        tenantId,
       ],
     )
     const row = result.rows[0]!
@@ -360,6 +460,7 @@ export async function createSolicitud(
       input.team,
       assignee.userName,
       assignee.userId,
+      { userId: actor.userId, userName: actor.userName },
     )
     await client.query('COMMIT')
     const detail = mapSolicitudDetail(row, await loadSolicitudTeam(row.id))
@@ -446,6 +547,10 @@ export async function updateSolicitud(
         input.team,
         nextAssigneeName,
         assignee.userId,
+        {
+          userId: existing.createdById?.trim() || actor.userId,
+          userName: existing.createdByName?.trim() || actor.userName,
+        },
       )
     }
 

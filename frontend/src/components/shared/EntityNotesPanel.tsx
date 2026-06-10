@@ -13,6 +13,7 @@ import {
   resolveMentionLabel,
 } from '@/lib/mentions'
 import { sanitizeRichTextHtml } from '@/lib/rich-text-sanitize'
+import { canDeleteEntityNote } from '@/lib/entity-note-delete'
 import { useAuth } from '@/hooks/use-auth'
 import { useNotifications } from '@/contexts/notifications-context'
 import { isApiEnabled } from '@/api/config'
@@ -44,7 +45,7 @@ export function EntityNotesPanel({
   onDeleteNote,
 }: EntityNotesPanelProps) {
   const [draftHtml, setDraftHtml] = useState('')
-  const { session } = useAuth()
+  const { session, profile } = useAuth()
   const { addLocalNotification } = useNotifications()
   const notifiedNoteIdsRef = useRef<Set<string>>(new Set())
 
@@ -98,6 +99,7 @@ export function EntityNotesPanel({
       body,
       mentions,
       author: session?.name?.trim() || authorName,
+      authorUserId: session?.userId ?? null,
       when: formatNoteWhen(),
     }
     onAddNote?.(note)
@@ -186,7 +188,7 @@ export function EntityNotesPanel({
                   key={note.id}
                   className="rounded-lg border border-border bg-card p-4 shadow-sm"
                 >
-                  {onDeleteNote ? (
+                  {onDeleteNote && canDeleteEntityNote(note, session, profile) ? (
                     <div className="mb-2 flex justify-end">
                       <Button
                         type="button"

@@ -1,4 +1,5 @@
 import type { PoolClient } from 'pg'
+import { enforceRecordQuota } from '../lib/tenant-quota-enforce.js'
 
 import { sumLineTotals } from '../lib/line-items.js'
 import {
@@ -278,6 +279,7 @@ export async function createPurchase(
   input: CreatePurchaseInput,
   actor: AuditActor,
 ): Promise<PurchaseDetail> {
+  await enforceRecordQuota(actor)
   const supplier = await resolveSupplier(input.supplierId, input.supplier)
   if (!supplier.supplierName) throw badRequest('El proveedor es obligatorio')
 

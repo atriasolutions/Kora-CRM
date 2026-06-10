@@ -1,10 +1,11 @@
 import { Globe, Languages, Shield, UserRound } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
 import { ContactFormSection } from '@/components/contacts/ContactFormSection'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { UserDetail } from '@/data/user-detail.mock'
-import { userRoleLabel, userStatusVariant } from '@/lib/user-display'
+import { isGuestUserDetail, userRoleLabel, userStatusVariant } from '@/lib/user-display'
 
 function ProfileRow({ label, value }: { label: string; value: string }) {
   const display = value.trim() || '—'
@@ -23,6 +24,8 @@ type UserDetailSidebarProps = {
 }
 
 export function UserDetailSidebar({ user }: UserDetailSidebarProps) {
+  const showGuestCompany = isGuestUserDetail(user)
+
   return (
     <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
       <ContactFormSection title="Perfil" icon={UserRound} className="bg-card">
@@ -55,9 +58,28 @@ export function UserDetailSidebar({ user }: UserDetailSidebarProps) {
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs text-muted-foreground">Perfil de acceso</span>
+            <Badge variant="outline">{user.profileName?.trim() || '—'}</Badge>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs text-muted-foreground">Rol</span>
             <Badge variant="secondary">{userRoleLabel(user.role)}</Badge>
           </div>
+          {showGuestCompany ? (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs text-muted-foreground">Cliente de la empresa</span>
+              {user.guestCompanyId && user.guestCompanyName?.trim() ? (
+                <Link
+                  to={`/empresas/${user.guestCompanyId}`}
+                  className="truncate text-sm font-medium text-primary hover:underline"
+                >
+                  {user.guestCompanyName.trim()}
+                </Link>
+              ) : (
+                <span className="text-sm font-medium text-muted-foreground">—</span>
+              )}
+            </div>
+          ) : null}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs text-muted-foreground">Estado</span>
             <Badge variant={userStatusVariant(user.status)}>{user.status}</Badge>

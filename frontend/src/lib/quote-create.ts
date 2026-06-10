@@ -46,6 +46,8 @@ export type CreateQuoteFormValues = SaleCustomerValues & {
   deliveryTerms: string
   terms: string
   globalDiscountPercent: string
+  includeBankDetails: boolean
+  bankAccountId: string
 }
 
 export function createDefaultQuoteFormValues(
@@ -85,6 +87,8 @@ export function createDefaultQuoteFormValues(
     terms: partial?.terms ?? '',
     lineItems,
     globalDiscountPercent: partial?.globalDiscountPercent ?? DEFAULT_GLOBAL_DISCOUNT,
+    includeBankDetails: partial?.includeBankDetails ?? false,
+    bankAccountId: partial?.bankAccountId ?? '',
     amount:
       partial?.amount ??
       computeQuoteTotals(lineItems, {

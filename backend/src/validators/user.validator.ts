@@ -20,6 +20,7 @@ export const createUserSchema = z.object({
   password: z.string().min(8).max(128).optional(),
   sendInvite: z.boolean().optional(),
   twoFactorEnabled: z.boolean().optional(),
+  guestCompanyId: z.string().uuid().nullable().optional(),
 })
 
 export const updateUserSchema = createUserSchema.partial()

@@ -470,7 +470,7 @@ export function ProjectDetailPage() {
               authorName={project.manager}
               disabled={!canEdit}
               onAddNote={canEdit ? handleNoteAdded : undefined}
-              onDeleteNote={canEdit ? handleNoteDeleted : undefined}
+              onDeleteNote={handleNoteDeleted}
             />
           ) : null}
 

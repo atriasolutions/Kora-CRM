@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { isValidChilePhone } from '../lib/chile-phone.js'
+
 export const trialLeadSchema = z.object({
   name: z.string().min(1).max(255),
   company: z.string().min(1).max(255),
@@ -8,8 +10,13 @@ export const trialLeadSchema = z.object({
   address: z.string().min(1).max(500),
   region: z.string().min(1).max(255),
   commune: z.string().min(1).max(255),
-  email: z.string().email().max(320),
-  phone: z.string().min(1).max(64),
+  email: z.string().trim().email('Correo electrónico inválido.').max(320),
+  phone: z
+    .string()
+    .trim()
+    .min(1, 'El teléfono es obligatorio.')
+    .max(64)
+    .refine(isValidChilePhone, 'Teléfono chileno inválido (ej. +56 9 8765 4321).'),
   message: z.string().max(5000).optional(),
 })
 

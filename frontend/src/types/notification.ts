@@ -3,6 +3,7 @@ export type NotificationType =
   | 'assignment'
   | 'stock_low'
   | 'stock_out'
+  | 'quota_warning'
 
 export type NotificationItem = {
   id: string

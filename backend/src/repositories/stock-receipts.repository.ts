@@ -1,4 +1,5 @@
 import type { PoolClient } from 'pg'
+import { enforceRecordQuota } from '../lib/tenant-quota-enforce.js'
 
 import { computeStockReceiptLines } from '../lib/line-items.js'
 import {
@@ -214,6 +215,7 @@ export async function createStockReceipt(
   input: CreateStockReceiptInput,
   actor: AuditActor,
 ): Promise<StockReceiptDetail> {
+  await enforceRecordQuota(actor)
   const warehouse = await resolveWarehouse(input.warehouseId, input.warehouse)
   const purchase = await resolvePurchaseSnapshot(input.purchaseId)
   const lines = computeStockReceiptLines(input.lineItems)

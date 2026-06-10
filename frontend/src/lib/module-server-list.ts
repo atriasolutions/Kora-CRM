@@ -2,6 +2,8 @@ import { fetchListPage } from '@/api/list-page'
 import { API_V1 } from '@/api/config'
 import { resolveEntityImageSrc } from '@/lib/image-upload'
 import type { ActivityListItem } from '@/data/activities.mock'
+import type { BitacoraListItem } from '@/data/bitacora.mock'
+import type { BitacoraServerListQuery } from '@/lib/bitacora-filters'
 import type { CompanyListItem } from '@/data/companies.mock'
 import type { ContactListItem } from '@/data/contacts.mock'
 import type { InventoryListItem } from '@/data/inventory.mock'
@@ -126,6 +128,19 @@ export function fetchSolicitudesServerPage(
 ): Promise<ServerListFetchResult<SolicitudListItem>> {
   return fetchModulePage(`${API_V1}/solicitudes`, params, {
     archived: archived ? 'true' : 'false',
+  })
+}
+
+export function fetchBitacoraServerPage(
+  params: ServerListFetchParams,
+  serverQuery: BitacoraServerListQuery = {},
+): Promise<ServerListFetchResult<BitacoraListItem>> {
+  return fetchModulePage(`${API_V1}/bitacora`, params, {
+    mine: serverQuery.mine,
+    billable: serverQuery.billable,
+    workDateFrom: serverQuery.workDateFrom,
+    workDateTo: serverQuery.workDateTo,
+    companyId: serverQuery.companyId,
   })
 }
 

@@ -31,6 +31,9 @@ export type UserDetail = UserListItem & {
   twoFactorConfigured: boolean
   bio: string
   recentSessions: UserSessionEntry[]
+  /** Empresa del cliente invitado (solo perfil guest). */
+  guestCompanyId?: string
+  guestCompanyName?: string
 }
 
 export type CreateUserInput = {
@@ -50,6 +53,7 @@ export type CreateUserInput = {
   /** Si true y sin contraseña, envía correo de activación (por defecto true). */
   sendInvite?: boolean
   twoFactorEnabled?: boolean
+  guestCompanyId?: string | null
 }
 
 export type UpdateUserInput = Partial<CreateUserInput>

@@ -7,11 +7,16 @@ import { runWithTenantAsync } from '../lib/tenant-context.js'
 import { createEntityNote } from '../repositories/entity-notes.repository.js'
 import { createUser } from '../repositories/users.repository.js'
 import {
+  createBlankTenant,
   createTrialTenant,
+  ensureAllPlatformOperatorsInTenant,
   getTenantBySlug,
   listTenantsDueForPurge,
   markTenantDeleted,
 } from '../repositories/tenants.repository.js'
+import { insertDefaultTrialQuotas } from '../repositories/tenant-quotas.repository.js'
+import { insertDefaultTenantProfiles } from './default-tenant-profiles.service.js'
+import { purgeTenantLikeExpiredTrial } from './tenant-purge.service.js'
 import { ATRIA_TENANT_ID } from '../types/tenant.js'
 import { badRequest } from '../middleware/errors.js'
 import type { CreateTrialTenantInput } from '../repositories/tenants.repository.js'
@@ -52,6 +57,61 @@ function slugifyCompanyName(name: string): string {
 
 export function buildTenantLoginUrl(slug: string): string {
   return `https://${slug}.${env.platformDomain}/login`
+}
+
+export type BlankTenantProvisionResult = {
+  tenantId: string
+  slug: string
+  displayName: string
+  loginUrl: string
+}
+
+/** Instancia vacía: perfiles, bodega y configuración base; sin usuarios ni datos CRM. */
+export async function provisionBlankTenant(input: {
+  displayName: string
+  slug?: string
+}): Promise<BlankTenantProvisionResult> {
+  const displayName = input.displayName.trim()
+  if (!displayName) throw badRequest('El nombre de la instancia es obligatorio.')
+
+  const { tenantId, slug } = await createBlankTenant({
+    displayName,
+    slug: input.slug?.trim() ?? displayName,
+  })
+
+  try {
+    await runWithTenantAsync({ tenantId, tenantSlug: slug }, async () => {
+      const { adminProfileId: profileId } = await insertDefaultTenantProfiles(tenantId, slug)
+      if (!profileId) throw badRequest('No se pudo crear el perfil administrador.')
+
+      await tenantQuery(
+        `INSERT INTO crm_organization_settings (tenant_id, legal_name, trade_name)
+         VALUES ($1, $2, $2)`,
+        [tenantId, displayName],
+      )
+
+      await tenantQuery(
+        `INSERT INTO crm_warehouses (tenant_id, name, code, is_default, active)
+         VALUES ($1, 'Bodega principal', 'MAIN', true, true)`,
+        [tenantId],
+      )
+    })
+
+    await platformQuery(
+      `UPDATE crm_tenants SET status = 'active', updated_at = now() WHERE id = $1`,
+      [tenantId],
+    )
+
+    await ensureAllPlatformOperatorsInTenant(tenantId)
+
+    const loginUrl = buildTenantLoginUrl(slug)
+    return { tenantId, slug, displayName, loginUrl }
+  } catch (err) {
+    await markTenantDeleted(tenantId).catch((cleanupErr) => {
+      console.error('[blank-tenant] No se pudo limpiar instancia fallida:', cleanupErr)
+    })
+    throw err
+  }
 }
 
 export type ActiveTrialForEmail = {
@@ -117,29 +177,8 @@ export async function provisionTrialTenant(
 
   try {
     await runWithTenantAsync({ tenantId, tenantSlug: slug }, async () => {
-      const profileResult = await tenantQuery<{ id: string }>(
-        `INSERT INTO crm_access_profiles (name, description, is_system, updated_at, tenant_id)
-         VALUES ($1, 'Acceso total al tenant de prueba', true, now(), $2)
-         RETURNING id`,
-        [TRIAL_PROFILE_NAME, tenantId],
-      )
-      const profileId = profileResult.rows[0]?.id
+      const { adminProfileId: profileId } = await insertDefaultTenantProfiles(tenantId, slug)
       if (!profileId) throw badRequest('No se pudo crear el perfil demo')
-
-      const modules = [
-        'dashboard', 'contactos', 'empresas', 'oportunidades', 'cotizaciones',
-        'facturacion', 'actividades', 'proyectos', 'solicitudes', 'compras', 'ingresos',
-        'inventario', 'productos', 'reportes', 'usuarios', 'perfiles', 'configuracion',
-      ]
-      for (const moduleId of modules) {
-        await platformQuery(
-          `INSERT INTO crm_access_profile_permissions
-            (profile_id, module_id, can_menu, can_view, can_create, can_edit, can_delete)
-           VALUES ($1, $2, true, true, true, true, true)
-           ON CONFLICT (profile_id, module_id) DO NOTHING`,
-          [profileId, moduleId],
-        )
-      }
 
       await tenantQuery(
         `INSERT INTO crm_organization_settings (tenant_id, legal_name, trade_name, email)
@@ -154,10 +193,14 @@ export async function provisionTrialTenant(
       )
     })
 
+    await insertDefaultTrialQuotas(tenantId)
+
     await platformQuery(
       `UPDATE crm_tenants SET status = 'active', updated_at = now() WHERE id = $1`,
       [tenantId],
     )
+
+    await ensureAllPlatformOperatorsInTenant(tenantId)
 
     const loginUrl = buildTenantLoginUrl(slug)
     return { tenantId, slug, loginUrl }
@@ -391,79 +434,7 @@ export async function purgeExpiredTrialTenants(): Promise<number> {
 
   for (const tenant of due) {
     if (tenant.id === ATRIA_TENANT_ID) continue
-
-    const tables = [
-      'crm_report_runs',
-      'crm_reports',
-      'crm_report_folders',
-      'crm_entity_notes',
-      'crm_entity_files',
-      'crm_notifications',
-      'crm_recent_views',
-      'crm_archived_records',
-      'crm_entity_journey_states',
-      'crm_stock_reservations',
-      'crm_stock_movements',
-      'crm_inventory_positions',
-      'crm_stock_receipt_lines',
-      'crm_stock_receipts',
-      'crm_purchase_line_items',
-      'crm_purchases',
-      'crm_invoice_payments',
-      'crm_invoice_line_items',
-      'crm_invoices',
-      'crm_quote_line_items',
-      'crm_quotes',
-      'crm_opportunity_line_items',
-      'crm_opportunities',
-      'crm_project_work_items',
-      'crm_project_work_groups',
-      'crm_project_team_members',
-      'crm_projects',
-      'crm_solicitud_team_members',
-      'crm_solicitudes',
-      'crm_activities',
-      'crm_contacts',
-      'crm_company_branches',
-      'crm_company_addresses',
-      'crm_companies',
-      'crm_products',
-      'crm_product_categories',
-      'crm_warehouses',
-      'crm_organization_settings',
-      'crm_access_profile_permissions',
-      'crm_access_profiles',
-      'crm_tenant_memberships',
-      'crm_user_auth_sessions',
-    ]
-
-    for (const table of tables) {
-      const exists = await platformQuery<{ reg: string | null }>(
-        `SELECT to_regclass($1) AS reg`,
-        [`public.${table}`],
-      )
-      if (!exists.rows[0]?.reg) continue
-      const col = await platformQuery<{ ok: boolean }>(
-        `SELECT EXISTS (
-          SELECT 1 FROM information_schema.columns
-          WHERE table_schema = 'public' AND table_name = $1 AND column_name = 'tenant_id'
-        ) AS ok`,
-        [table],
-      )
-      if (col.rows[0]?.ok) {
-        await platformQuery(`DELETE FROM ${table} WHERE tenant_id = $1`, [tenant.id])
-      }
-    }
-
-    await platformQuery(
-      `DELETE FROM crm_user_verification_tokens t
-       USING crm_users u
-       WHERE t.user_id = u.id AND u.tenant_id = $1`,
-      [tenant.id],
-    )
-    await platformQuery(`DELETE FROM crm_users WHERE tenant_id = $1`, [tenant.id])
-
-    await platformQuery(`DELETE FROM crm_tenants WHERE id = $1`, [tenant.id])
+    await purgeTenantLikeExpiredTrial(tenant.id)
     count++
   }
 

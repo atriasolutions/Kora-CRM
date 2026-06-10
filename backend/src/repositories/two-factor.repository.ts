@@ -7,6 +7,7 @@ import {
   encryptSecretForStorage,
   generateBackupCodes,
   hashBackupCode,
+  tryDecryptSecretFromStorage,
   verifyBackupCodeHash,
   verifyTotpCode,
 } from '../services/totp.service.js'
@@ -206,7 +207,12 @@ export async function verifyUserTotpOrBackup(
 
   // Código TOTP (6 dígitos)
   if (/^\d{6}$/.test(norm)) {
-    const secret = decryptSecretFromStorage(row.totp_secret_encrypted!)
+    const secret = tryDecryptSecretFromStorage(row.totp_secret_encrypted!)
+    if (!secret) {
+      throw badRequest(
+        'No se pudo validar tu autenticador (configuración 2FA dañada). Contacta al administrador para restablecer el 2FA.',
+      )
+    }
     if (await verifyTotpCode(secret, norm)) return true
   }
 

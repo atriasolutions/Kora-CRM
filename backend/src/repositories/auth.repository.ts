@@ -8,9 +8,11 @@ import { getAccessProfileById } from './access-profiles.repository.js'
 import * as twoFactorRepo from './two-factor.repository.js'
 import {
   getDefaultTenantIdForUser,
+  isPlatformOperator,
   resolveTenantAccess,
 } from './tenants.repository.js'
 import { listRecentUserSessions, recordUserSession } from './user-sessions.repository.js'
+import { loadTenantScopedUserRow } from './users.repository.js'
 import type { AccessProfile } from '../types/access-profile.js'
 import type { UserDetail } from '../types/user.js'
 import { toInetOrNull } from '../utils/client-request.js'
@@ -111,11 +113,7 @@ export async function createAuthSessionForUser(
   return runWithTenantAsync({ tenantId }, async () => {
     const { profileId, isPlatformOperator } = await resolveTenantAccess(userId, tenantId)
 
-    const result = await platformQuery<UserRow>(
-      `SELECT ${USER_COLUMNS} FROM crm_users WHERE id = $1 AND deleted_at IS NULL`,
-      [userId],
-    )
-    const row = result.rows[0]
+    const row = await loadTenantScopedUserRow(userId, tenantId)
     if (!row || row.status !== 'Activo') {
       throw badRequest('Tu cuenta no está activa.')
     }
@@ -136,17 +134,23 @@ export async function createAuthSessionForUser(
       ],
     )
 
-    await platformQuery(`UPDATE crm_users SET last_login_at = now() WHERE id = $1`, [row.id])
+    await platformQuery(
+      `UPDATE crm_tenant_memberships
+       SET last_login_at = now()
+       WHERE user_id = $1 AND tenant_id = $2`,
+      [row.id, tenantId],
+    )
 
     await recordUserSession({
       userId: row.id,
+      tenantId,
       userAgent: client?.userAgent,
       ipAddress: client?.ipAddress,
     })
 
     const user = mapUserDetail({ ...row, last_login_at: new Date(), profile_id: profileId })
     user.profileId = profileId
-    user.recentSessions = await listRecentUserSessions(row.id)
+    user.recentSessions = await listRecentUserSessions(row.id, tenantId)
     const profile = await getAccessProfileById(profileId)
 
     return { token, user, profile, tenantId, isPlatformOperator }
@@ -161,10 +165,13 @@ export async function loginWithEmailPassword(
 ): Promise<AuthLoginStepResult> {
   const row = await findUserRowByCredentials(email, password)
   const resolved = await resolveTenantForLogin(row.id, tenantId)
+  const scoped = await runWithTenantAsync({ tenantId: resolved.tenantId }, () =>
+    loadTenantScopedUserRow(row.id, resolved.tenantId),
+  )
   const stepUser: AuthLoginStepUser = {
     id: row.id,
     email: row.email,
-    name: row.name,
+    name: scoped?.name ?? row.name,
   }
 
   const totpRow = await twoFactorRepo.getTotpUserRow(row.id)
@@ -202,7 +209,10 @@ export async function loginWithEmailPasswordLegacy(
   return step.result
 }
 
-export async function resolveSessionUser(token: string): Promise<{
+export async function resolveSessionUser(
+  token: string,
+  hostTenantId?: string,
+): Promise<{
   user: UserDetail
   profile: AccessProfile
   tenantId: string
@@ -233,27 +243,44 @@ export async function resolveSessionUser(token: string): Promise<{
     }
   }
 
-  const { profileId, isPlatformOperator } = await resolveTenantAccess(userId, tenantId)
+  let accessTenantId = tenantId
+  const hostId = hostTenantId?.trim()
+  if (hostId && hostId !== tenantId && (await isPlatformOperator(userId))) {
+    accessTenantId = hostId
+  }
 
-  return runWithTenantAsync({ tenantId }, async () => {
-    const result = await platformQuery<UserRow>(
-      `SELECT ${USER_COLUMNS} FROM crm_users WHERE id = $1 AND deleted_at IS NULL`,
-      [userId],
-    )
-    const row = result.rows[0]
+  const { profileId, isPlatformOperator: platformOp } = await resolveTenantAccess(
+    userId,
+    accessTenantId,
+  )
+
+  return runWithTenantAsync({ tenantId: accessTenantId }, async () => {
+    const row = await loadTenantScopedUserRow(userId, accessTenantId)
     if (!row || row.status !== 'Activo') return null
 
     const user = mapUserDetail(row)
     user.profileId = profileId
     const profile = await getAccessProfileById(profileId)
-    return { user, profile, tenantId, isPlatformOperator }
+    return { user, profile, tenantId: accessTenantId, isPlatformOperator: platformOp }
   })
 }
 
 export async function logoutSession(token: string): Promise<void> {
-  await platformQuery(`DELETE FROM crm_user_auth_sessions WHERE token_hash = $1`, [
-    token.trim(),
-  ])
+  const trimmed = token.trim()
+  if (!trimmed) return
+
+  const session = await platformQuery<{ user_id: string }>(
+    `SELECT user_id FROM crm_user_auth_sessions
+     WHERE token_hash = $1 AND expires_at > now()
+     LIMIT 1`,
+    [trimmed],
+  )
+  const userId = session.rows[0]?.user_id
+  if (userId) {
+    await platformQuery(`DELETE FROM crm_user_auth_sessions WHERE user_id = $1`, [userId])
+    return
+  }
+  await platformQuery(`DELETE FROM crm_user_auth_sessions WHERE token_hash = $1`, [trimmed])
 }
 
 export async function switchTenantSession(
@@ -278,11 +305,7 @@ export async function getUserByIdForAuth(
 }> {
   return runWithTenantAsync({ tenantId }, async () => {
     const { profileId, isPlatformOperator } = await resolveTenantAccess(id, tenantId)
-    const result = await platformQuery<UserRow>(
-      `SELECT ${USER_COLUMNS} FROM crm_users WHERE id = $1 AND deleted_at IS NULL`,
-      [id],
-    )
-    const row = result.rows[0]
+    const row = await loadTenantScopedUserRow(id, tenantId)
     if (!row) throw notFound('Usuario no encontrado')
     const user = mapUserDetail(row)
     user.profileId = profileId

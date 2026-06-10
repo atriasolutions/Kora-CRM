@@ -4,33 +4,37 @@ import { useNavigate } from 'react-router-dom'
 import { CreateProfileDialog } from '@/components/profiles/CreateProfileDialog'
 import { ProfilesModuleHeader } from '@/components/profiles/ProfilesModuleHeader'
 import { ListPageLayout } from '@/components/list/ListPageLayout'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useProfilesRegistry } from '@/hooks/use-profiles-registry'
-import { isSystemAccessProfile } from '@/lib/access-profile-admin'
+import { useAuth } from '@/hooks/use-auth'
+import { isLockedAccessProfile } from '@/lib/access-profile-admin'
 import { getProfileDetailPath } from '@/lib/profile-routes'
 import { toast } from '@/lib/toast'
 import type { AccessProfileListItem } from '@/types/access-profile'
 
 export function ProfilesPage() {
   const navigate = useNavigate()
+  const { session } = useAuth()
   const { listItems, addProfile } = useProfilesRegistry()
   const [query, setQuery] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
 
-  const editableProfiles = useMemo(
-    () => listItems.filter((p) => !isSystemAccessProfile(p)),
-    [listItems],
-  )
-
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return editableProfiles
-    return editableProfiles.filter(
+    const sorted = [...listItems].sort((a, b) => {
+      const aLocked = isLockedAccessProfile(a) ? 0 : 1
+      const bLocked = isLockedAccessProfile(b) ? 0 : 1
+      if (aLocked !== bLocked) return aLocked - bLocked
+      return a.name.localeCompare(b.name, 'es')
+    })
+    if (!q) return sorted
+    return sorted.filter(
       (p) =>
         p.name.toLowerCase().includes(q) ||
         p.description.toLowerCase().includes(q),
     )
-  }, [editableProfiles, query])
+  }, [listItems, query])
 
   const openDetail = useCallback(
     (row: AccessProfileListItem) => {
@@ -88,7 +92,16 @@ export function ProfilesPage() {
                       className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-muted/20"
                       onClick={() => openDetail(row)}
                     >
-                      <td className="px-4 py-3 font-medium">{row.name}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium">{row.name}</span>
+                          {isLockedAccessProfile(row) ? (
+                            <Badge variant="secondary" className="text-[10px]">
+                              Predefinido
+                            </Badge>
+                          ) : null}
+                        </div>
+                      </td>
                       <td className="max-w-md truncate px-4 py-3 text-muted-foreground">
                         {row.description || '—'}
                       </td>
@@ -113,6 +126,12 @@ export function ProfilesPage() {
               </tbody>
             </table>
           </div>
+          {!session?.isPlatformOperator ? (
+            <p className="mt-3 text-xs text-muted-foreground">
+              Los perfiles Administrador e Invitado son predefinidos por instancia y no pueden
+              editarse desde aquí.
+            </p>
+          ) : null}
         </div>
       </ListPageLayout>
 

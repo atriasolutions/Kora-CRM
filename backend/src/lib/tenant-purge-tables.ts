@@ -1,0 +1,61 @@
+/** Tablas SII (schema sii) — eliminar antes que facturas CRM por FK opcional. */
+export const SII_TENANT_TABLES = [
+  'sii.dte_submissions',
+  'sii.sync_jobs',
+  'sii.rcv_invoices',
+  'sii.folio_ranges',
+  'sii.token_cache',
+  'sii.credentials',
+  'sii.settings',
+] as const
+
+/** Datos operacionales del CRM (instancia vacía pero activa). */
+export const TENANT_TRUNCATE_TABLES = [
+  'crm_report_runs',
+  'crm_reports',
+  'crm_report_folders',
+  'crm_entity_notes',
+  'crm_entity_files',
+  'crm_notifications',
+  'crm_recent_views',
+  'crm_archived_records',
+  'crm_entity_journey_states',
+  'crm_stock_reservations',
+  'crm_stock_movements',
+  'crm_inventory_positions',
+  'crm_stock_receipt_lines',
+  'crm_stock_receipts',
+  'crm_purchase_line_items',
+  'crm_purchases',
+  'crm_invoice_payments',
+  'crm_invoice_line_items',
+  'crm_invoices',
+  'crm_quote_line_items',
+  'crm_quotes',
+  'crm_opportunity_line_items',
+  'crm_opportunities',
+  'crm_project_work_items',
+  'crm_project_work_groups',
+  'crm_project_team_members',
+  'crm_projects',
+  'crm_solicitud_team_members',
+  'crm_bitacora_entries',
+  'crm_solicitudes',
+  'crm_activities',
+  'crm_contacts',
+  'crm_company_branches',
+  'crm_company_addresses',
+  'crm_companies',
+  'crm_products',
+  'crm_product_categories',
+  'crm_exchange_rates',
+  'crm_tenant_usage_cache',
+  'crm_tenant_quota_events',
+] as const
+
+/** Infraestructura del tenant al eliminar la instancia (solo tablas con tenant_id directo). */
+export const TENANT_SHELL_TABLES = [
+  'crm_warehouses',
+  'crm_organization_settings',
+  'crm_tenant_quotas',
+] as const

@@ -2,6 +2,7 @@ import { API_V1 } from '@/api/config'
 import { fetchJSON } from '@/api/client'
 import type { ApiItemResponse } from '@/api/types'
 import type { UserDetail } from '@/data/user-detail.mock'
+import { loadAuthSession } from '@/lib/auth-session'
 import type { AccessProfile } from '@/types/access-profile'
 import type { TenantBranding } from '@/lib/tenant-host'
 
@@ -82,6 +83,7 @@ export async function identifyTenantsApi(
     ApiItemResponse<{ memberships: TenantMembershipOption[] }>
   >(`${BASE}/identify`, {
     method: 'POST',
+    auth: false,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email }),
   })
@@ -97,6 +99,7 @@ export async function loginApi(
     `${BASE}/login`,
     {
       method: 'POST',
+      auth: false,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         email,
@@ -117,6 +120,7 @@ export async function verifyTwoFactorLoginApi(
     `${BASE}/login/verify-2fa`,
     {
       method: 'POST',
+      auth: false,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         challengeId,
@@ -138,6 +142,7 @@ export async function confirmEnrollmentLoginApi(
     `${BASE}/2fa/enrollment/confirm`,
     {
       method: 'POST',
+      auth: false,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         enrollmentToken,
@@ -150,8 +155,16 @@ export async function confirmEnrollmentLoginApi(
   return res.data
 }
 
-export async function logoutApi(): Promise<void> {
-  await fetchJSON(`${BASE}/logout`, { method: 'POST' })
+export async function logoutApi(token?: string): Promise<void> {
+  const sessionToken = token ?? loadAuthSession()?.token
+  if (!sessionToken) return
+  await fetchJSON(`${BASE}/logout`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${sessionToken}`,
+      'x-auth-token': sessionToken,
+    },
+  })
 }
 
 export async function fetchMeApi(): Promise<{

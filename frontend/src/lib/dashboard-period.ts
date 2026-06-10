@@ -1,3 +1,5 @@
+import type { CompactPeriodValue } from '@/lib/period-filter-options'
+
 export type DashboardPeriod =
   | { mode: 'years' }
   | { mode: 'year'; year: number }
@@ -82,6 +84,19 @@ export function buildDashboardPeriodOptions(now = new Date()): DashboardPeriodOp
   }
 
   return options
+}
+
+export function dashboardPeriodToCompact(value: DashboardPeriod): CompactPeriodValue {
+  if (value.mode === 'years') return { mode: 'years' }
+  if (value.mode === 'year') return { mode: 'year', year: value.year }
+  return { mode: 'month', year: value.year, month: value.month }
+}
+
+export function compactToDashboardPeriod(value: CompactPeriodValue): DashboardPeriod {
+  if (value.mode === 'years') return { mode: 'years' }
+  if (value.mode === 'year') return { mode: 'year', year: value.year }
+  if (value.mode === 'month') return { mode: 'month', year: value.year, month: value.month }
+  return defaultDashboardPeriod()
 }
 
 export function findPeriodOption(

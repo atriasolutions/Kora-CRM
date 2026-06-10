@@ -12,6 +12,7 @@ import { RegionCommuneFields } from '@/components/shared/RegionCommuneFields'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { getRutValidationMessage } from '@/lib/contact-rut'
+import { getEmailValidationError, getPhoneValidationError } from '@/lib/form-input-format'
 import { MARKETING_TRIAL_COPY } from '@/lib/marketing-content'
 import type { TaxIdentifierType } from '@/lib/tax-identifier'
 import { toast } from '@/lib/toast'
@@ -90,12 +91,14 @@ export function TrialLeadForm({ onSuccess }: TrialLeadFormProps) {
       toast.warning('Selecciona región y comuna.')
       return
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
-      toast.warning('Indica un correo electrónico válido.')
+    const emailError = getEmailValidationError(form.email, { required: true })
+    if (emailError) {
+      toast.warning(emailError)
       return
     }
-    if (!form.phone.trim()) {
-      toast.warning('Indica un teléfono de contacto.')
+    const phoneError = getPhoneValidationError(form.phone, { required: true })
+    if (phoneError) {
+      toast.warning(phoneError)
       return
     }
 
@@ -259,10 +262,11 @@ export function TrialLeadForm({ onSuccess }: TrialLeadFormProps) {
             <ContactFormInput
               id="trial-email"
               label="Correo electrónico"
-              type="email"
+              inputVariant="email"
               value={form.email}
               onChange={(email) => patch({ email })}
               required
+              forceShowError={showValidation}
             />
             <ContactFormInput
               id="trial-phone"
@@ -271,6 +275,7 @@ export function TrialLeadForm({ onSuccess }: TrialLeadFormProps) {
               value={form.phone}
               onChange={(phone) => patch({ phone })}
               required
+              forceShowError={showValidation}
             />
             <ContactFormTextarea
               id="trial-message"

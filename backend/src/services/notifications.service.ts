@@ -317,3 +317,56 @@ export async function notifyStockTransition(params: {
   await Promise.all(userIds.map((userId) => notifyByUserId(userId, payload)))
 }
 
+function formatQuotaGb(bytes: number): string {
+  return (bytes / (1024 * 1024 * 1024)).toFixed(2)
+}
+
+async function listTenantConfigAdminUserIds(tenantId: string): Promise<string[]> {
+  const result = await pool.query<{ id: string }>(
+    `SELECT DISTINCT u.id
+     FROM crm_users u
+     INNER JOIN crm_tenant_memberships m
+       ON m.user_id = u.id AND m.tenant_id = $1 AND m.status = 'active'
+     INNER JOIN crm_access_profiles p ON p.id = m.profile_id
+     LEFT JOIN crm_access_profile_permissions perm
+       ON perm.profile_id = p.id AND perm.module_id = 'configuracion'
+     WHERE u.deleted_at IS NULL
+       AND u.status = 'Activo'
+       AND (p.is_system = true OR perm.can_edit = true)`,
+    [tenantId],
+  )
+  return result.rows.map((row) => row.id)
+}
+
+export async function notifyTenantQuotaWarning(
+  tenantId: string,
+  kind: 'records' | 'files' | 'seats',
+  usage: number,
+  limit: number,
+): Promise<void> {
+  const userIds = await listTenantConfigAdminUserIds(tenantId)
+  if (userIds.length === 0) return
+
+  const labels: Record<typeof kind, string> = {
+    records: 'registros',
+    files: 'archivos',
+    seats: 'usuarios activos',
+  }
+  const unit = kind === 'seats' ? '' : ' GB'
+  const usageLabel =
+    kind === 'seats' ? String(usage) : formatQuotaGb(usage)
+  const limitLabel =
+    kind === 'seats' ? String(limit) : formatQuotaGb(limit)
+
+  const payload = {
+    type: 'quota_warning' as const,
+    title: `Límite de ${labels[kind]} superado`,
+    message: `La instancia superó el límite asignado de ${labels[kind]} (${limitLabel}${unit}). Uso actual: ${usageLabel}${unit}. Revisa Configuración → Información de la instancia.`,
+    href: '/configuracion?seccion=informacion-instancia',
+    entityType: 'tenant_quota',
+    entityId: tenantId,
+  }
+
+  await Promise.all(userIds.map((userId) => notifyByUserId(userId, payload)))
+}
+

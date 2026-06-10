@@ -14,15 +14,26 @@ import { authenticateUser } from '@/lib/auth'
 import { parseLoginErrorMessage } from '@/lib/login-errors'
 import {
   clearAuthSession,
+  consumePostLogoutLanding,
   loadAuthSession,
+  markLoggedOut,
   saveAuthSession,
   type AuthSession,
 } from '@/lib/auth-session'
-import { resolveLoginRedirectUrl } from '@/lib/auth-routes'
+import { resolveLoginRedirectUrl, resolveLogoutRedirectUrl } from '@/lib/auth-routes'
 import { resolveTenantSlugFromHostname } from '@/lib/tenant-host'
+import type { UserDetail } from '@/data/user-detail.mock'
 import type { AccessProfile } from '@/types/access-profile'
+import type { AuthMembershipContext } from '@/contexts/auth-context'
 
 const useApi = isApiEnabled()
+
+function membershipFromUser(user: Pick<UserDetail, 'guestCompanyId' | 'guestCompanyName'>): AuthMembershipContext {
+  const guestCompanyId = user.guestCompanyId?.trim() || undefined
+  const guestCompanyName = user.guestCompanyName?.trim() || undefined
+  if (!guestCompanyId && !guestCompanyName) return {}
+  return { guestCompanyId, guestCompanyName }
+}
 
 function sessionFromLogin(
   token: string,
@@ -44,14 +55,33 @@ function sessionFromLogin(
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<AuthSession | null>(() => loadAuthSession())
+  const [session, setSession] = useState<AuthSession | null>(() => {
+    if (typeof window !== 'undefined' && consumePostLogoutLanding()) {
+      return null
+    }
+    return loadAuthSession()
+  })
   const [profile, setProfile] = useState<AccessProfile | null>(null)
+  const [membership, setMembership] = useState<AuthMembershipContext | null>(null)
   const [isReady, setIsReady] = useState(!useApi)
   /** Token validado al montar; si el login crea uno nuevo, ignoramos fallos del bootstrap anterior. */
   const bootstrapTokenRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (!useApi) return
+
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      if (params.get('loggedOut') === '1') {
+        clearAuthSession()
+        bootstrapTokenRef.current = null
+        setSession(null)
+        setProfile(null)
+        setMembership(null)
+        setIsReady(true)
+        return
+      }
+    }
 
     const stored = loadAuthSession()
     if (!stored?.token) {
@@ -84,6 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         saveAuthSession(next)
         setSession(next)
         setProfile(meProfile)
+        setMembership(membershipFromUser(user))
       })
       .catch(() => {
         if (cancelled || bootstrapTokenRef.current !== validatedToken) return
@@ -92,6 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         clearAuthSession()
         setSession(null)
         setProfile(null)
+        setMembership(null)
       })
       .finally(() => {
         if (!cancelled && bootstrapTokenRef.current === validatedToken) setIsReady(true)
@@ -105,24 +137,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const applyLoginSession = useCallback(
     (
       token: string,
-      user: { id: string; email: string; name: string; profileId: string },
+      user: Pick<UserDetail, 'id' | 'email' | 'name' | 'profileId' | 'guestCompanyId' | 'guestCompanyName'>,
       meProfile: AccessProfile,
       tenantId: string,
       tenantSlug?: string,
       isPlatformOperator?: boolean,
     ) => {
-      bootstrapTokenRef.current = null
+      bootstrapTokenRef.current = token
       const next = sessionFromLogin(token, user, tenantId, tenantSlug, isPlatformOperator)
       saveAuthSession(next)
       setSession(next)
       setProfile(meProfile)
+      setMembership(membershipFromUser(user))
       setIsReady(true)
     },
     [],
   )
 
   const login = useCallback(
-    async (email: string, password: string, tenantId?: string): Promise<LoginOutcome> => {
+    async (
+      email: string,
+      password: string,
+      tenantId?: string,
+      tenantSlug?: string,
+    ): Promise<LoginOutcome> => {
       const normalizedEmail = email.trim()
       if (!normalizedEmail) return { status: 'error', message: 'Indica tu correo electrónico.' }
       if (!password) return { status: 'error', message: 'Indica tu contraseña.' }
@@ -151,7 +189,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             result.user,
             result.profile,
             result.tenantId,
-            undefined,
+            tenantSlug,
             result.isPlatformOperator,
           )
           return { status: 'ok' }
@@ -225,9 +263,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshProfile = useCallback(async () => {
     if (!useApi || !session?.token) return
     try {
-      const { profile: meProfile, isPlatformOperator, tenantId, tenantSlug } =
+      const { user, profile: meProfile, isPlatformOperator, tenantId, tenantSlug } =
         await fetchMeApi()
       setProfile(meProfile)
+      setMembership(membershipFromUser(user))
       const stored = loadAuthSession()
       if (stored?.token) {
         saveAuthSession({
@@ -255,25 +294,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [session?.token])
 
   const logout = useCallback(async () => {
-    if (useApi && session?.token) {
+    const token = session?.token ?? loadAuthSession()?.token
+    if (useApi && token) {
       try {
-        await logoutApi()
+        await logoutApi(token)
       } catch {
         /* ignore */
       }
     }
-    clearAuthSession()
+    markLoggedOut()
+    bootstrapTokenRef.current = null
+    if (typeof window !== 'undefined') {
+      window.location.replace(resolveLogoutRedirectUrl())
+      return
+    }
     setSession(null)
     setProfile(null)
-    if (typeof window !== 'undefined') {
-      window.location.href = resolveLoginRedirectUrl()
-    }
+    setMembership(null)
   }, [session?.token])
 
   const value = useMemo(
     () => ({
       session,
       profile,
+      membership,
       isAuthenticated: Boolean(session),
       isReady,
       login,
@@ -285,6 +329,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [
       session,
       profile,
+      membership,
       isReady,
       login,
       completeTwoFactorLogin,

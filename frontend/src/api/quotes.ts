@@ -27,6 +27,8 @@ export type QuoteApiBody = {
   deliveryTerms?: string
   terms?: string
   globalDiscount?: string
+  includeBankDetails?: boolean
+  bankAccountId?: string | null
   lineItems?: {
     sku?: string
     productName?: string
@@ -69,6 +71,9 @@ function quoteLinesToApi(lineItems: QuoteLineItem[] | undefined) {
     priceCurrency: li.priceCurrency ?? 'CLP',
     discount: li.discount,
     productId: li.productId?.trim() ? li.productId : null,
+    subjectToVat: li.subjectToVat !== false,
+    deferredPayment: li.deferredPayment === true,
+    deferredPaymentText: li.deferredPaymentText?.trim() || undefined,
   }))
 }
 
@@ -88,11 +93,21 @@ export function quoteFormToApiBody(values: CreateQuoteFormValues): QuoteApiBody 
     deliveryTerms: values.deliveryTerms?.trim() || undefined,
     terms: values.terms?.trim() || undefined,
     globalDiscount: values.globalDiscountPercent.trim() || undefined,
+    includeBankDetails: values.includeBankDetails,
+    bankAccountId: values.bankAccountId.trim() || null,
     lineItems: quoteLinesToApi(values.lineItems),
   }
 }
 
-export function quoteDetailToApiBody(detail: QuoteDetail): QuoteApiBody {
+export function quoteDetailToApiBody(
+  detail: QuoteDetail,
+  options?: { previousStatus?: string },
+): QuoteApiBody {
+  const leavingAccepted =
+    options?.previousStatus === 'Aceptada' &&
+    detail.status !== 'Aceptada'
+  const omitLineItems = quoteLineItemsLocked(detail.status) || leavingAccepted
+
   return {
     code: detail.code,
     title: detail.title,
@@ -109,9 +124,9 @@ export function quoteDetailToApiBody(detail: QuoteDetail): QuoteApiBody {
     deliveryTerms: detail.deliveryTerms?.trim() || undefined,
     terms: detail.terms?.trim() || undefined,
     globalDiscount: detail.discountPercent?.trim() || undefined,
-    lineItems: quoteLineItemsLocked(detail.status)
-      ? undefined
-      : quoteLinesToApi(detail.lineItems),
+    includeBankDetails: detail.includeBankDetails,
+    bankAccountId: detail.bankAccountId ?? null,
+    lineItems: omitLineItems ? undefined : quoteLinesToApi(detail.lineItems),
   }
 }
 

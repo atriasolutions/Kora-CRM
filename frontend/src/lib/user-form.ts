@@ -102,6 +102,9 @@ export type UserFormValues = {
   twoFactorEnabled: boolean
   /** Equipos separados por coma. */
   teamsInput: string
+  /** Empresa del cliente invitado (opcional, solo perfil Invitado). */
+  guestCompanyId: string
+  guestCompanyName: string
 }
 
 export function createDefaultUserFormValues(
@@ -126,6 +129,8 @@ export function createDefaultUserFormValues(
     language: 'Español (Chile)',
     twoFactorEnabled: false,
     teamsInput: '',
+    guestCompanyId: '',
+    guestCompanyName: '',
     ...partial,
   }
 }
@@ -157,6 +162,8 @@ export function userDetailToFormValues(user: UserDetail): UserFormValues {
     language: user.language,
     twoFactorEnabled: user.twoFactorEnabled,
     teamsInput: teamsInputFromList(user.teams),
+    guestCompanyId: user.guestCompanyId ?? '',
+    guestCompanyName: user.guestCompanyName ?? '',
   }
 }
 
@@ -184,6 +191,8 @@ export function applyFormValuesToUser(
     twoFactorEnabled: values.twoFactorEnabled,
     teams,
     permissions: user.permissions,
+    guestCompanyId: values.guestCompanyId.trim() || undefined,
+    guestCompanyName: values.guestCompanyName.trim() || undefined,
   }
 }
 

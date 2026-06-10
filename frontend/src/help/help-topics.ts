@@ -441,6 +441,84 @@ export const HELP_CONTENT: Record<string, HelpTopic> = {
     ],
   }),
 
+  ...listDetail('bitacora', {
+    titleList: 'Bitácora · listado',
+    summary:
+      'Registro de horas de trabajo vinculadas a solicitudes: quién trabajó, cuántas horas, si son facturables y en qué fecha. Sirve para control interno y para armar reportes al cliente.',
+    actions: [
+      'Alternar entre vista Lista (tabla paginada) y Dashboard (resumen de horas para presentar).',
+      'Buscar por código de solicitud, título, descripción, responsable o empresa.',
+      'Filtrar por fecha de trabajo (todo, mes, año o rango), empresa y facturación.',
+      'Usar «Mis bitácoras» para ver solo registros donde figuras como usuario asignado.',
+      'Los perfiles con alcance amplio pueden usar «Todas las bitácoras» para ver el listado completo.',
+      'Abrir un registro para ver el detalle completo.',
+    ],
+    actionsIfCreate: [
+      'Registrar horas con «Nueva bitácora»: solicitud, fecha, horas, usuario asignado y descripción.',
+    ],
+    actionsIfEdit: [
+      'Modificar un registro desde su ficha.',
+      'Eliminar un registro si tu perfil lo permite.',
+    ],
+    concepts: [
+      'Cada registro pertenece a una solicitud; la empresa asociada se toma de esa solicitud.',
+      'Horas en incrementos de 0,5 (mínimo 0,5 h).',
+      'Facturable — horas cobrables al cliente; si marcas «No facturable», debes indicar el motivo.',
+      'Usuario asignado — persona a quien se imputan las horas (puede ser distinta de quien crea el registro).',
+      'Invitados — solo ven menú y lectura; el listado y dashboard quedan limitados a la empresa configurada en su usuario.',
+    ],
+    permissionsNote:
+      'Crear, editar o eliminar depende de tu perfil. Los invitados suelen tener solo visualización.',
+    tips: [
+      'En el dashboard, el filtro de empresa queda fijado a tu empresa asignada si eres invitado.',
+      'Al elegir un rango de fechas, «Desde» no puede quedar después de «Hasta»; el sistema ajusta el rango automáticamente.',
+      'Desde la pestaña Bitácora de una solicitud puedes ver sus registros y crear uno nuevo con la solicitud ya precargada.',
+    ],
+    keywords: [
+      'horas',
+      'timesheet',
+      'solicitud',
+      'facturable',
+      'no facturable',
+      'trabajo',
+      'registro',
+      'dashboard',
+      'empresa',
+      'invitado',
+    ],
+  }, {
+    titleDetail: 'Bitácora · ficha',
+    summary:
+      'Detalle de un registro de horas: solicitud vinculada, fecha, duración, facturación, descripción del trabajo y auditoría.',
+    actions: [
+      'Revisar código y título de la solicitud, empresa, usuario asignado y fecha de trabajo.',
+      'Leer la descripción del trabajo realizado.',
+      'Consultar si las horas son facturables o no, y el motivo cuando aplica.',
+      'Volver al listado con el enlace «Bitácora» en la miga de pan.',
+    ],
+    actionsIfEdit: [
+      'Editar fecha, horas, descripción, facturabilidad y usuario asignado.',
+      'Eliminar el registro si ya no aplica (acción irreversible).',
+    ],
+    concepts: [
+      'La solicitud no se puede cambiar libremente en todos los flujos: al crear desde una solicitud, el vínculo queda definido.',
+      'Las horas no facturables exigen un motivo breve para justificar el tiempo registrado.',
+    ],
+    permissionsNote:
+      'Si no ves editar ni eliminar, tu perfil es de solo lectura en Bitácora (común en usuarios Invitado).',
+    tips: [
+      'Usa descripciones claras: facilitan filtrar en el listado y explicar el trabajo al cliente en el dashboard.',
+    ],
+    keywords: [
+      'detalle bitácora',
+      'horas',
+      'facturable',
+      'solicitud',
+      'descripción',
+      'usuario asignado',
+    ],
+  }),
+
   ...listDetail('compras', {
     titleList: 'Compras · listado',
     summary:
@@ -634,6 +712,7 @@ const MODULE_LABEL: Record<string, string> = {
   actividades: 'Actividades',
   proyectos: 'Proyectos',
   solicitudes: 'Solicitudes',
+  bitacora: 'Bitácora',
   compras: 'Compras',
   ingresos: 'Ingresos',
   inventario: 'Inventario',

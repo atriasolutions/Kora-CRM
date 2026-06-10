@@ -9,6 +9,7 @@ import { getInvoiceApi } from '@/api/invoices'
 import { getProjectApi } from '@/api/projects'
 import { getSolicitudApi } from '@/api/solicitudes'
 import { getActivityApi } from '@/api/activities'
+import { getBitacoraApi } from '@/api/bitacora'
 import { getUserApi } from '@/api/users'
 import { getPurchaseApi } from '@/api/purchases'
 import { getInventoryApi } from '@/api/inventory'
@@ -28,6 +29,8 @@ import type { InvoiceDetail } from '@/data/invoice-detail.mock'
 import type { ProjectDetail } from '@/data/project-detail.mock'
 import type { SolicitudDetail } from '@/data/solicitudes.mock'
 import type { ActivityDetail } from '@/data/activity-detail.mock'
+import { resolveBitacoraListItem } from '@/data/bitacora.mock'
+import type { BitacoraListItem } from '@/data/bitacora.mock'
 import type { PurchaseDetail } from '@/data/purchase-detail.mock'
 import { getCompanyLocationsApi } from '@/api/companies'
 import { isApiEnabled } from '@/api/config'
@@ -565,4 +568,11 @@ export async function loadActivityDetail(id: string): Promise<ActivityDetail> {
     tags: api.tags ?? [],
     completedAt: api.completedAt,
   })
+}
+
+export async function loadBitacoraDetail(id: string): Promise<BitacoraListItem> {
+  if (isApiEnabled()) {
+    return getBitacoraApi(id)
+  }
+  return resolveBitacoraListItem(id)
 }

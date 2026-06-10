@@ -1,5 +1,6 @@
 import { Router } from 'express'
 
+import { getAuditActor } from '../middleware/audit-actor.js'
 import { requirePermission } from '../middleware/require-permission.js'
 import * as profilesRepo from '../repositories/access-profiles.repository.js'
 import { routeParam } from '../lib/route-params.js'
@@ -56,7 +57,7 @@ accessProfilesRouter.patch(
   async (req, res, next) => {
     try {
       const body = updateAccessProfileSchema.parse(req.body)
-      const item = await profilesRepo.updateAccessProfile(routeParam(req), body)
+      const item = await profilesRepo.updateAccessProfile(routeParam(req), body, getAuditActor(req))
       res.json({ data: item })
     } catch (e) {
       next(e)
@@ -69,7 +70,7 @@ accessProfilesRouter.delete(
   requirePermission('perfiles', 'delete'),
   async (req, res, next) => {
     try {
-      await profilesRepo.deleteAccessProfile(routeParam(req))
+      await profilesRepo.deleteAccessProfile(routeParam(req), getAuditActor(req))
       res.status(204).send()
     } catch (e) {
       next(e)

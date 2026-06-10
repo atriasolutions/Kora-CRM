@@ -450,7 +450,7 @@ export function QuoteDetailPage() {
             }
 
             try {
-              await updateQuoteFromDetail(nextQuote)
+              await updateQuoteFromDetail(nextQuote, { previousStatus })
               setQuote(nextQuote)
               if (useApi) {
                 refreshInventoryFromServer()

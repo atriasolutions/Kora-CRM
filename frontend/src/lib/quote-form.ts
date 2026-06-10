@@ -34,6 +34,8 @@ export type QuoteFormValues = {
   terms: string
   internalNotes: string
   globalDiscountPercent: string
+  includeBankDetails: boolean
+  bankAccountId: string
 }
 
 export function quoteDetailToFormValues(quote: QuoteDetail): QuoteFormValues {
@@ -61,6 +63,8 @@ export function quoteDetailToFormValues(quote: QuoteDetail): QuoteFormValues {
     terms: quote.terms,
     internalNotes: quote.internalNotes,
     globalDiscountPercent: quote.discountPercent ?? DEFAULT_GLOBAL_DISCOUNT,
+    includeBankDetails: quote.includeBankDetails === true,
+    bankAccountId: quote.bankAccountId ?? '',
   }
 }
 
@@ -104,11 +108,15 @@ export function applyFormValuesToQuote(
     internalNotes: values.internalNotes.trim(),
     lineItems: items,
     subtotal: totals.subtotal,
+    taxableSubtotal: totals.taxableSubtotal,
+    exemptSubtotal: totals.exemptSubtotal,
     discountPercent: totals.discountPercent,
     discountAmount: totals.discountAmount,
     taxPercent: totals.taxPercent,
     taxAmount: totals.taxAmount,
     amount: totals.amount,
+    includeBankDetails: values.includeBankDetails,
+    bankAccountId: values.bankAccountId.trim() || null,
   }
 }
 

@@ -73,6 +73,22 @@ export function sanitizeAlphanumeric(value: string): string {
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
+/** Dígitos nacionales chilenos (sin +56 ni cero inicial). */
+export function normalizeChilePhoneDigits(value: string): string {
+  let digits = value.replace(/\D/g, '')
+  if (digits.startsWith('0')) digits = digits.slice(1)
+  if (digits.startsWith('56')) digits = digits.slice(2)
+  return digits
+}
+
+/** Móvil 9XXXXXXXX o fijo chileno de 9 dígitos (código de área incluido). */
+export function isValidChilePhone(value: string): boolean {
+  const digits = normalizeChilePhoneDigits(value.trim())
+  if (digits.length !== 9) return false
+  if (digits.startsWith('9')) return true
+  return /^[2-7]/.test(digits)
+}
+
 /** Caracteres permitidos mientras se escribe un teléfono. */
 export function sanitizePhoneInput(value: string): string {
   return value.replace(/[^\d+\s().-]/g, '')
@@ -87,8 +103,7 @@ export function isValidEmail(value: string): boolean {
 export function isValidPhone(value: string): boolean {
   const trimmed = value.trim()
   if (!trimmed || trimmed === '—') return false
-  const digits = trimmed.replace(/\D/g, '')
-  return digits.length >= 8 && digits.length <= 15
+  return isValidChilePhone(trimmed)
 }
 
 export function getEmailValidationError(
@@ -113,12 +128,8 @@ export function getPhoneValidationError(
   if (!trimmed || trimmed === '—') {
     return options?.required ? 'El teléfono es obligatorio.' : null
   }
-  const digits = trimmed.replace(/\D/g, '')
-  if (digits.length < 8) {
-    return 'Introduce un teléfono válido (mínimo 8 dígitos).'
-  }
-  if (digits.length > 15) {
-    return 'El teléfono no puede superar 15 dígitos.'
+  if (!isValidChilePhone(trimmed)) {
+    return 'Introduce un teléfono chileno válido (ej. +56 9 8765 4321).'
   }
   return null
 }

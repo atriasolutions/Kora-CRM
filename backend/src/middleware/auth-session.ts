@@ -51,58 +51,67 @@ export async function authSessionMiddleware(
   const hostTenant = await resolveHostTenant(req)
 
   const finish = async () => {
-    if (token) {
-      const session = await resolveSessionUser(token)
-      if (session) {
-        if (
-          hostTenant.tenantId &&
-          hostTenant.tenantId !== session.tenantId
-        ) {
-          next(unauthorized('Esta sesión no corresponde a la empresa de este subdominio.'))
+    try {
+      if (token) {
+        const session = await resolveSessionUser(token, hostTenant.tenantId)
+        if (session) {
+          let effectiveTenantId = session.tenantId
+          if (session.isPlatformOperator && hostTenant.tenantId) {
+            effectiveTenantId = hostTenant.tenantId
+          } else if (
+            hostTenant.tenantId &&
+            hostTenant.tenantId !== session.tenantId
+          ) {
+            next(
+              unauthorized('Esta sesión no corresponde a la empresa de este subdominio.'),
+            )
+            return
+          }
+          r.tenantId = effectiveTenantId
+          r.tenantSlug = hostTenant.slug
+          r.auditActor = {
+            userId: session.user.id,
+            userName: session.user.name,
+            tenantId: effectiveTenantId,
+            isPlatformOperator: session.isPlatformOperator,
+          }
+          r.authProfile = session.profile
+          await runWithTenantAsync(
+            { tenantId: effectiveTenantId, tenantSlug: hostTenant.slug },
+            async () => next(),
+          )
           return
         }
-        r.tenantId = session.tenantId
-        r.tenantSlug = hostTenant.slug
-        r.auditActor = {
-          userId: session.user.id,
-          userName: session.user.name,
-          tenantId: session.tenantId,
-          isPlatformOperator: session.isPlatformOperator,
-        }
-        r.authProfile = session.profile
-        await runWithTenantAsync(
-          { tenantId: session.tenantId, tenantSlug: hostTenant.slug },
-          async () => next(),
-        )
+        // Token presente pero inválido/caducado: continuar como anónimo (marketing, login, etc.).
+      }
+
+      if (env.nodeEnv === 'production') {
+        next()
         return
       }
-      // Token presente pero inválido/caducado: continuar como anónimo (marketing, login, etc.).
-    }
 
-    if (env.nodeEnv === 'production') {
-      next()
-      return
-    }
+      const fallbackTenantId =
+        hostTenant.tenantId ??
+        (await getTenantBySlug(env.defaultTenantSlug))?.id ??
+        ATRIA_TENANT_ID
 
-    const fallbackTenantId =
-      hostTenant.tenantId ??
-      (await getTenantBySlug(env.defaultTenantSlug))?.id ??
-      ATRIA_TENANT_ID
-
-    try {
-      const fallback = await getUserByIdForAuth(env.demoUserId, fallbackTenantId)
-      r.tenantId = fallbackTenantId
-      r.tenantSlug = hostTenant.slug
-      r.auditActor = {
-        userId: fallback.user.id,
-        userName: fallback.user.name,
-        tenantId: fallbackTenantId,
+      try {
+        const fallback = await getUserByIdForAuth(env.demoUserId, fallbackTenantId)
+        r.tenantId = fallbackTenantId
+        r.tenantSlug = hostTenant.slug
+        r.auditActor = {
+          userId: fallback.user.id,
+          userName: fallback.user.name,
+          tenantId: fallbackTenantId,
+        }
+        r.authProfile = fallback.profile
+        await runWithTenantAsync(
+          { tenantId: fallbackTenantId, tenantSlug: hostTenant.slug },
+          async () => next(),
+        )
+      } catch (e) {
+        next(e)
       }
-      r.authProfile = fallback.profile
-      await runWithTenantAsync(
-        { tenantId: fallbackTenantId, tenantSlug: hostTenant.slug },
-        async () => next(),
-      )
     } catch (e) {
       next(e)
     }

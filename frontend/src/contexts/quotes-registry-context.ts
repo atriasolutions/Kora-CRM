@@ -15,7 +15,10 @@ export type QuotesRegistryContextValue = {
   archivedQuotes: ArchivedQuoteEntry[]
   findById: (id: string) => QuoteListItem | undefined
   addQuote: (values: CreateQuoteFormValues) => Promise<QuoteListItem>
-  updateQuoteFromDetail: (detail: QuoteDetail) => Promise<QuoteDetail>
+  updateQuoteFromDetail: (
+    detail: QuoteDetail,
+    options?: { previousStatus?: string },
+  ) => Promise<QuoteDetail>
   archiveQuote: (id: string) => Promise<void>
   archiveQuotes: (ids: string[]) => Promise<void>
   restoreQuote: (id: string) => Promise<void>

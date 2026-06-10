@@ -110,6 +110,8 @@ export function normalizeQuoteDetailFromApi(
     exchangeRateEur: api.exchangeRateEur ?? null,
     description,
     subtotal: totals.subtotal,
+    taxableSubtotal: totals.taxableSubtotal,
+    exemptSubtotal: totals.exemptSubtotal,
     discountPercent: totals.discountPercent,
     discountAmount: totals.discountAmount,
     taxPercent: totals.taxPercent,
@@ -129,6 +131,8 @@ export function normalizeQuoteDetailFromApi(
         ? api.statusHistory
         : statusHistoryFor(id, status),
     terms: api.terms?.trim() ?? '',
+    includeBankDetails: api.includeBankDetails === true,
+    bankAccountId: api.bankAccountId ?? null,
     internalNotes: api.internalNotes?.trim() || '',
     activities: api.activities ?? [],
     notes: api.notes ?? [],

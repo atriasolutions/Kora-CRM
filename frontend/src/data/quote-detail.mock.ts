@@ -41,6 +41,9 @@ export type QuoteLineItem = {
   unitPrice: string
   discount: string
   total: string
+  subjectToVat?: boolean
+  deferredPayment?: boolean
+  deferredPaymentText?: string
 }
 
 export type { QuoteStatusHistoryEntry }
@@ -59,6 +62,8 @@ export type QuoteDetail = QuoteListItem & {
   exchangeRateEur?: number | null
   description: string
   subtotal: string
+  taxableSubtotal?: string
+  exemptSubtotal?: string
   discountPercent: string
   discountAmount: string
   taxPercent: string
@@ -73,6 +78,8 @@ export type QuoteDetail = QuoteListItem & {
   lineItems: QuoteLineItem[]
   statusHistory: QuoteStatusHistoryEntry[]
   terms: string
+  includeBankDetails?: boolean
+  bankAccountId?: string | null
   internalNotes: string
   activities: ContactActivity[]
   notes: ContactNote[]

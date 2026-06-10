@@ -41,6 +41,7 @@ export function mapEntityNoteRow(row: EntityNoteRow): EntityNoteDto {
     body: row.body,
     mentions: parseMentions(row.mentions),
     author: row.author_name?.trim() || '—',
+    authorUserId: row.author_user_id,
     when: formatWhen(row.created_at),
   }
 }

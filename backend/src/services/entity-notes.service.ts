@@ -1,14 +1,15 @@
 import type { Request } from 'express'
 
-import { badRequest, forbidden } from '../middleware/errors.js'
+import { badRequest, forbidden, notFound } from '../middleware/errors.js'
 import type { RequestWithAuth } from '../middleware/auth-session.js'
+import { isSystemAccessProfile } from '../lib/access-profile-admin.js'
 import { canModulePermission } from '../lib/permissions.js'
 import type { MenuModuleId } from '../lib/menu-modules.js'
 import {
   createEntityNote,
   deleteEntityNote,
   ensureEntityNotesTable,
-  getEntityNoteEntityType,
+  getEntityNoteDeleteContext,
   listEntityNotes,
 } from '../repositories/entity-notes.repository.js'
 import { enrichEntityNotes } from '../services/entity-notes-enrich.service.js'
@@ -78,11 +79,29 @@ export async function createEntityNoteForRequest(
   return createEntityNote(input, auth)
 }
 
+function assertCanDeleteEntityNote(req: Request, authorUserId: string | null): void {
+  const auth = (req as RequestWithAuth).auditActor
+  const profile = (req as RequestWithAuth).authProfile
+  const isAdmin =
+    isSystemAccessProfile(profile) || Boolean(auth.isPlatformOperator)
+  const isAuthor =
+    Boolean(authorUserId) &&
+    Boolean(auth.userId) &&
+    authorUserId === auth.userId
+
+  if (!isAdmin && !isAuthor) {
+    throw forbidden(
+      'Solo el autor de la nota o un administrador puede eliminarla.',
+    )
+  }
+}
+
 export async function deleteEntityNoteForRequest(req: Request, noteId: string) {
   await ensureEntityNotesTable()
-  const entityType = await getEntityNoteEntityType(noteId)
-  if (entityType) {
-    assertModuleAccess(req, entityType as EntityNoteType, 'delete')
-  }
+  const note = await getEntityNoteDeleteContext(noteId)
+  if (!note) throw notFound('Nota no encontrada')
+
+  assertModuleAccess(req, note.entity_type as EntityNoteType, 'view')
+  assertCanDeleteEntityNote(req, note.author_user_id)
   await deleteEntityNote(noteId)
 }

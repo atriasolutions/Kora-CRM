@@ -2,6 +2,11 @@ import type { Request } from 'express'
 
 import { badRequest, forbidden } from '../middleware/errors.js'
 import type { RequestWithAuth } from '../middleware/auth-session.js'
+import { getTenantIdOrDefault } from '../lib/tenant-context.js'
+import {
+  computeProjectedTenantFilesBytes,
+  enforceFilesQuotaForTenantTotal,
+} from '../lib/tenant-quota-enforce.js'
 import { canModulePermission } from '../lib/permissions.js'
 import type { MenuModuleId } from '../lib/menu-modules.js'
 import {
@@ -81,6 +86,18 @@ export async function syncEntityFilesForRequest(
 
   const auth = (req as RequestWithAuth).auditActor
   const entityLabel = input.entityLabel?.trim() || ''
+  const tenantId = getTenantIdOrDefault()
+  const projectedTotal = await computeProjectedTenantFilesBytes(
+    tenantId,
+    input.entityType,
+    input.entityId,
+    input.files.map((file) => ({
+      size: file.size,
+      storageKey: file.dataUrl!.trim(),
+      id: file.id,
+    })),
+  )
+  await enforceFilesQuotaForTenantTotal(tenantId, auth, projectedTotal)
 
   return replaceEntityFiles({
     entityType: input.entityType,

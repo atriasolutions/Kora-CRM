@@ -34,6 +34,8 @@ export type QuoteRow = {
   exchange_rate_usd: string | number | null
   exchange_rate_eur: string | number | null
   global_discount_pct: string | number | null
+  include_bank_details: boolean | null
+  bank_account_id: string | null
   created_at: Date
   created_by_id: string | null
   created_by_name: string | null
@@ -56,6 +58,9 @@ export type QuoteLineRow = {
   sort_order: number
   price_currency: string | null
   unit_price_original: string | number | null
+  subject_to_vat: boolean | null
+  deferred_payment: boolean | null
+  deferred_payment_text: string | null
 }
 
 export function mapQuoteLineRow(row: QuoteLineRow): QuoteLineItemDto {
@@ -79,6 +84,9 @@ export function mapQuoteLineRow(row: QuoteLineRow): QuoteLineItemDto {
     priceCurrency: priceCurrency !== 'CLP' ? priceCurrency : undefined,
     discount: formatDiscountPct(row.discount_pct),
     total: formatCentsToMoney(row.total_cents),
+    subjectToVat: row.subject_to_vat !== false,
+    deferredPayment: row.deferred_payment === true,
+    deferredPaymentText: row.deferred_payment_text?.trim() || undefined,
   }
 }
 
@@ -113,6 +121,8 @@ export function mapQuoteDetail(row: QuoteRow, lineItems: QuoteLineRow[]): QuoteD
   return {
     ...mapQuoteRow(row),
     globalDiscount: formatDiscountPct(row.global_discount_pct),
+    includeBankDetails: row.include_bank_details === true,
+    bankAccountId: row.bank_account_id ?? null,
     lineItems: lineItems.map(mapQuoteLineRow),
     paymentTerms: row.payment_terms?.trim() ?? '',
     deliveryTerms: row.delivery_terms?.trim() ?? '',

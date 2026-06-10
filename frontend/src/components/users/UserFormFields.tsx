@@ -4,7 +4,9 @@ import {
   ContactFormSelect,
   ContactFormTextarea,
 } from '@/components/contacts/ContactFormField'
+import { CompanyLookupField } from '@/components/shared/CompanyLookupField'
 import { AvatarImageUpload } from '@/components/shared/AvatarImageUpload'
+import { isGuestAccessProfile } from '@/lib/access-profile-admin'
 import { resolveProfileIdForRole } from '@/lib/user-form'
 import { useProfilesRegistry } from '@/hooks/use-profiles-registry'
 import {
@@ -32,6 +34,8 @@ export function UserFormFields({
 }: UserFormFieldsProps) {
   const { listItems: profileOptions } = useProfilesRegistry()
   const patch = (partial: Partial<UserFormValues>) => onChange(partial)
+  const selectedProfile = profileOptions.find((p) => p.id === form.profileId)
+  const showGuestCompanyLookup = isGuestAccessProfile(selectedProfile)
 
   return (
     <div className="space-y-6">
@@ -127,19 +131,31 @@ export function UserFormFields({
             id="user-role"
             label="Rol"
             value={form.role}
-            onChange={(role) =>
-              patch({
-                role,
-                profileId: resolveProfileIdForRole(role, profileOptions),
-              })
-            }
+            onChange={(role) => {
+              const profileId = resolveProfileIdForRole(role, profileOptions)
+              const nextProfile = profileOptions.find((p) => p.id === profileId)
+              const patchValues: Partial<UserFormValues> = { role, profileId }
+              if (!isGuestAccessProfile(nextProfile)) {
+                patchValues.guestCompanyId = ''
+                patchValues.guestCompanyName = ''
+              }
+              patch(patchValues)
+            }}
             options={USER_ROLE_OPTIONS}
           />
           <ContactFormSelect
             id="user-profile"
             label="Perfil de acceso"
             value={form.profileId}
-            onChange={(profileId) => patch({ profileId })}
+            onChange={(profileId) => {
+              const nextProfile = profileOptions.find((p) => p.id === profileId)
+              const patchValues: Partial<UserFormValues> = { profileId }
+              if (!isGuestAccessProfile(nextProfile)) {
+                patchValues.guestCompanyId = ''
+                patchValues.guestCompanyName = ''
+              }
+              patch(patchValues)
+            }}
             options={profileOptions.map((p) => ({
               value: p.id,
               label: p.name,
@@ -169,6 +185,25 @@ export function UserFormFields({
             </ContactFormField>
           )}
         </div>
+        {showGuestCompanyLookup ? (
+          <CompanyLookupField
+            label="Cliente de la empresa"
+            value={form.guestCompanyId}
+            onChange={(guestCompanyId, company) =>
+              patch({
+                guestCompanyId,
+                guestCompanyName: company?.name ?? '',
+              })
+            }
+            searchPlaceholder="Buscar empresa del cliente…"
+            helperText="Opcional. Las solicitudes creadas por este invitado quedarán asociadas a esta empresa."
+            presetCompany={
+              form.guestCompanyId && form.guestCompanyName
+                ? { id: form.guestCompanyId, name: form.guestCompanyName }
+                : undefined
+            }
+          />
+        ) : null}
         <ContactFormSelect
           id="user-2fa"
           label="Autenticación en dos pasos (2FA)"

@@ -1,24 +1,19 @@
-import { ChevronDown } from 'lucide-react'
+import { CalendarRange, ChevronDown } from 'lucide-react'
 
+import { CompactPeriodFilter } from '@/components/shared/CompactPeriodFilter'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
-  buildDashboardPeriodOptions,
-  findPeriodOption,
+  compactToDashboardPeriod,
+  dashboardPeriodToCompact,
   labelForPeriod,
   type DashboardPeriod,
 } from '@/lib/dashboard-period'
 import { cn } from '@/lib/utils'
-
-const PERIOD_OPTIONS = buildDashboardPeriodOptions()
 
 type DashboardPeriodSelectorProps = {
   value: DashboardPeriod
@@ -33,13 +28,6 @@ export function DashboardPeriodSelector({
   disabled,
   className,
 }: DashboardPeriodSelectorProps) {
-  const selected =
-    findPeriodOption(PERIOD_OPTIONS, value) ?? {
-      label: labelForPeriod(value),
-    }
-  const yearOptions = PERIOD_OPTIONS.filter((o) => o.period.mode === 'year')
-  const monthOptions = PERIOD_OPTIONS.filter((o) => o.period.mode === 'month')
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -48,36 +36,23 @@ export function DashboardPeriodSelector({
           type="button"
           disabled={disabled}
           className={cn(
-            'h-10 w-full shrink-0 rounded-full px-4 shadow-sm sm:h-10 sm:w-auto sm:min-w-[12rem]',
+            'h-10 w-full shrink-0 gap-2 rounded-full px-4 shadow-sm sm:h-10 sm:w-auto sm:min-w-[12rem]',
             className,
           )}
         >
-          <span className="truncate text-sm">{selected.label}</span>
-          <ChevronDown aria-hidden className="ms-2 size-4 shrink-0 opacity-60" />
+          <CalendarRange aria-hidden className="size-4 shrink-0 opacity-70" />
+          <span className="truncate text-sm">{labelForPeriod(value)}</span>
+          <ChevronDown aria-hidden className="size-4 shrink-0 opacity-60" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="max-h-[min(70vh,24rem)] w-56 overflow-y-auto">
-        <DropdownMenuItem onSelect={() => onChange({ mode: 'years' })}>
-          Por años (últimos 5)
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuLabel>Año específico</DropdownMenuLabel>
-        <DropdownMenuGroup>
-          {yearOptions.map((opt) => (
-            <DropdownMenuItem key={opt.id} onSelect={() => onChange(opt.period)}>
-              {opt.label}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-        <DropdownMenuLabel>Mes específico</DropdownMenuLabel>
-        <DropdownMenuGroup>
-          {monthOptions.map((opt) => (
-            <DropdownMenuItem key={opt.id} onSelect={() => onChange(opt.period)}>
-              {opt.label}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuGroup>
+      <DropdownMenuContent align="end" className="w-72 p-3" onCloseAutoFocus={(e) => e.preventDefault()}>
+        <p className="mb-2 text-xs font-medium text-muted-foreground">Período del dashboard</p>
+        <CompactPeriodFilter
+          idPrefix="dashboard-period"
+          modes={['years', 'year', 'month']}
+          value={dashboardPeriodToCompact(value)}
+          onChange={(next) => onChange(compactToDashboardPeriod(next))}
+        />
       </DropdownMenuContent>
     </DropdownMenu>
   )

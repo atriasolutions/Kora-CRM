@@ -28,6 +28,7 @@ export type EntityNoteDto = {
   body: string
   mentions?: EntityNoteMentionDto[]
   author: string
+  authorUserId?: string | null
   when: string
 }
 

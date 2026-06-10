@@ -1,17 +1,25 @@
 import { z } from 'zod'
 
-const invoiceLineSchema = z.object({
-  id: z.string().optional(),
-  productId: z.string().uuid().optional(),
-  sku: z.string().optional(),
-  productName: z.string().optional(),
-  description: z.string().optional(),
-  quantity: z.number().optional(),
-  unitPrice: z.string().optional(),
-  unitPriceOriginal: z.coerce.number().optional(),
-  priceCurrency: z.string().max(8).optional(),
-  discount: z.string().optional(),
-})
+const invoiceLineSchema = z
+  .object({
+    id: z.string().optional(),
+    productId: z.string().uuid().optional(),
+    sku: z.string().optional(),
+    productName: z.string().optional(),
+    description: z.string().optional(),
+    quantity: z.number().optional(),
+    unitPrice: z.string().optional(),
+    unitPriceOriginal: z.coerce.number().optional(),
+    priceCurrency: z.string().max(8).optional(),
+    discount: z.string().optional(),
+    subjectToVat: z.boolean().optional(),
+    deferredPayment: z.boolean().optional(),
+    deferredPaymentText: z.string().max(500).optional(),
+  })
+  .refine(
+    (line) => !line.deferredPayment || Boolean(line.deferredPaymentText?.trim()),
+    { message: 'Indica el texto de plazo diferido en la línea.' },
+  )
 
 const invoiceStatusSchema = z.enum([
   'Pagada',

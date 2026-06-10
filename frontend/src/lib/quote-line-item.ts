@@ -30,6 +30,10 @@ export function isManualQuoteLine(line: QuoteLineItem): boolean {
   return quoteLineKind(line) === 'manual'
 }
 
+export function quoteLineSubjectToVat(line: QuoteLineItem): boolean {
+  return line.subjectToVat !== false
+}
+
 export function quoteLineDescription(line: QuoteLineItem): string {
   return line.description.trim()
 }
@@ -110,6 +114,9 @@ export function defaultQuoteLineItem(
     unitPrice: '$0',
     discount: '0%',
     total: '$0',
+    subjectToVat: true,
+    deferredPayment: false,
+    deferredPaymentText: '',
   })
 }
 
@@ -140,6 +147,8 @@ export function quoteLineFromProduct(
 
 export type QuoteTotals = {
   subtotal: string
+  taxableSubtotal: string
+  exemptSubtotal: string
   discountPercent: string
   discountAmount: string
   taxPercent: string
@@ -153,17 +162,38 @@ export function computeQuoteTotals(
 ): QuoteTotals {
   const taxPct = options?.taxPercent ?? getDefaultVatPercent()
   const globalPct = parseGlobalDiscountPercent(options?.globalDiscountPercent)
-  const linesSubtotalNum = lineItems.reduce(
-    (sum, li) => sum + parseMoneyNum(li.total),
-    0,
-  )
+  let taxableNum = 0
+  let exemptNum = 0
+
+  for (const li of lineItems) {
+    const net = parseMoneyNum(li.total)
+    if (quoteLineSubjectToVat(li)) {
+      taxableNum += net
+    } else {
+      exemptNum += net
+    }
+  }
+
+  const linesSubtotalNum = taxableNum + exemptNum
   const discountAmountNum = Math.round((linesSubtotalNum * globalPct) / 100)
-  const netSubtotalNum = linesSubtotalNum - discountAmountNum
-  const taxAmount = Math.round((netSubtotalNum * taxPct) / 100)
+
+  let taxableAfter = taxableNum
+  let exemptAfter = exemptNum
+  if (linesSubtotalNum > 0 && discountAmountNum > 0) {
+    const taxableDiscount = Math.round((discountAmountNum * taxableNum) / linesSubtotalNum)
+    const exemptDiscount = discountAmountNum - taxableDiscount
+    taxableAfter = taxableNum - taxableDiscount
+    exemptAfter = exemptNum - exemptDiscount
+  }
+
+  const netSubtotalNum = taxableAfter + exemptAfter
+  const taxAmount = Math.round((taxableAfter * taxPct) / 100)
   const total = netSubtotalNum + taxAmount
 
   return {
     subtotal: formatMoneyCLP(linesSubtotalNum),
+    taxableSubtotal: formatMoneyCLP(taxableAfter),
+    exemptSubtotal: formatMoneyCLP(exemptAfter),
     discountPercent: formatGlobalDiscountPercent(globalPct),
     discountAmount:
       discountAmountNum > 0 ? `−${formatMoneyCLP(discountAmountNum)}` : '$0',

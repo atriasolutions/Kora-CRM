@@ -1,4 +1,5 @@
 import { resolveCustomerSnapshots } from '../lib/relation-snapshots.js'
+import { enforceRecordQuota } from '../lib/tenant-quota-enforce.js'
 import {
   computeOpportunityLines,
   sumLineTotals,
@@ -191,6 +192,7 @@ export async function createOpportunity(
   input: CreateOpportunityInput,
   actor: AuditActor,
 ): Promise<OpportunityDetail> {
+  await enforceRecordQuota(actor)
   if (!input.name?.trim()) throw badRequest('El nombre es obligatorio')
 
   const lines = computeOpportunityLines(input.lineItems)

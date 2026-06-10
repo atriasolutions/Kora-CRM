@@ -10,6 +10,9 @@ export type InvoiceLineItemDto = {
   priceCurrency?: string
   discount: string
   total: string
+  subjectToVat?: boolean
+  deferredPayment?: boolean
+  deferredPaymentText?: string
 }
 
 export type InvoicePaymentDto = {
@@ -74,6 +77,9 @@ export type InvoiceLineItemInput = {
   unitPriceOriginal?: number | string
   priceCurrency?: string
   discount?: string
+  subjectToVat?: boolean
+  deferredPayment?: boolean
+  deferredPaymentText?: string
 }
 
 export type CreateInvoiceInput = {

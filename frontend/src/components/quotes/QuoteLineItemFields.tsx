@@ -1,6 +1,7 @@
 import { Trash2 } from 'lucide-react'
 
 import {
+  ContactFormCheckbox,
   ContactFormField,
   ContactFormInput,
 } from '@/components/contacts/ContactFormField'
@@ -16,6 +17,7 @@ import {
   quoteLineDescription,
   quoteLineFromProduct,
   quoteLineKind,
+  quoteLineSubjectToVat,
   recalcQuoteLine,
 } from '@/lib/quote-line-item'
 
@@ -230,6 +232,38 @@ export function QuoteLineItemFields({
           </p>
         </ContactFormField>
       </div>
+
+      <ContactFormCheckbox
+        id={`${idPrefix}-vat-${line.id}`}
+        label="Afecto a IVA"
+        description={
+          quoteLineSubjectToVat(line)
+            ? 'Se incluye en el neto afecto'
+            : 'Línea exenta de IVA'
+        }
+        checked={quoteLineSubjectToVat(line)}
+        onChange={(subjectToVat) => patchRecalc({ subjectToVat })}
+      />
+      <ContactFormCheckbox
+        id={`${idPrefix}-deferred-${line.id}`}
+        label="Plazo diferido"
+        checked={line.deferredPayment === true}
+        onChange={(deferredPayment) =>
+          patchRecalc({
+            deferredPayment,
+            deferredPaymentText: deferredPayment ? line.deferredPaymentText ?? '' : '',
+          })
+        }
+      />
+      {line.deferredPayment ? (
+        <ContactFormInput
+          id={`${idPrefix}-deferred-text-${line.id}`}
+          label="Texto plazo diferido"
+          placeholder="Ej. 30 días desde emisión"
+          value={line.deferredPaymentText ?? ''}
+          onChange={(deferredPaymentText) => patchRecalc({ deferredPaymentText })}
+        />
+      ) : null}
     </div>
   )
 }

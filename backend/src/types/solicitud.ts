@@ -40,6 +40,8 @@ export type SolicitudListItem = {
   updatedById: string
   updatedByName: string
   teamMembers?: SolicitudListTeamMember[]
+  companyId?: string
+  companyName?: string
 }
 
 export type SolicitudDetail = SolicitudListItem & {

@@ -15,6 +15,16 @@ export function resolveLoginRedirectUrl(): string {
     : centralLoginUrl()
 }
 
+/** Tras cerrar sesión: login central con limpieza forzada de sesión. */
+export function resolveLogoutRedirectUrl(): string {
+  if (typeof window === 'undefined') {
+    return `${centralLoginUrl()}?loggedOut=1`
+  }
+  return isCentralAppHost()
+    ? `${window.location.origin}${LOGIN_PATH}?loggedOut=1`
+    : `${centralLoginUrl()}?loggedOut=1`
+}
+
 export function getPostLoginRedirect(
   state: unknown,
   fallback = APP_HOME_PATH,

@@ -1,4 +1,5 @@
 import { tenantQuery } from '../db/tenant-query.js'
+import { enforceRecordQuota } from '../lib/tenant-quota-enforce.js'
 import { pushTenantCondition, tenantWhereParam } from '../lib/tenant-sql.js'
 import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import { mapCompanyDetail, mapCompanyRow, type CompanyRow } from '../mappers/company.mapper.js'
@@ -140,6 +141,7 @@ export async function createCompany(
   input: CreateCompanyInput,
   actor: AuditActor,
 ): Promise<CompanyListItem> {
+  await enforceRecordQuota(actor)
   await assertUniqueCompanyTaxId(input.rut)
 
   const result = await tenantQuery<CompanyRow>(

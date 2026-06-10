@@ -225,6 +225,26 @@ export function InvoiceLineItemFields({
         checked={invoiceLineSubjectToVat(line)}
         onChange={(subjectToVat) => patchRecalc({ subjectToVat })}
       />
+      <ContactFormCheckbox
+        id={`${idPrefix}-deferred-${line.id}`}
+        label="Plazo diferido"
+        checked={line.deferredPayment === true}
+        onChange={(deferredPayment) =>
+          patchRecalc({
+            deferredPayment,
+            deferredPaymentText: deferredPayment ? line.deferredPaymentText ?? '' : '',
+          })
+        }
+      />
+      {line.deferredPayment ? (
+        <ContactFormInput
+          id={`${idPrefix}-deferred-text-${line.id}`}
+          label="Texto plazo diferido"
+          placeholder="Ej. 30 días desde emisión"
+          value={line.deferredPaymentText ?? ''}
+          onChange={(deferredPaymentText) => patchRecalc({ deferredPaymentText })}
+        />
+      ) : null}
     </div>
   )
 }

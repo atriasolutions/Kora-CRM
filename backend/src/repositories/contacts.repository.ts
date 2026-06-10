@@ -1,4 +1,5 @@
 import { tenantQuery } from '../db/tenant-query.js'
+import { enforceRecordQuota } from '../lib/tenant-quota-enforce.js'
 import {
   findActiveCompanyIdByName,
   getCompanyById,
@@ -151,6 +152,7 @@ export async function createContact(
   input: CreateContactInput,
   actor: AuditActor,
 ): Promise<ContactDetail> {
+  await enforceRecordQuota(actor)
   if (!input.name?.trim()) throw badRequest('El nombre es obligatorio')
 
   if (input.companyId) {

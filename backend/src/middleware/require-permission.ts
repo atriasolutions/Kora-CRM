@@ -52,6 +52,7 @@ const ASSIGNEE_LOOKUP_MODULES: MenuModuleId[] = [
   'inventario',
   'reportes',
   'solicitudes',
+  'bitacora',
 ]
 
 const MENTION_LOOKUP_MODULES: MenuModuleId[] = [

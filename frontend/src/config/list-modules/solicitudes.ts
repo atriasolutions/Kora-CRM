@@ -21,7 +21,8 @@ export const solicitudesListConfig: ModuleListConfig<SolicitudListItem> = {
     row.title.toLowerCase().includes(q) ||
     row.code.toLowerCase().includes(q) ||
     row.assignee.toLowerCase().includes(q) ||
-    row.description.toLowerCase().includes(q),
+    row.description.toLowerCase().includes(q) ||
+    (row.companyName ?? '').toLowerCase().includes(q),
   columns: [
     {
       kind: 'primary',
@@ -46,6 +47,13 @@ export const solicitudesListConfig: ModuleListConfig<SolicitudListItem> = {
       className: 'w-[100px]',
       label: (r) => r.priority,
       variant: (r) => solicitudPriorityVariant(r.priority),
+    },
+    {
+      kind: 'text',
+      header: 'Empresa',
+      sortable: true,
+      className: 'w-[160px]',
+      cell: (r) => r.companyName || '—',
     },
     {
       kind: 'text',

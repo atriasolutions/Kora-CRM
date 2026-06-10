@@ -62,6 +62,8 @@ function toQuoteFormFieldsModel(form: CreateQuoteFormValues): QuoteFormFieldsMod
     deliveryAddress: form.deliveryAddress,
     terms: '',
     internalNotes: '',
+    includeBankDetails: false,
+    bankAccountId: '',
   }
 }
 

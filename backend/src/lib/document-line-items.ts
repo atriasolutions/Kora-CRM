@@ -23,6 +23,27 @@ export type ProductPriceInfo = {
 export type ComputedLineWithCurrency = ComputedLine & {
   priceCurrency: ProductCurrency
   unitPriceOriginal: number
+  subjectToVat: boolean
+  deferredPayment: boolean
+  deferredPaymentText: string | null
+}
+
+function resolveDocumentLineExtras(item: {
+  subjectToVat?: boolean
+  deferredPayment?: boolean
+  deferredPaymentText?: string
+}): Pick<
+  ComputedLineWithCurrency,
+  'subjectToVat' | 'deferredPayment' | 'deferredPaymentText'
+> {
+  const deferredPayment = item.deferredPayment === true
+  return {
+    subjectToVat: item.subjectToVat !== false,
+    deferredPayment,
+    deferredPaymentText: deferredPayment
+      ? item.deferredPaymentText?.trim() || null
+      : null,
+  }
 }
 
 export type ComputedPurchaseLineWithCurrency = ComputedPurchaseLine & {
@@ -130,6 +151,7 @@ export function computeQuoteLinesWithCurrency(
       sku: item.sku?.trim() || '',
       priceCurrency,
       unitPriceOriginal,
+      ...resolveDocumentLineExtras(item),
     }
   })
 

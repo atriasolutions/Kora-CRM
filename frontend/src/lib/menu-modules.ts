@@ -9,6 +9,7 @@ export type MenuModuleId =
   | 'actividades'
   | 'proyectos'
   | 'solicitudes'
+  | 'bitacora'
   | 'compras'
   | 'ingresos'
   | 'inventario'
@@ -35,6 +36,7 @@ export const MENU_MODULE_DEFINITIONS: MenuModuleDef[] = [
   { id: 'actividades', label: 'Actividades', pathSegment: 'actividades' },
   { id: 'proyectos', label: 'Proyectos', pathSegment: 'proyectos' },
   { id: 'solicitudes', label: 'Solicitudes', pathSegment: 'solicitudes' },
+  { id: 'bitacora', label: 'Bitácora', pathSegment: 'bitacora' },
   { id: 'compras', label: 'Compras', pathSegment: 'compras' },
   { id: 'ingresos', label: 'Ingresos', pathSegment: 'ingresos' },
   { id: 'inventario', label: 'Inventario', pathSegment: 'inventario' },

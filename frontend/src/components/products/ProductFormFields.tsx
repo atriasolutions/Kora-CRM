@@ -205,12 +205,6 @@ export function ProductFormFields({
             options={['Activo', 'Agotado', 'Borrador'].map((s) => ({ value: s, label: s }))}
           />
         </div>
-        <ContactFormCheckbox
-          id="pd-form-tax-included"
-          label="Incluye IVA"
-          checked={form.taxIncluded}
-          onChange={(taxIncluded) => patch({ taxIncluded })}
-        />
       </div>
 
       <Separator />

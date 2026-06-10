@@ -329,19 +329,19 @@ export function LoginPage() {
     return memberships.find((m) => m.tenantId === selectedTenantId)?.slug
   }
 
-  function persistTenantSlugInSession() {
-    const slug = resolveTenantSlug()
-    if (!slug) return
-    const stored = loadAuthSession()
-    if (stored) saveAuthSession({ ...stored, tenantSlug: slug })
-  }
-
   function redirectAfterLogin() {
-    persistTenantSlugInSession()
+    const slug = resolveTenantSlug() ?? session?.tenantSlug
     const path = getPostLoginRedirect(location.state)
-    const slug = resolveTenantSlug()
+    if (!slug && isCentral) {
+      setError('No se pudo determinar la empresa. Vuelve a iniciar sesión.')
+      return
+    }
+    if (slug) {
+      const stored = loadAuthSession()
+      if (stored) saveAuthSession({ ...stored, tenantSlug: slug })
+    }
     if (isCentral && slug) {
-      window.location.href = `${tenantAppOrigin(slug)}${path}`
+      window.location.replace(`${tenantAppOrigin(slug)}${path}`)
       return
     }
     navigate(path, { replace: true })
@@ -376,6 +376,14 @@ export function LoginPage() {
       )
     }
 
+    if (isCentralAppHost()) {
+      return (
+        <div className="flex min-h-svh items-center justify-center bg-background">
+          <Loader2 aria-hidden className="size-8 animate-spin text-primary" />
+        </div>
+      )
+    }
+
     return <Navigate to={path} replace />
   }
 
@@ -383,13 +391,23 @@ export function LoginPage() {
     event.preventDefault()
     setError(null)
     const tenantId = isCentral ? selectedTenantId : tenant?.id
+    const tenantSlug = activeMembership?.slug ?? tenant?.slug
     if (!tenantId) {
       setError('Selecciona la empresa con la que deseas ingresar.')
       return
     }
+    if (isCentral && !tenantSlug) {
+      setError('Espera a que cargue la lista de empresas e inténtalo de nuevo.')
+      return
+    }
     setLoading(true)
     try {
-      const outcome = await login(email.trim(), password, tenantId)
+      const outcome = await login(
+        email.trim(),
+        password,
+        tenantId,
+        tenantSlug,
+      )
       if (outcome.status === 'error') {
         setError(outcome.message)
         return

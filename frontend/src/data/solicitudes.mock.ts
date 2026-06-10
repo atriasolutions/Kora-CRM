@@ -33,6 +33,8 @@ export type SolicitudListItem = {
   assignee: string
   assigneeUserId?: string
   teamMembers?: SolicitudListTeamMember[]
+  companyId?: string
+  companyName?: string
 } & RecordAuditFields
 
 export type SolicitudTeamMember = {

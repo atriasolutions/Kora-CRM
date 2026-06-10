@@ -1,8 +1,11 @@
 import {
   Building2,
   FileDigit,
+  Gauge,
+  Landmark,
   Layers,
   Receipt,
+  Server,
   SlidersHorizontal,
   Warehouse,
   ClipboardList,
@@ -11,17 +14,24 @@ import {
 
 export type SettingsSectionId =
   | 'empresa'
+  | 'datos-bancarios'
   | 'facturacion-sii'
   | 'bodegas'
   | 'categorias'
   | 'impuestos'
   | 'solicitudes'
+  | 'informacion-instancia'
+  | 'instancia'
 
 export type SettingsSection = {
   id: SettingsSectionId
   label: string
   description: string
   Icon: LucideIcon
+  /** Visible pero no seleccionable (p. ej. integración en desarrollo). */
+  comingSoon?: boolean
+  /** Solo operador de plataforma (superadmin). */
+  platformOperatorOnly?: boolean
 }
 
 export const SETTINGS_SECTIONS: SettingsSection[] = [
@@ -32,16 +42,16 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     Icon: Building2,
   },
   {
-    id: 'facturacion-sii',
-    label: 'Facturación electrónica',
-    description: 'Modo manual o integración con el SII (certificado, folios y RCV).',
-    Icon: FileDigit,
-  },
-  {
     id: 'bodegas',
     label: 'Bodegas',
     description: 'Ubicaciones de inventario y almacenamiento.',
     Icon: Warehouse,
+  },
+  {
+    id: 'datos-bancarios',
+    label: 'Datos bancarios',
+    description: 'Cuentas para transferencias y PDF de cotizaciones.',
+    Icon: Landmark,
   },
   {
     id: 'categorias',
@@ -60,6 +70,26 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     label: 'Solicitudes',
     description: 'Responsable predeterminado al crear nuevas solicitudes.',
     Icon: ClipboardList,
+  },
+  {
+    id: 'facturacion-sii',
+    label: 'Facturación electrónica',
+    description: 'Modo manual o integración con el SII (certificado, folios y RCV).',
+    Icon: FileDigit,
+    comingSoon: true,
+  },
+  {
+    id: 'informacion-instancia',
+    label: 'Información de la instancia',
+    description: 'Uso de usuarios, registros y archivos vs. límites contratados.',
+    Icon: Gauge,
+  },
+  {
+    id: 'instancia',
+    label: 'Instancia',
+    description: 'Límites de usuarios, capacidad y operaciones críticas de esta instancia.',
+    Icon: Server,
+    platformOperatorOnly: true,
   },
 ]
 

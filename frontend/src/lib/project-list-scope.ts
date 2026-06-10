@@ -1,7 +1,7 @@
 import type { ProjectListItem } from '@/data/projects.mock'
 import type { EntityRecentSlug } from '@/lib/entity-recently-viewed'
 import { loadRecentlyViewedIds } from '@/lib/entity-recently-viewed'
-import { isSystemAccessProfile } from '@/lib/access-profile-admin'
+import { hasElevatedTenantScope } from '@/lib/access-profile-admin'
 import type { AccessProfile } from '@/types/access-profile'
 import {
   createListScopeOptions,
@@ -34,7 +34,7 @@ export const PROJECT_SCOPE_SHORT_LABELS: Record<ProjectListScope, string> = {
 export function canViewAllProjects(
   profile: Pick<AccessProfile, 'isSystem'> | null | undefined,
 ): boolean {
-  return isSystemAccessProfile(profile)
+  return hasElevatedTenantScope(profile)
 }
 
 export function projectListScopeOptionsForProfile(

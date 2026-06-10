@@ -237,6 +237,11 @@ export function CompanyLookupField({
                 aria-expanded={open}
                 aria-controls={`${inputId}-listbox`}
                 aria-autocomplete="list"
+                onPointerDown={(e) => e.stopPropagation()}
+                onMouseDown={() => {
+                  setBlockAutofill(false)
+                  setOpen(true)
+                }}
                 onFocus={() => {
                   setBlockAutofill(false)
                   setOpen(true)
@@ -253,7 +258,7 @@ export function CompanyLookupField({
             <ul
               id={`${inputId}-listbox`}
               role="listbox"
-              className="absolute z-50 mt-1 max-h-64 w-full overflow-auto rounded-md border border-border bg-popover py-1 shadow-md"
+              className="absolute z-[200] mt-1 max-h-64 w-full overflow-auto rounded-md border border-border bg-popover py-1 shadow-md"
             >
               {results.length === 0 && !showCreateOption ? (
                 <li className="px-3 py-2 text-sm text-muted-foreground">
@@ -268,6 +273,7 @@ export function CompanyLookupField({
                       'flex w-full items-center gap-2 px-3 py-2 text-start text-sm hover:bg-muted',
                       company.id === companyId && 'bg-muted/80',
                     )}
+                    onPointerDown={(e) => e.stopPropagation()}
                     onClick={() => selectCompany(company)}
                   >
                     <Building2 aria-hidden className="size-4 shrink-0 text-muted-foreground" />

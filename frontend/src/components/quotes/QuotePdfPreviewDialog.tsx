@@ -1,6 +1,9 @@
 import { FileDown } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
+import { listBankAccountsApi, type BankAccount } from '@/api/bank-accounts'
+import { quoteDetailToApiBody, updateQuoteApi } from '@/api/quotes'
+import { isApiEnabled } from '@/api/config'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -10,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { isApiEnabled } from '@/api/config'
+import { QuoteBankPdfFields } from '@/components/quotes/QuoteBankPdfFields'
 import type { CompanyListItem } from '@/data/companies.mock'
 import type { QuoteDetail } from '@/data/quote-detail.mock'
 import { getCompanyDetail } from '@/data/company-detail.mock'
@@ -39,6 +42,22 @@ export function QuotePdfPreviewDialog({ quote, open, onOpenChange }: QuotePdfPre
     CompanyAddressRecord | undefined
   >()
   const [customerCompany, setCustomerCompany] = useState<CompanyListItem | undefined>()
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([])
+  const [includeBankDetails, setIncludeBankDetails] = useState(quote.includeBankDetails === true)
+  const [bankAccountId, setBankAccountId] = useState(quote.bankAccountId ?? '')
+
+  useEffect(() => {
+    if (!open) return
+    setIncludeBankDetails(quote.includeBankDetails === true)
+    setBankAccountId(quote.bankAccountId ?? '')
+  }, [open, quote.includeBankDetails, quote.bankAccountId])
+
+  useEffect(() => {
+    if (!isApiEnabled()) return
+    void listBankAccountsApi()
+      .then(setBankAccounts)
+      .catch(() => setBankAccounts([]))
+  }, [])
 
   useEffect(() => {
     if (!quote.companyId?.trim()) {
@@ -64,16 +83,39 @@ export function QuotePdfPreviewDialog({ quote, open, onOpenChange }: QuotePdfPre
     setCustomerCompany(detail)
   }, [quote.companyId])
 
+  const pdfQuote = useMemo(
+    (): QuoteDetail => ({
+      ...quote,
+      includeBankDetails,
+      bankAccountId: bankAccountId || null,
+    }),
+    [quote, includeBankDetails, bankAccountId],
+  )
+
+  const selectedBankAccount = useMemo(
+    () => bankAccounts.find((a) => a.id === bankAccountId),
+    [bankAccounts, bankAccountId],
+  )
+
   const pdfInput = useMemo(
-    () => ({
-      quote,
+    (): QuotePdfInput => ({
+      quote: pdfQuote,
       organization,
       customerCompany:
         customerCompany ??
         (quote.companyId ? getRegistryCompanyById(quote.companyId) : undefined),
       customerHeadquarters,
+      bankAccount: includeBankDetails ? selectedBankAccount : undefined,
     }),
-    [quote, organization, customerCompany, customerHeadquarters],
+    [
+      pdfQuote,
+      organization,
+      customerCompany,
+      quote.companyId,
+      customerHeadquarters,
+      includeBankDetails,
+      selectedBankAccount,
+    ],
   )
 
   useEffect(() => {
@@ -115,6 +157,18 @@ export function QuotePdfPreviewDialog({ quote, open, onOpenChange }: QuotePdfPre
     }
   }, [open, pdfInput])
 
+  const persistBankPrefs = async () => {
+    if (!isApiEnabled()) return
+    await updateQuoteApi(quote.id, {
+      ...quoteDetailToApiBody({
+        ...quote,
+        includeBankDetails,
+        bankAccountId: bankAccountId || null,
+      }),
+      lineItems: undefined,
+    })
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] gap-0 overflow-hidden p-0 sm:max-w-3xl">
@@ -124,6 +178,20 @@ export function QuotePdfPreviewDialog({ quote, open, onOpenChange }: QuotePdfPre
             Cliente desde la ficha de empresa; emisor desde Configuración.
           </DialogDescription>
         </DialogHeader>
+        <div className="space-y-4 border-b border-border bg-muted/20 px-6 py-4">
+          <QuoteBankPdfFields
+            idPrefix="pdf-preview-bank"
+            values={{ includeBankDetails, bankAccountId }}
+            onChange={(patch) => {
+              if (patch.includeBankDetails !== undefined) {
+                setIncludeBankDetails(patch.includeBankDetails)
+              }
+              if (patch.bankAccountId !== undefined) {
+                setBankAccountId(patch.bankAccountId)
+              }
+            }}
+          />
+        </div>
         <div className="min-h-[50vh] bg-muted/30 p-4">
           {generating ? (
             <p className="py-20 text-center text-sm text-muted-foreground">Generando PDF…</p>
@@ -147,12 +215,15 @@ export function QuotePdfPreviewDialog({ quote, open, onOpenChange }: QuotePdfPre
             type="button"
             disabled={generating}
             onClick={() => {
-              try {
-                downloadQuotePdf(pdfInput)
-              } catch (err) {
-                console.error(err)
-                toast.error('No se pudo descargar el PDF.')
-              }
+              void (async () => {
+                try {
+                  await persistBankPrefs()
+                  downloadQuotePdf(pdfInput)
+                } catch (err) {
+                  console.error(err)
+                  toast.error('No se pudo descargar el PDF.')
+                }
+              })()
             }}
           >
             <FileDown aria-hidden className="size-4" />

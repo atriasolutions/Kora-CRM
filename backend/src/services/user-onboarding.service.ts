@@ -1,8 +1,11 @@
 import { env } from '../config/env.js'
 import { accountSetupEmail } from '../emails/account-setup.js'
 import { passwordResetEmail } from '../emails/password-reset.js'
+import { tenantAccessGrantedEmail } from '../emails/tenant-access-granted.js'
 import { createVerificationToken } from '../lib/verification-token.js'
+import { statusCountsTowardSeat } from '../lib/tenant-quota-modules.js'
 import { badRequest } from '../middleware/errors.js'
+import { platformQuery } from '../db/tenant-query.js'
 import {
   activateUserAccount,
   expiresAtForPurpose,
@@ -16,13 +19,63 @@ import {
   resetUserPassword,
   type VerificationPurpose,
 } from '../repositories/user-onboarding.repository.js'
+import { getTenantById } from '../repositories/tenants.repository.js'
+import { getAccessProfileById } from '../repositories/access-profiles.repository.js'
+import { runWithTenantAsync } from '../lib/tenant-context.js'
 import { sendMail } from './mail.service.js'
+import { assertCanConsumeSeat } from './tenant-quota.service.js'
 import { normalizeSecurityAnswer } from '../lib/verification-token.js'
 
 function buildUrl(path: string, token: string): string {
   const base = env.appPublicUrl
   const sep = path.includes('?') ? '&' : '?'
   return `${base}${path}${sep}token=${encodeURIComponent(token)}`
+}
+
+function buildTenantLoginUrl(slug: string): string {
+  return `https://${slug}.${env.platformDomain}/login`
+}
+
+function buildCentralLoginUrl(): string {
+  return `https://${env.platformDomain}/login`
+}
+
+export async function sendTenantAccessGranted(input: {
+  userId: string
+  tenantId: string
+  profileId: string
+  displayName?: string
+}): Promise<{ emailed: boolean }> {
+  const user = await getUserEmailStatus(input.userId)
+  if (!user) throw badRequest('Usuario no encontrado')
+
+  const tenant = await getTenantById(input.tenantId)
+  if (!tenant) throw badRequest('Empresa no encontrada')
+
+  return runWithTenantAsync({ tenantId: input.tenantId }, async () => {
+    const profile = await getAccessProfileById(input.profileId)
+    const profileName = profile?.name?.trim() || 'Usuario'
+    const accountInactive = user.status !== 'Activo'
+
+    const mail = tenantAccessGrantedEmail({
+      userName: input.displayName?.trim() || user.name,
+      tenantName: tenant.displayName,
+      profileName,
+      loginUrl: buildTenantLoginUrl(tenant.slug),
+      centralLoginUrl: buildCentralLoginUrl(),
+      accountInactive,
+    })
+
+    const emailed = await sendMail({
+      to: user.email,
+      subject: mail.subject,
+      text: mail.text,
+      html: mail.html,
+      category: mail.category,
+    })
+
+    return { emailed }
+  })
 }
 
 export async function sendAccountSetupInvite(userId: string): Promise<{
@@ -130,6 +183,21 @@ export async function completeAccountSetup(input: {
   }
   if (!input.securityAnswer.trim()) {
     throw badRequest('Indica la respuesta a tu pregunta de seguridad.')
+  }
+
+  if (!statusCountsTowardSeat(row.status)) {
+    const memberships = await platformQuery<{ tenant_id: string }>(
+      `SELECT tenant_id FROM crm_tenant_memberships WHERE user_id = $1`,
+      [row.user_id],
+    )
+    for (const membership of memberships.rows) {
+      await assertCanConsumeSeat(membership.tenant_id, {
+        userId: row.user_id,
+        userName: row.name,
+        tenantId: membership.tenant_id,
+        isPlatformOperator: false,
+      })
+    }
   }
 
   await activateUserAccount({

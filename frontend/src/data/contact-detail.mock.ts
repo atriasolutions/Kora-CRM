@@ -63,6 +63,7 @@ export type ContactNote = {
   body: string
   mentions?: NoteMention[]
   author: string
+  authorUserId?: string | null
   when: string
 }
 

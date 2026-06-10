@@ -4,6 +4,7 @@ import { isApiEnabled } from '@/api/config'
 import { isForbiddenError } from '@/api/errors'
 import {
   createUserApi,
+  deleteUserApi,
   listUserAssigneesApi,
   listUsersApi,
   updateUserApi,
@@ -105,6 +106,17 @@ export function UsersRegistryProvider({ children }: { children: ReactNode }) {
     [save, userUsers],
   )
 
+  const removeUser = useCallback(
+    async (id: string): Promise<void> => {
+      if (useApi) {
+        await deleteUserApi(id)
+      }
+      invalidateUserAvatarCache('', id)
+      save(userUsers.filter((u) => u.id !== id))
+    },
+    [save, userUsers],
+  )
+
   const addUser = useCallback(
     async (values: UserFormValues) => {
       if (useApi) {
@@ -146,6 +158,7 @@ export function UsersRegistryProvider({ children }: { children: ReactNode }) {
       userUsers,
       addUser,
       updateUserFromDetail,
+      removeUser,
       findById,
       reloadFromApi,
       usersDirectoryLoaded,
@@ -155,6 +168,7 @@ export function UsersRegistryProvider({ children }: { children: ReactNode }) {
       userUsers,
       addUser,
       updateUserFromDetail,
+      removeUser,
       findById,
       reloadFromApi,
       usersDirectoryLoaded,

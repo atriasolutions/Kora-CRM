@@ -1,4 +1,9 @@
-export type NotificationType = 'mention' | 'assignment' | 'stock_low' | 'stock_out'
+export type NotificationType =
+  | 'mention'
+  | 'assignment'
+  | 'stock_low'
+  | 'stock_out'
+  | 'quota_warning'
 
 export type Notification = {
   id: string

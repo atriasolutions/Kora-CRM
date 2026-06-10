@@ -154,7 +154,11 @@ export function InvoiceDetailPage() {
 
       const previousStatus = invoice.status
       const nextSii =
-        siiNumber !== undefined ? siiNumber : invoice.siiNumber
+        stage === 'Borrador'
+          ? ''
+          : siiNumber !== undefined
+            ? siiNumber
+            : invoice.siiNumber
 
       const nextInvoice: InvoiceDetail = {
         ...invoice,
@@ -218,10 +222,7 @@ export function InvoiceDetailPage() {
         return
       }
 
-      if (
-        stage === INVOICE_EMITTED_STATUS &&
-        invoice.status !== INVOICE_EMITTED_STATUS
-      ) {
+      if (stage === INVOICE_EMITTED_STATUS && invoice.status === 'Borrador') {
         if (invoicingMode === 'sii') {
           void handleEmitToSii()
           return

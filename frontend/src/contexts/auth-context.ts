@@ -10,13 +10,20 @@ export type LoginOutcome =
   | { status: 'verify'; challengeId: string; userEmail: string; tenantId: string }
   | { status: 'enroll'; enrollmentToken: string; userEmail: string; tenantId: string }
 
+export type AuthMembershipContext = {
+  guestCompanyId?: string
+  guestCompanyName?: string
+}
+
 export type AuthContextValue = {
   session: AuthSession | null
   /** Perfil de acceso del usuario conectado (API). */
   profile: AccessProfile | null
+  /** Empresa vinculada al invitado (membresía del tenant). */
+  membership: AuthMembershipContext | null
   isAuthenticated: boolean
   isReady: boolean
-  login: (email: string, password: string, tenantId?: string) => Promise<LoginOutcome>
+  login: (email: string, password: string, tenantId?: string, tenantSlug?: string) => Promise<LoginOutcome>
   completeTwoFactorLogin: (
     challengeId: string,
     code: string,

@@ -2,6 +2,7 @@ import {
   ArrowLeft,
   ChevronRight,
   ClipboardList,
+  Clock,
   FolderOpen,
   LayoutList,
   Pencil,
@@ -19,6 +20,7 @@ import { EditSolicitudDialog } from '@/components/solicitudes/EditSolicitudDialo
 import { SolicitudDescriptionContent } from '@/components/solicitudes/SolicitudDescriptionContent'
 import { SolicitudFilesPanel } from '@/components/solicitudes/SolicitudFilesPanel'
 import { SolicitudProjectsPanel } from '@/components/solicitudes/SolicitudProjectsPanel'
+import { SolicitudBitacoraPanel } from '@/components/solicitudes/SolicitudBitacoraPanel'
 import { SolicitudSuccessPath } from '@/components/solicitudes/SolicitudSuccessPath'
 import { SolicitudTeamMembersPanel } from '@/components/solicitudes/SolicitudTeamMembersPanel'
 import { RegisterActivityDialog } from '@/components/contacts/RegisterActivityDialog'
@@ -66,13 +68,14 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 
-type DetailTab = 'detalle' | 'equipo' | 'notas' | 'archivos' | 'actividad' | 'proyectos'
+type DetailTab = 'detalle' | 'equipo' | 'notas' | 'archivos' | 'actividad' | 'proyectos' | 'bitacora'
 
 const tabs: { id: DetailTab; label: string; Icon: typeof LayoutList }[] = [
   { id: 'detalle', label: 'Detalle', Icon: LayoutList },
   { id: 'equipo', label: 'Equipo', Icon: Users },
   { id: 'notas', label: 'Notas', Icon: StickyNote },
   { id: 'proyectos', label: 'Proyectos', Icon: Puzzle },
+  { id: 'bitacora', label: 'Bitácora', Icon: Clock },
   { id: 'archivos', label: 'Archivos', Icon: FolderOpen },
   { id: 'actividad', label: 'Actividad', Icon: Zap },
 ]
@@ -83,6 +86,8 @@ export function SolicitudDetailPage() {
   const { canEdit, canDelete } = useModulePermissions('solicitudes')
   const { canView: canViewProjects, canCreate: canCreateProject } =
     useModulePermissions('proyectos')
+  const { canView: canViewBitacora, canCreate: canCreateBitacora } =
+    useModulePermissions('bitacora')
   const { canCreate: canCreateActivity } = useModulePermissions('actividades')
   const canRegisterActivity = canCreateActivity || canEdit
   const { archiveSolicitud, isArchived, updateSolicitudFromDetail } = useSolicitudesRegistry()
@@ -100,6 +105,7 @@ export function SolicitudDetailPage() {
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [tab, setTab] = useState<DetailTab>('detalle')
   const [projectCount, setProjectCount] = useState(0)
+  const [bitacoraCount, setBitacoraCount] = useState(0)
   const [activityDialogOpen, setActivityDialogOpen] = useState(false)
   const [activityPresetType, setActivityPresetType] =
     useState<ContactActivityType>('llamada')
@@ -391,6 +397,11 @@ export function SolicitudDetailPage() {
                   {projectCount}
                 </Badge>
               ) : null}
+              {id === 'bitacora' && bitacoraCount > 0 ? (
+                <Badge variant="secondary" className="ms-0.5 font-normal">
+                  {bitacoraCount}
+                </Badge>
+              ) : null}
             </button>
           ))}
         </div>
@@ -453,7 +464,7 @@ export function SolicitudDetailPage() {
             authorName={solicitud.assignee}
             disabled={!canEdit}
             onAddNote={canEdit ? handleNoteAdded : undefined}
-            onDeleteNote={canEdit ? handleNoteDeleted : undefined}
+            onDeleteNote={handleNoteDeleted}
           />
         ) : null}
 
@@ -463,6 +474,15 @@ export function SolicitudDetailPage() {
             canViewProjects={canViewProjects}
             canCreateProject={canCreateProject}
             onCountChange={setProjectCount}
+          />
+        ) : null}
+
+        {tab === 'bitacora' ? (
+          <SolicitudBitacoraPanel
+            solicitud={solicitud}
+            canViewBitacora={canViewBitacora}
+            canCreateBitacora={canCreateBitacora}
+            onCountChange={setBitacoraCount}
           />
         ) : null}
 

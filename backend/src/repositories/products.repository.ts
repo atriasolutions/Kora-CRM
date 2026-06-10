@@ -1,4 +1,5 @@
 import type { PoolClient } from 'pg'
+import { enforceRecordQuota } from '../lib/tenant-quota-enforce.js'
 
 import { pool } from '../db/pool.js'
 import { setTenantLocal, tenantQuery } from '../db/tenant-query.js'
@@ -257,6 +258,7 @@ export async function createProduct(
   input: CreateProductInput,
   actor: AuditActor,
 ): Promise<ProductListItem> {
+  await enforceRecordQuota(actor)
   if (!input.name?.trim()) throw badRequest('El nombre es obligatorio')
   if (!input.sku?.trim()) throw badRequest('El SKU es obligatorio')
 

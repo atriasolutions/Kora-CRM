@@ -16,6 +16,7 @@ import {
   Warehouse,
   Puzzle,
   ClipboardList,
+  Clock,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -54,6 +55,7 @@ export const navSections: NavSectionDef[] = [
       { label: 'Actividades', path: '/actividades', icon: ListTodo, moduleId: 'actividades' },
       { label: 'Proyectos', path: '/proyectos', icon: Puzzle, moduleId: 'proyectos' },
       { label: 'Solicitudes', path: '/solicitudes', icon: ClipboardList, moduleId: 'solicitudes' },
+      { label: 'Bitácora', path: '/bitacora', icon: Clock, moduleId: 'bitacora' },
       { label: 'Compras', path: '/compras', icon: ShoppingCart, moduleId: 'compras' },
       { label: 'Ingresos', path: '/ingresos', icon: ArrowDownToLine, moduleId: 'ingresos' },
       { label: 'Inventario', path: '/inventario', icon: Warehouse, moduleId: 'inventario' },

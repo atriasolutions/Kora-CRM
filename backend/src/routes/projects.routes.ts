@@ -1,6 +1,6 @@
 import { Router } from 'express'
 
-import { isSystemAccessProfile } from '../lib/access-profile-admin.js'
+import { hasElevatedTenantScope } from '../lib/access-profile-admin.js'
 import { getAuditActor, getAuthProfile } from '../middleware/audit-actor.js'
 import { requirePermission } from '../middleware/require-permission.js'
 import { routeParam } from '../lib/route-params.js'
@@ -39,7 +39,7 @@ projectsRouter.get(
         solicitudId: query.solicitudId,
         companyId: query.companyId,
         archivedOnly: query.archived === true,
-        memberAccess: isSystemAccessProfile(profile)
+        memberAccess: hasElevatedTenantScope(profile)
           ? undefined
           : { userId: actor.userId, userName: actor.userName },
       })
@@ -65,7 +65,7 @@ projectsRouter.get(
     try {
       const profile = getAuthProfile(req)
       const item = await projectsRepo.getProjectById(routeParam(req))
-      if (!isSystemAccessProfile(profile)) {
+      if (!hasElevatedTenantScope(profile)) {
         assertProjectTeamAccess(item.manager, item.team, getAuditActor(req))
       }
       res.json({ data: item })
@@ -96,7 +96,7 @@ projectsRouter.get(
     try {
       const profile = getAuthProfile(req)
       const id = routeParam(req)
-      if (!isSystemAccessProfile(profile)) {
+      if (!hasElevatedTenantScope(profile)) {
         const project = await projectsRepo.getProjectById(id)
         assertProjectTeamAccess(project.manager, project.team, getAuditActor(req))
       }

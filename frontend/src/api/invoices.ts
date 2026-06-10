@@ -67,6 +67,9 @@ function lineItemsToApi(lineItems: InvoiceLineItem[]) {
       unitPriceOriginal: invoiceLineOriginalAmount(li),
       priceCurrency: li.priceCurrency ?? 'CLP',
       discount: li.discount,
+      subjectToVat: li.subjectToVat !== false,
+      deferredPayment: li.deferredPayment === true,
+      deferredPaymentText: li.deferredPaymentText?.trim() || undefined,
     }))
 }
 

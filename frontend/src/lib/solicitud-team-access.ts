@@ -118,7 +118,7 @@ export function solicitudTeamMemberRefs(
 }
 
 export function isUserOnSolicitudTeam(
-  solicitud: Pick<SolicitudListItem, 'assignee' | 'assigneeUserId'> & {
+  solicitud: Pick<SolicitudListItem, 'assignee' | 'assigneeUserId' | 'createdById' | 'createdByName'> & {
     teamMembers?: SolicitudTeamMemberRef[]
     team?: SolicitudTeamMember[]
   },
@@ -126,6 +126,11 @@ export function isUserOnSolicitudTeam(
 ): boolean {
   const mineId = user.id.trim().toLowerCase()
   const mineName = user.name.trim().toLowerCase()
+  const creatorId = solicitud.createdById?.trim().toLowerCase() ?? ''
+  const creatorName = solicitud.createdByName?.trim().toLowerCase() ?? ''
+  if (creatorId && creatorId === mineId) return true
+  if (creatorName && creatorName === mineName) return true
+
   const assigneeId = solicitud.assigneeUserId?.trim().toLowerCase() ?? ''
   const assigneeName = solicitud.assignee?.trim().toLowerCase() ?? ''
   if (assigneeId && assigneeId === mineId) return true

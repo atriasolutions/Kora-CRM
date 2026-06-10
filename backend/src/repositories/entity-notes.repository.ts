@@ -1,4 +1,9 @@
 import { tenantQuery } from '../db/tenant-query.js'
+import { enforceRecordQuota } from '../lib/tenant-quota-enforce.js'
+import {
+  tenantUserDisplayNameSql,
+  tenantUserMembershipJoins,
+} from '../lib/tenant-user-display-name-sql.js'
 import { tenantWhereParam } from '../lib/tenant-sql.js'
 import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import {
@@ -87,13 +92,17 @@ export async function listEntityNotes(
   entityType: string,
   entityId: string,
 ): Promise<EntityNoteDto[]> {
+  const tenantId = getTenantIdOrDefault()
   const result = await tenantQuery<EntityNoteRow>(
-    `SELECT id, entity_type, entity_id, body, mentions,
-            author_user_id, author_name, created_at
-     FROM crm_entity_notes
-     WHERE entity_type = $1 AND entity_id = $2::uuid AND ${tenantWhereParam(3)}
-     ORDER BY created_at DESC`,
-    [entityType, entityId, getTenantIdOrDefault()],
+    `SELECT n.id, n.entity_type, n.entity_id, n.body, n.mentions,
+            n.author_user_id,
+            ${tenantUserDisplayNameSql('n.author_name')} AS author_name,
+            n.created_at
+     FROM crm_entity_notes n
+     ${tenantUserMembershipJoins('n.author_user_id', 4)}
+     WHERE n.entity_type = $1 AND n.entity_id = $2::uuid AND ${tenantWhereParam(3, 'n')}
+     ORDER BY n.created_at DESC`,
+    [entityType, entityId, tenantId, tenantId],
   )
   return result.rows.map(mapEntityNoteRow)
 }
@@ -102,6 +111,7 @@ export async function createEntityNote(
   input: CreateEntityNoteInput,
   actor: AuditActor,
 ): Promise<EntityNoteDto> {
+  await enforceRecordQuota(actor)
   const mentions: EntityNoteMentionDto[] = input.mentions ?? []
   const result = await tenantQuery<EntityNoteRow>(
     `INSERT INTO crm_entity_notes (
@@ -125,14 +135,21 @@ export async function createEntityNote(
   return mapEntityNoteRow(row)
 }
 
-export async function getEntityNoteEntityType(
+export type EntityNoteDeleteContext = {
+  entity_type: string
+  author_user_id: string | null
+}
+
+export async function getEntityNoteDeleteContext(
   id: string,
-): Promise<string | null> {
-  const result = await tenantQuery<{ entity_type: string }>(
-    `SELECT entity_type FROM crm_entity_notes WHERE id = $1::uuid AND ${tenantWhereParam(2)}`,
+): Promise<EntityNoteDeleteContext | null> {
+  const result = await tenantQuery<EntityNoteDeleteContext>(
+    `SELECT entity_type, author_user_id
+     FROM crm_entity_notes
+     WHERE id = $1::uuid AND ${tenantWhereParam(2)}`,
     [id, getTenantIdOrDefault()],
   )
-  return result.rows[0]?.entity_type ?? null
+  return result.rows[0] ?? null
 }
 
 export async function deleteEntityNote(id: string): Promise<void> {

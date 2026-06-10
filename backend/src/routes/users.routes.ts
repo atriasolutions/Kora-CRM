@@ -1,6 +1,7 @@
 import { Router } from 'express'
 
 import { getAuditActor } from '../middleware/audit-actor.js'
+import { forbidden } from '../middleware/errors.js'
 import {
   requireAssigneeLookup,
   requirePermission,
@@ -139,10 +140,14 @@ usersRouter.patch(
 
 usersRouter.delete(
   '/:id',
-  requirePermission('usuarios', 'delete'),
   async (req, res, next) => {
+    const actor = getAuditActor(req)
+    if (!actor.isPlatformOperator) {
+      next(forbidden('Solo el operador de plataforma puede eliminar usuarios.'))
+      return
+    }
     try {
-      await usersRepo.softDeleteUser(routeParam(req), getAuditActor(req))
+      await usersRepo.softDeleteUser(routeParam(req), actor)
       res.status(204).send()
     } catch (e) {
       next(e)

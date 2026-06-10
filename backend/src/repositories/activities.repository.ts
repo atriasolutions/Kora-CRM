@@ -1,4 +1,5 @@
 import { tenantQuery } from '../db/tenant-query.js'
+import { enforceRecordQuota } from '../lib/tenant-quota-enforce.js'
 import { pushTenantCondition, tenantWhereParam } from '../lib/tenant-sql.js'
 import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import {
@@ -169,6 +170,7 @@ export async function createActivity(
   input: CreateActivityInput,
   actor: AuditActor,
 ): Promise<ActivityDetail> {
+  await enforceRecordQuota(actor)
   if (!input.title?.trim()) throw badRequest('El título es obligatorio')
   if (!input.relatedId?.trim()) throw badRequest('El registro relacionado es obligatorio')
 
