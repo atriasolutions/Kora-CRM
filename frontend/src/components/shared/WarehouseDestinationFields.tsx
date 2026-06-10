@@ -8,6 +8,8 @@ import {
 import { useCatalogSettings } from '@/hooks/use-catalog-settings'
 import {
   activeWarehousesOrDefault,
+  formatWarehouseDeliveryAddress,
+  resolveWarehouseDisplayAddress,
   resolveWarehouseIdFromForm,
   warehouseFormPatchFromSelection,
   warehouseHasCompleteLocation,
@@ -41,7 +43,7 @@ export function WarehouseDestinationFields({
   addressFieldId,
   warehouseLabel = 'Bodega destino',
   addressLabel = 'Dirección de entrega',
-  addressHelperText = 'Se carga desde Configuración → Bodegas al elegir la bodega destino.',
+  addressHelperText = 'Se carga desde Configuración → Direcciones de despacho al elegir la ubicación.',
   readOnlyDeliveryAddress = false,
 }: WarehouseDestinationFieldsProps) {
   const { catalog } = useCatalogSettings()
@@ -52,6 +54,12 @@ export function WarehouseDestinationFields({
   const addressFromCatalog = Boolean(
     selectedWarehouse && warehouseHasCompleteLocation(selectedWarehouse),
   )
+  const displayDeliveryAddress = resolveWarehouseDisplayAddress(
+    warehouses,
+    warehouseId,
+    warehouseName,
+    deliveryAddress,
+  )
 
   const handleWarehouseChange = (id: string) => {
     const warehouse = warehouses.find((w) => w.id === id)
@@ -59,12 +67,20 @@ export function WarehouseDestinationFields({
   }
 
   useEffect(() => {
-    if (!selectedWarehouse || !warehouseHasCompleteLocation(selectedWarehouse)) return
+    if (!selectedWarehouse) return
+    const fromCatalog = formatWarehouseDeliveryAddress(selectedWarehouse)
+    if (!fromCatalog.trim()) return
+    if (readOnlyDeliveryAddress) {
+      if (deliveryAddress?.trim() === fromCatalog) return
+      onChange(warehouseFormPatchFromSelection(selectedWarehouse))
+      return
+    }
     if (deliveryAddress?.trim()) return
     onChange(warehouseFormPatchFromSelection(selectedWarehouse))
     // onChange estable en la mayoría de formularios; no incluirlo evita bucles si el padre recrea el callback.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sincroniza dirección al cargar catálogo
   }, [
+    readOnlyDeliveryAddress,
     selectedId,
     selectedWarehouse?.address,
     selectedWarehouse?.region,
@@ -87,13 +103,13 @@ export function WarehouseDestinationFields({
       {readOnlyDeliveryAddress ? (
         <ContactFormField id={addressFieldId} label={addressLabel}>
           <p className="truncate rounded-md border border-border bg-muted/40 px-3 py-2 text-sm font-medium text-foreground">
-            {deliveryAddress?.trim() || '—'}
+            {displayDeliveryAddress || '—'}
           </p>
           <p className="text-xs text-muted-foreground">{addressHelperText}</p>
           {selectedId && !addressFromCatalog ? (
             <p className="text-xs text-amber-700 dark:text-amber-400">
               Esta bodega no tiene dirección, región y comuna configuradas. Complétalas en
-              Configuración → Bodegas.
+              Configuración → Direcciones de despacho.
             </p>
           ) : null}
         </ContactFormField>
@@ -113,7 +129,7 @@ export function WarehouseDestinationFields({
           />
           {!addressFromCatalog && selectedId ? (
             <p className="text-xs text-muted-foreground sm:col-span-2">
-              Esta bodega no tiene ubicación completa en Configuración → Bodegas. Puedes
+              Esta ubicación no tiene dirección completa en Configuración → Direcciones de despacho. Puedes
               completarla aquí.
             </p>
           ) : null}

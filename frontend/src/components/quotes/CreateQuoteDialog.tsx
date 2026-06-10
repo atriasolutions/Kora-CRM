@@ -5,6 +5,7 @@ import {
   QuoteFormFields,
   type QuoteFormFieldsModel,
 } from '@/components/quotes/QuoteFormFields'
+import { QuoteBankPdfFields } from '@/components/quotes/QuoteBankPdfFields'
 import { QuoteCommercialTermsFields } from '@/components/quotes/QuoteCommercialTermsFields'
 import { QuoteLineItemsEditor } from '@/components/quotes/QuoteLineItemsEditor'
 import { DocumentGlobalDiscountField } from '@/components/shared/DocumentGlobalDiscountField'
@@ -27,6 +28,7 @@ import {
 } from '@/lib/quote-create'
 import { computeQuoteTotals } from '@/lib/quote-line-item'
 import { useProductsRegistry } from '@/hooks/use-products-registry'
+import { useCatalogSettings } from '@/hooks/use-catalog-settings'
 import { defaultSaleCustomerValues } from '@/lib/sale-customer'
 
 type CreateQuoteDialogProps = {
@@ -62,8 +64,8 @@ function toQuoteFormFieldsModel(form: CreateQuoteFormValues): QuoteFormFieldsMod
     deliveryAddress: form.deliveryAddress,
     terms: '',
     internalNotes: '',
-    includeBankDetails: false,
-    bankAccountId: '',
+    includeBankDetails: form.includeBankDetails,
+    bankAccountId: form.bankAccountId,
   }
 }
 
@@ -77,6 +79,7 @@ export function CreateQuoteDialog({
 }: CreateQuoteDialogProps) {
   const [form, setForm] = useState(() => createDefaultQuoteFormValues(initialValues))
   const { reloadFromApi: reloadProducts } = useProductsRegistry()
+  const { reloadCatalog } = useCatalogSettings()
 
   const totals = useMemo(
     () =>
@@ -89,10 +92,11 @@ export function CreateQuoteDialog({
   useEffect(() => {
     if (!open) return
     void reloadProducts().catch(() => {})
+    void reloadCatalog().catch(() => {})
     queueMicrotask(() => {
       setForm(createDefaultQuoteFormValues(initialValues))
     })
-  }, [open, initialValues, reloadProducts])
+  }, [open, initialValues, reloadProducts, reloadCatalog])
 
   const handleOpportunityChange = useCallback(
     (_opportunityId: string, opportunity?: OpportunityListItem) => {
@@ -186,6 +190,15 @@ export function CreateQuoteDialog({
               paymentTerms: form.paymentTerms,
               deliveryTerms: form.deliveryTerms,
               terms: form.terms,
+            }}
+            onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
+          />
+
+          <QuoteBankPdfFields
+            idPrefix="create-qt-bank"
+            values={{
+              includeBankDetails: form.includeBankDetails,
+              bankAccountId: form.bankAccountId,
             }}
             onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
           />

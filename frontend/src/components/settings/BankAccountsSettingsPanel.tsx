@@ -15,12 +15,12 @@ import { ContactFormInput, ContactFormSelect } from '@/components/contacts/Conta
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useModulePermissions } from '@/hooks/use-module-permissions'
-import { CHILE_ACCOUNT_TYPES, CHILE_BANKS } from '@/lib/chile-banks'
+import { CHILE_ACCOUNT_TYPES, CHILE_BANKS, normalizeChileBankCode } from '@/lib/chile-banks'
 import { cn } from '@/lib/utils'
 
 const emptyDraft = (): BankAccountInput => ({
   accountName: '',
-  bankCode: CHILE_BANKS[0]?.code ?? 'banco_chile',
+  bankCode: CHILE_BANKS[0]?.code ?? '1',
   accountType: CHILE_ACCOUNT_TYPES[0],
   accountNumber: '',
   email: '',
@@ -73,7 +73,7 @@ export function BankAccountsSettingsPanel() {
     setEditingId(account.id)
     setEditDraft({
       accountName: account.accountName,
-      bankCode: account.bankCode,
+      bankCode: normalizeChileBankCode(account.bankCode),
       accountType: account.accountType,
       accountNumber: account.accountNumber,
       email: account.email,

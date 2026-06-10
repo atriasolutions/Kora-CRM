@@ -3,6 +3,7 @@ import { toast } from '@/lib/toast'
 
 import { quoteLineItemsLocked } from '@/api/quotes'
 import { QuoteFormFields } from '@/components/quotes/QuoteFormFields'
+import { QuoteBankPdfFields } from '@/components/quotes/QuoteBankPdfFields'
 import { QuoteCommercialTermsFields } from '@/components/quotes/QuoteCommercialTermsFields'
 import { QuoteLineItemsEditor } from '@/components/quotes/QuoteLineItemsEditor'
 import { QuoteLineItemsPanel } from '@/components/quotes/QuoteLineItemsPanel'
@@ -24,6 +25,7 @@ import {
   type QuoteFormValues,
 } from '@/lib/quote-form'
 import { useProductsRegistry } from '@/hooks/use-products-registry'
+import { useCatalogSettings } from '@/hooks/use-catalog-settings'
 import { computeQuoteTotals } from '@/lib/quote-line-item'
 
 type EditQuoteDialogProps = {
@@ -38,6 +40,7 @@ export function EditQuoteDialog({ open, onOpenChange, quote, onSave }: EditQuote
   const [lineItems, setLineItems] = useState<QuoteLineItem[]>(() => quote.lineItems)
   const [saving, setSaving] = useState(false)
   const { reloadFromApi: reloadProducts } = useProductsRegistry()
+  const { reloadCatalog } = useCatalogSettings()
 
   const linesLocked = quoteLineItemsLocked(quote.status)
   const globalDiscountPercent = form.globalDiscountPercent
@@ -52,12 +55,13 @@ export function EditQuoteDialog({ open, onOpenChange, quote, onSave }: EditQuote
   useEffect(() => {
     if (!open) return
     void reloadProducts().catch(() => {})
+    void reloadCatalog().catch(() => {})
     queueMicrotask(() => {
       setForm(quoteDetailToFormValues(quote))
       setLineItems(quote.lineItems)
       setSaving(false)
     })
-  }, [open, quote, reloadProducts])
+  }, [open, quote, reloadProducts, reloadCatalog])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -131,6 +135,15 @@ export function EditQuoteDialog({ open, onOpenChange, quote, onSave }: EditQuote
               paymentTerms: form.paymentTerms,
               deliveryTerms: form.deliveryTerms,
               terms: form.terms,
+            }}
+            onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
+          />
+
+          <QuoteBankPdfFields
+            idPrefix="edit-qt-bank"
+            values={{
+              includeBankDetails: form.includeBankDetails,
+              bankAccountId: form.bankAccountId,
             }}
             onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
           />

@@ -100,12 +100,14 @@ export function SettingsPage() {
         </div>
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(240px,280px)_1fr] lg:items-start">
+      <div className="grid gap-4 lg:grid-cols-[minmax(200px,220px)_1fr] lg:items-start">
         <Card className="shadow-sm lg:sticky lg:top-4">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold">Secciones</CardTitle>
+          <CardHeader className="space-y-0 p-3 pb-2">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Secciones
+            </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-2 pt-0">
             <SettingsNav activeId={activeSection} onSelect={selectSection} />
           </CardContent>
         </Card>

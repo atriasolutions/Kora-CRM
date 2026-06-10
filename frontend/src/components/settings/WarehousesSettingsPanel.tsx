@@ -155,7 +155,7 @@ export function WarehousesSettingsPanel() {
     <div className="space-y-4">
       <Card className="shadow-sm">
         <CardHeader>
-          <CardTitle className="text-base font-semibold">Bodegas y ubicaciones</CardTitle>
+          <CardTitle className="text-base font-semibold">Direcciones de despacho</CardTitle>
           <CardDescription>
             Estas ubicaciones aparecen al registrar inventario, compras y cotizaciones. La
             dirección, región y comuna son obligatorias para entregas.

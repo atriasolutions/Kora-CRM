@@ -12,6 +12,21 @@ export function formatWarehouseDeliveryAddress(
   return parts.join(', ')
 }
 
+/** Dirección mostrable: valor guardado o la configurada en la bodega elegida. */
+export function resolveWarehouseDisplayAddress(
+  warehouses: WarehouseSetting[],
+  warehouseId: string | undefined,
+  warehouseName: string | undefined,
+  storedDeliveryAddress: string | undefined,
+): string {
+  const stored = storedDeliveryAddress?.trim()
+  if (stored) return stored
+
+  const id = resolveWarehouseIdFromForm(warehouses, warehouseId, warehouseName)
+  const warehouse = warehouses.find((w) => w.id === id)
+  return warehouse ? formatWarehouseDeliveryAddress(warehouse) : ''
+}
+
 export function warehouseHasCompleteLocation(
   warehouse: Pick<WarehouseSetting, 'address' | 'region' | 'commune'>,
 ): boolean {

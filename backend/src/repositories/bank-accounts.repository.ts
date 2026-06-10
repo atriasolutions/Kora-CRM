@@ -7,6 +7,7 @@ import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import {
   isValidChileAccountType,
   isValidChileBankCode,
+  normalizeChileBankCode,
   resolveChileBankName,
 } from '../lib/chile-banks.js'
 import { mapBankAccount, type BankAccountRow } from '../mappers/bank-account.mapper.js'
@@ -73,7 +74,8 @@ export async function getBankAccountById(id: string): Promise<BankAccount> {
 
 export async function createBankAccount(input: CreateBankAccountInput): Promise<BankAccount> {
   validateBankInput(input)
-  const bankName = resolveChileBankName(input.bankCode)
+  const bankCode = normalizeChileBankCode(input.bankCode)
+  const bankName = resolveChileBankName(bankCode)
   if (!bankName) throw badRequest('Banco no válido.')
 
   const client = await pool.connect()
@@ -129,7 +131,7 @@ export async function updateBankAccount(
   validateBankInput(input)
   const existing = await getBankAccountById(id)
 
-  const bankCode = input.bankCode ?? existing.bankCode
+  const bankCode = normalizeChileBankCode(input.bankCode ?? existing.bankCode)
   const bankName = resolveChileBankName(bankCode)
   if (!bankName) throw badRequest('Banco no válido.')
 

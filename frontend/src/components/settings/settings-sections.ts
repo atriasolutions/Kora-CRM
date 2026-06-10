@@ -43,8 +43,8 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   },
   {
     id: 'bodegas',
-    label: 'Bodegas',
-    description: 'Ubicaciones de inventario y almacenamiento.',
+    label: 'Direcciones de despacho',
+    description: 'Ubicaciones de origen y destino para entregas, stock y documentos.',
     Icon: Warehouse,
   },
   {

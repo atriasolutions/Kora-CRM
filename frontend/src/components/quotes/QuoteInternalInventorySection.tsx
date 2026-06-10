@@ -1,6 +1,11 @@
 import { Warehouse } from 'lucide-react'
 
 import { WarehouseDestinationFields } from '@/components/shared/WarehouseDestinationFields'
+import { useCatalogSettings } from '@/hooks/use-catalog-settings'
+import {
+  activeWarehousesOrDefault,
+  resolveWarehouseDisplayAddress,
+} from '@/lib/warehouse-lookup'
 
 type QuoteInternalInventorySectionProps = {
   warehouseFieldId: string
@@ -37,6 +42,15 @@ export function QuoteInternalInventorySection({
   onChange,
   readOnly = false,
 }: QuoteInternalInventorySectionProps) {
+  const { catalog } = useCatalogSettings()
+  const warehouses = activeWarehousesOrDefault(catalog.warehouses)
+  const displayAddress = resolveWarehouseDisplayAddress(
+    warehouses,
+    warehouseId,
+    warehouseName,
+    deliveryAddress,
+  )
+
   if (readOnly) {
     return (
       <section className="space-y-3 rounded-lg border border-dashed border-border bg-muted/20 p-4">
@@ -51,12 +65,12 @@ export function QuoteInternalInventorySection({
         </div>
         <dl className="grid gap-2 text-sm sm:grid-cols-2">
           <div>
-            <dt className="text-xs text-muted-foreground">Bodega de origen</dt>
+            <dt className="text-xs text-muted-foreground">Dirección de origen</dt>
             <dd className="font-medium text-foreground">{warehouseName?.trim() || '—'}</dd>
           </div>
           <div>
-            <dt className="text-xs text-muted-foreground">Ubicación de la bodega</dt>
-            <dd className="font-medium text-foreground">{deliveryAddress?.trim() || '—'}</dd>
+            <dt className="text-xs text-muted-foreground">Dirección</dt>
+            <dd className="font-medium text-foreground">{displayAddress || '—'}</dd>
           </div>
         </dl>
       </section>
@@ -82,9 +96,9 @@ export function QuoteInternalInventorySection({
           warehouseName={warehouseName}
           deliveryAddress={deliveryAddress}
           readOnlyDeliveryAddress
-          warehouseLabel="Bodega de origen"
-          addressLabel="Ubicación de la bodega"
-          addressHelperText="Referencia de la bodega en Configuración → Bodegas. Solo para reservas y movimientos de stock."
+          warehouseLabel="Dirección de origen"
+          addressLabel="Dirección"
+          addressHelperText="Se carga desde Configuración → Direcciones de despacho al elegir la ubicación. Solo para reservas y movimientos de stock."
           onChange={onChange ?? (() => {})}
         />
       </div>
