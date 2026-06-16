@@ -1,0 +1,7 @@
+-- Campos de contacto y descripción en empresas
+
+ALTER TABLE crm_companies
+  ADD COLUMN IF NOT EXISTS website TEXT NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS email VARCHAR(255) NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS phone VARCHAR(64) NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT '';

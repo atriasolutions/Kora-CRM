@@ -13,7 +13,7 @@ import {
 } from '../lib/relation-snapshots.js'
 import { withStockTransaction } from '../lib/inventory-stock-lock.js'
 import { pool } from '../db/pool.js'
-import { setTenantLocal, tenantQuery } from '../db/tenant-query.js'
+import { setTenantLocal, tenantQuery, withTenantClient } from '../db/tenant-query.js'
 import { pushTenantCondition, tenantWhereParam } from '../lib/tenant-sql.js'
 import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import {
@@ -219,6 +219,9 @@ export async function listQuotes(
       `(company_id = $${idx} OR (
         company_id IS NULL AND company_name <> ''
         AND company_name = (SELECT name FROM crm_companies WHERE id = $${idx})
+      ) OR opportunity_id IN (
+        SELECT id FROM crm_opportunities
+        WHERE company_id = $${idx} AND deleted_at IS NULL
       ))`,
     )
     values.push(params.companyId)
@@ -234,25 +237,27 @@ export async function listQuotes(
 
   const where = `WHERE ${conditions.join(' AND ')}`
 
-  const countResult = await tenantQuery<{ count: string }>(
-    `SELECT count(*)::text AS count FROM crm_quotes ${where}`,
-    values,
-  )
-  const total = Number.parseInt(countResult.rows[0]?.count ?? '0', 10)
+  return withTenantClient(async (client) => {
+    const countResult = await client.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM crm_quotes ${where}`,
+      values,
+    )
+    const total = Number.parseInt(countResult.rows[0]?.count ?? '0', 10)
 
-  const offset = paginationOffset(params.page, params.pageSize)
-  values.push(params.pageSize, offset)
+    const offset = paginationOffset(params.page, params.pageSize)
+    const listValues = [...values, params.pageSize, offset]
 
-  const result = await tenantQuery<QuoteRow>(
-    `SELECT ${QUOTE_COLUMNS}
-     FROM crm_quotes
-     ${where}
-     ORDER BY updated_at DESC
-     LIMIT $${idx++} OFFSET $${idx}`,
-    values,
-  )
+    const result = await client.query<QuoteRow>(
+      `SELECT ${QUOTE_COLUMNS}
+       FROM crm_quotes
+       ${where}
+       ORDER BY updated_at DESC
+       LIMIT $${idx++} OFFSET $${idx}`,
+      listValues,
+    )
 
-  return { items: result.rows.map(mapQuoteRow), total }
+    return { items: result.rows.map(mapQuoteRow), total }
+  })
 }
 
 export async function getQuoteById(id: string): Promise<QuoteDetail> {

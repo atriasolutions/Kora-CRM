@@ -1,4 +1,4 @@
-import { tenantQuery } from '../db/tenant-query.js'
+import { tenantQuery, withTenantClient } from '../db/tenant-query.js'
 import { enforceRecordQuota } from '../lib/tenant-quota-enforce.js'
 import { pushTenantCondition, tenantWhereParam } from '../lib/tenant-sql.js'
 import { getTenantIdOrDefault } from '../lib/tenant-context.js'
@@ -19,7 +19,8 @@ import { maybeNotifyRecordOwnerChange } from '../lib/owner-assignment.js'
 
 const SELECT_COLUMNS = `
   id, name, logo_url, rut, headquarters_street, industry, city, employees,
-  owner_name, lifecycle, operational_status, last_activity_at,
+  owner_name, website, email, phone, description,
+  lifecycle, operational_status, last_activity_at,
   created_at, created_by_id, created_by_name,
   updated_at, updated_by_id, updated_by_name
 `
@@ -63,28 +64,30 @@ export async function listCompanies(
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
 
-  const countResult = await tenantQuery<{ count: string }>(
-    `SELECT count(*)::text AS count FROM crm_companies ${where}`,
-    values,
-  )
-  const total = Number.parseInt(countResult.rows[0]?.count ?? '0', 10)
+  return withTenantClient(async (client) => {
+    const countResult = await client.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM crm_companies ${where}`,
+      values,
+    )
+    const total = Number.parseInt(countResult.rows[0]?.count ?? '0', 10)
 
-  const offset = paginationOffset(params.page, params.pageSize)
-  values.push(params.pageSize, offset)
+    const offset = paginationOffset(params.page, params.pageSize)
+    const listValues = [...values, params.pageSize, offset]
 
-  const result = await tenantQuery<CompanyRow>(
-    `SELECT ${SELECT_COLUMNS}
-     FROM crm_companies
-     ${where}
-     ORDER BY name ASC
-     LIMIT $${idx++} OFFSET $${idx}`,
-    values,
-  )
+    const result = await client.query<CompanyRow>(
+      `SELECT ${SELECT_COLUMNS}
+       FROM crm_companies
+       ${where}
+       ORDER BY name ASC
+       LIMIT $${idx++} OFFSET $${idx}`,
+      listValues,
+    )
 
-  return {
-    items: result.rows.map(mapCompanyRow),
-    total,
-  }
+    return {
+      items: result.rows.map(mapCompanyRow),
+      total,
+    }
+  })
 }
 
 export async function getCompanyById(id: string): Promise<CompanyListItem> {
@@ -147,14 +150,16 @@ export async function createCompany(
   const result = await tenantQuery<CompanyRow>(
     `INSERT INTO crm_companies (
       name, logo_url, rut, headquarters_street, industry, city, employees,
-      owner_name, lifecycle, operational_status,
+      owner_name, website, email, phone, description,
+      lifecycle, operational_status,
       created_by_id, created_by_name, updated_by_id, updated_by_name,
       tenant_id
     ) VALUES (
       $1, $2, $3, $4, $5, $6, $7,
-      $8, $9, $10,
-      $11, $12, $11, $12,
-      $13
+      $8, $9, $10, $11, $12,
+      $13, $14,
+      $15, $16, $15, $16,
+      $17
     )
     RETURNING ${SELECT_COLUMNS}`,
     [
@@ -166,6 +171,10 @@ export async function createCompany(
       input.city?.trim() || '',
       input.employees?.trim() || '',
       input.ownerName?.trim() || actor.userName,
+      input.website?.trim() ?? '',
+      input.email?.trim() ?? '',
+      input.phone?.trim() ?? '',
+      input.description?.trim() ?? '',
       input.lifecycle ?? 'Prospecto',
       input.operationalStatus ?? 'Activa',
       actor.userId,
@@ -197,12 +206,16 @@ export async function updateCompany(
       city = $7,
       employees = $8,
       owner_name = $9,
-      lifecycle = $10,
-      operational_status = $11,
-      updated_by_id = $12,
-      updated_by_name = $13,
+      website = $10,
+      email = $11,
+      phone = $12,
+      description = $13,
+      lifecycle = $14,
+      operational_status = $15,
+      updated_by_id = $16,
+      updated_by_name = $17,
       updated_at = now()
-    WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(14)}
+    WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(18)}
     RETURNING ${SELECT_COLUMNS}`,
     [
       id,
@@ -214,6 +227,10 @@ export async function updateCompany(
       input.city?.trim() ?? existing.city,
       input.employees?.trim() ?? existing.employees,
       input.ownerName?.trim() ?? existing.owner,
+      input.website?.trim() ?? existing.website,
+      input.email?.trim() ?? existing.email,
+      input.phone?.trim() ?? existing.phone,
+      input.description?.trim() ?? existing.description,
       input.lifecycle ?? existing.lifecycle,
       input.operationalStatus ?? existing.operationalStatus,
       actor.userId,

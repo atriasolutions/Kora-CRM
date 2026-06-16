@@ -2,7 +2,7 @@ import { Router } from 'express'
 import multer from 'multer'
 
 import { getAuditActor } from '../middleware/audit-actor.js'
-import { requirePermission } from '../middleware/require-permission.js'
+import { requirePermission, requirePlatformOperator } from '../middleware/require-permission.js'
 import { routeParam } from '../lib/route-params.js'
 import * as siiCredential from '../services/sii-credential.service.js'
 import * as siiRcv from '../services/sii-rcv.service.js'
@@ -23,6 +23,7 @@ export const siiRouter = Router()
 
 siiRouter.get(
   '/status',
+  requirePlatformOperator(),
   requirePermission('configuracion', 'view'),
   async (_req, res, next) => {
     try {
@@ -36,6 +37,7 @@ siiRouter.get(
 
 siiRouter.get(
   '/credentials',
+  requirePlatformOperator(),
   requirePermission('configuracion', 'view'),
   async (_req, res, next) => {
     try {
@@ -49,6 +51,7 @@ siiRouter.get(
 
 siiRouter.post(
   '/credentials',
+  requirePlatformOperator(),
   requirePermission('configuracion', 'edit'),
   upload.single('file'),
   async (req, res, next) => {
@@ -78,6 +81,7 @@ siiRouter.post(
 
 siiRouter.delete(
   '/credentials/:id',
+  requirePlatformOperator(),
   requirePermission('configuracion', 'edit'),
   async (req, res, next) => {
     try {
@@ -91,6 +95,7 @@ siiRouter.delete(
 
 siiRouter.get(
   '/folios',
+  requirePlatformOperator(),
   requirePermission('configuracion', 'view'),
   async (_req, res, next) => {
     try {
@@ -104,6 +109,7 @@ siiRouter.get(
 
 siiRouter.post(
   '/folios/upload',
+  requirePlatformOperator(),
   requirePermission('configuracion', 'edit'),
   async (req, res, next) => {
     try {
@@ -118,6 +124,7 @@ siiRouter.post(
 
 siiRouter.delete(
   '/folios/:id',
+  requirePlatformOperator(),
   requirePermission('configuracion', 'edit'),
   async (req, res, next) => {
     try {

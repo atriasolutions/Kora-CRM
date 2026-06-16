@@ -215,7 +215,7 @@ export function TopBar() {
 
       <GlobalSearch />
 
-      <div className="shell-topbar-actions flex shrink-0 items-center gap-0.5 rounded-2xl p-0.5 sm:gap-1 sm:p-1">
+      <div className="shell-topbar-actions ms-auto flex shrink-0 items-center gap-0.5 rounded-2xl p-0.5 sm:gap-1 sm:p-1">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -360,7 +360,7 @@ export function TopBar() {
             <button
               type="button"
               className={cn(
-                'flex max-w-[11rem] items-center gap-2 rounded-xl py-1 ps-1 pe-2.5 transition-colors',
+                'flex min-w-0 max-w-[20rem] items-center gap-2 rounded-xl py-1 ps-1 pe-2.5 transition-colors',
                 'hover:bg-primary/8 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30',
                 'data-[state=open]:bg-primary/8',
                 'sm:pe-3',
@@ -375,11 +375,17 @@ export function TopBar() {
                   {initials}
                 </AvatarFallback>
               </Avatar>
-              <span className="hidden min-w-0 truncate text-start leading-tight lg:block">
-                <span className="block truncate text-sm font-medium text-foreground">
+              <span className="hidden min-w-0 flex-1 text-start leading-tight lg:block">
+                <span
+                  className="block truncate text-sm font-medium text-foreground"
+                  title={current.name}
+                >
                   {current.name}
                 </span>
-                <span className="block truncate text-xs text-muted-foreground">
+                <span
+                  className="block truncate text-xs text-muted-foreground"
+                  title={registryUser?.role ?? userDetail?.role ?? ''}
+                >
                   {registryUser?.role ?? userDetail?.role ?? ''}
                 </span>
               </span>

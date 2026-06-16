@@ -45,7 +45,10 @@ function findUserByDisplayName(
 ): UserListItem | undefined {
   const key = name.trim()
   if (!key) return undefined
-  return users.find((u) => u.name.trim() === key)
+  const exact = users.find((u) => u.name.trim() === key)
+  if (exact) return exact
+  const lower = key.toLowerCase()
+  return users.find((u) => u.name.trim().toLowerCase() === lower)
 }
 
 export async function resolveUserAvatarById(
@@ -92,6 +95,8 @@ export async function resolveUserAvatarByName(
 
   const user = findUserByDisplayName(key, users)
   if (!user) {
+    // Sin directorio cargado aún: no cachear miss para reintentar cuando lleguen los usuarios.
+    if (users.length === 0) return undefined
     cache.set(nameCache, undefined)
     return undefined
   }

@@ -25,6 +25,9 @@ export type ProductListItem = {
   status: ProductStatus
   /** Responsable interno del producto en catálogo */
   owner: string
+  trackInventory?: boolean
+  minStockNum?: number
+  maxStockNum?: number
   imageUrl?: string
   barcode?: string
 } & RecordAuditFields

@@ -9,10 +9,20 @@ import {
 
 import { tenantQuery } from '../db/tenant-query.js'
 import { getTenantIdOrDefault } from '../lib/tenant-context.js'
+import {
+  buildDteItemsFromLines,
+  buildDteXmlAmounts,
+  computeInvoiceDteAmounts,
+  dteLineFromDto,
+  resolveDteTypeForDocument,
+  type InvoiceDocumentKind,
+} from '../lib/invoice-dte-amounts.js'
 import { badRequest } from '../middleware/errors.js'
 import * as invoicesRepo from '../repositories/invoices.repository.js'
 import * as orgSettingsRepo from '../repositories/organization-settings.repository.js'
 import type { AuditActor } from '../types/audit.js'
+import type { InvoiceDetail } from '../types/invoice.js'
+import { parsePercentToInt } from '../utils/money.js'
 import {
   cleanupTempCert,
   getSiiCredentialForEnv,
@@ -28,6 +38,25 @@ export type EmitSiiResult = {
   trackId: string | null
   dteStatus: string
   siiNumber: string
+  dteType: number
+}
+
+function parseGlobalDiscountPct(invoice: InvoiceDetail): number {
+  const raw = invoice.globalDiscount ?? '0'
+  return parsePercentToInt(raw) ?? 0
+}
+
+function toIsoDate(value: string | undefined | null): string {
+  if (!value?.trim()) return new Date().toISOString().slice(0, 10)
+  const trimmed = value.trim()
+  if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) return trimmed.slice(0, 10)
+  const parsed = new Date(trimmed)
+  if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10)
+  return new Date().toISOString().slice(0, 10)
+}
+
+function documentKind(invoice: InvoiceDetail): InvoiceDocumentKind {
+  return invoice.documentKind ?? 'invoice'
 }
 
 export async function emitInvoiceToSii(
@@ -48,16 +77,37 @@ export async function emitInvoiceToSii(
 
   const invoice = await invoicesRepo.getInvoiceById(invoiceId)
   if (invoice.status !== 'Borrador') {
-    throw badRequest('Solo se pueden emitir al SII facturas en borrador.')
+    throw badRequest('Solo se pueden emitir al SII documentos en borrador.')
   }
   if (invoice.siiNumber) {
-    throw badRequest('Esta factura ya tiene folio SII asignado.')
+    throw badRequest('Este documento ya tiene folio SII asignado.')
+  }
+  if (!invoice.lineItems.length) {
+    throw badRequest('El documento no tiene líneas.')
+  }
+
+  const kind = documentKind(invoice)
+  if (kind !== 'invoice') {
+    if (!invoice.sourceInvoiceId || !invoice.sourceInvoice?.siiNumber) {
+      throw badRequest('El documento de ajuste requiere una factura origen emitida al SII.')
+    }
+    if (!invoice.referenceReason?.trim()) {
+      throw badRequest('Indica el motivo de la referencia DTE.')
+    }
   }
 
   const cred = await getSiiCredentialForEnv(env)
   if (!cred) throw badRequest('Sube un certificado SII en Configuración.')
 
-  const dteType = 33
+  const dteLines = invoice.lineItems.map(dteLineFromDto)
+  const globalDiscountPct = parseGlobalDiscountPct(invoice)
+  const amounts = computeInvoiceDteAmounts(
+    dteLines,
+    globalDiscountPct,
+    org.defaultVatPercent,
+  )
+  const dteType = resolveDteTypeForDocument(kind, dteLines)
+
   let folio: number
   try {
     folio = await getNextFolio(dteType)
@@ -66,15 +116,24 @@ export async function emitInvoiceToSii(
     throw badRequest(msg)
   }
 
-  const netCents = Math.round(invoice.amountNum * 100) || 0
-  const iva = Math.round(netCents * (org.defaultVatPercent / 100))
-  const total = netCents + iva
-
   const receptorRut =
     invoice.companyId || invoice.contactId
       ? await resolveReceptorRut(invoice.companyId, invoice.contactId)
       : '66666666-6'
   const receptorName = invoice.client.trim() || 'Cliente'
+
+  const referencias =
+    kind !== 'invoice' && invoice.sourceInvoice
+      ? [
+          {
+            tipoDteRef: String(invoice.sourceInvoice.dteType ?? 33) as '33' | '34',
+            folioRef: Number.parseInt(invoice.sourceInvoice.siiNumber ?? '0', 10),
+            fechaRef: toIsoDate(invoice.sourceInvoice.issueDate),
+            razonRef: invoice.referenceReason!.trim(),
+            codigoRef: String(invoice.referenceCode ?? 3) as '1' | '2' | '3',
+          },
+        ]
+      : undefined
 
   try {
     const token = await authenticate({
@@ -87,9 +146,11 @@ export async function emitInvoiceToSii(
     let trackId: string | null = null
     let dteStatus: 'submitted' | 'rejected' = 'submitted'
 
+    const xmlAmounts = buildDteXmlAmounts(dteType, amounts)
+
     try {
       const xml = await buildDteXml({
-        tipoDte: String(dteType) as '33',
+        tipoDte: String(dteType) as '33' | '34' | '56' | '61',
         folio,
         fechaEmision: new Date().toISOString().slice(0, 10),
         emisor: {
@@ -104,15 +165,9 @@ export async function emitInvoiceToSii(
           rut: receptorRut,
           razonSocial: receptorName,
         },
-        items: invoice.lineItems.map((line) => ({
-          nombre: line.description,
-          cantidad: line.quantity,
-          precioUnitario: Math.round(Number(line.unitPrice.replace(/\D/g, '')) || 0),
-          montoItem: Math.round(Number(line.total.replace(/\D/g, '')) || 0),
-        })),
-        montoNeto: Math.round(netCents / 100),
-        iva: Math.round(iva / 100),
-        montoTotal: Math.round(total / 100),
+        items: buildDteItemsFromLines(dteLines),
+        ...xmlAmounts,
+        referencias,
       })
       signedXml = await signDte(xml, cred.certPath, cred.certPassword)
       const upload = await uploadDte(signedXml, token, {
@@ -144,10 +199,14 @@ export async function emitInvoiceToSii(
          dte_xml = $6,
          sii_emitted_at = now(),
          status = $7,
+         amount_cents = $8,
+         taxable_amount_cents = $9,
+         exempt_amount_cents = $10,
+         tax_amount_cents = $11,
          updated_at = now(),
-         updated_by_id = $8,
-         updated_by_name = $9
-       WHERE id = $1 AND tenant_id = $10`,
+         updated_by_id = $12,
+         updated_by_name = $13
+       WHERE id = $1 AND tenant_id = $14`,
       [
         invoiceId,
         siiNumber,
@@ -156,6 +215,10 @@ export async function emitInvoiceToSii(
         dteStatus,
         signedXml || null,
         EMITTED_STATUS,
+        amounts.totalCents,
+        amounts.taxableCents,
+        amounts.exemptCents,
+        amounts.taxCents,
         actor.userId,
         actor.userName,
         tenantId,
@@ -180,16 +243,40 @@ export async function emitInvoiceToSii(
       ],
     )
 
+    if (
+      kind === 'credit_note' &&
+      invoice.referenceCode === 1 &&
+      invoice.sourceInvoiceId
+    ) {
+      await markSourceInvoiceAnnulled(invoice.sourceInvoiceId, actor)
+    }
+
     return {
       invoiceId,
       folio,
       trackId,
       dteStatus,
       siiNumber,
+      dteType,
     }
   } finally {
     cleanupTempCert(cred.certPath)
   }
+}
+
+async function markSourceInvoiceAnnulled(
+  sourceInvoiceId: string,
+  actor: AuditActor,
+): Promise<void> {
+  await tenantQuery(
+    `UPDATE crm_invoices SET
+       status = 'Anulada',
+       updated_at = now(),
+       updated_by_id = $2,
+       updated_by_name = $3
+     WHERE id = $1 AND tenant_id = $4 AND status <> 'Anulada'`,
+    [sourceInvoiceId, actor.userId, actor.userName, getTenantIdOrDefault()],
+  )
 }
 
 async function resolveReceptorRut(

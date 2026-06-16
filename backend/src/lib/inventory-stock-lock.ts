@@ -1,6 +1,7 @@
 import type { Pool, PoolClient } from 'pg'
 
 import { setTenantLocal } from '../db/tenant-query.js'
+import { getTenantIdOrDefault } from './tenant-context.js'
 
 /** Namespace para pg_advisory_xact_lock (evita colisiones con otros módulos). */
 const LOCK_NAMESPACE = 0x5a43
@@ -57,8 +58,9 @@ export async function lockAllInventoryRowsBySku(
     `SELECT id
      FROM crm_inventory_positions
      WHERE lower(trim(sku)) = lower(trim($1))
+       AND tenant_id = $2
      FOR UPDATE`,
-    [sku.trim()],
+    [sku.trim(), getTenantIdOrDefault()],
   )
 }
 

@@ -31,10 +31,12 @@ import { entityNotesRouter } from './entity-notes.routes.js'
 import { mentionsRouter } from './mentions.routes.js'
 import { notificationsRouter } from './notifications.routes.js'
 import { marketingRouter } from './marketing.routes.js'
+import { integrationsRouter } from './integrations.routes.js'
 import { tenantQuotasRouter } from './tenant-quotas.routes.js'
 
 export const apiRouter = Router()
 
+apiRouter.use('/integrations', integrationsRouter)
 apiRouter.use('/tenant', tenantQuotasRouter)
 apiRouter.use('/marketing', marketingRouter)
 apiRouter.use('/auth', authRouter)

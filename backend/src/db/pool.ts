@@ -4,6 +4,9 @@ import { env } from '../config/env.js'
 
 export const pool = new pg.Pool({
   connectionString: env.databaseUrl,
+  max: env.pgPoolMax,
+  idleTimeoutMillis: env.pgPoolIdleTimeoutMs,
+  connectionTimeoutMillis: env.pgPoolConnectionTimeoutMs,
 })
 
 export async function checkDatabaseConnection(): Promise<boolean> {

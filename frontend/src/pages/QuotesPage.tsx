@@ -127,10 +127,16 @@ export function QuotesPage() {
   }, [])
 
   const handleEditSaved = useCallback(
-    (updated: QuoteDetail) => {
-      updateQuoteFromDetail(updated)
-      setListRefreshKey((k) => k + 1)
-      toast.success(`Cotización «${updated.code}» actualizada correctamente.`)
+    async (updated: QuoteDetail) => {
+      try {
+        const persisted = await updateQuoteFromDetail(updated)
+        setListRefreshKey((k) => k + 1)
+        toast.success(`Cotización «${persisted.code}» actualizada correctamente.`)
+      } catch (error) {
+        toast.error(
+          apiActionErrorMessage(error, 'No se pudo guardar la cotización.'),
+        )
+      }
     },
     [updateQuoteFromDetail],
   )

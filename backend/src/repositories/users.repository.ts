@@ -1,4 +1,4 @@
-import { platformQuery, tenantQuery } from '../db/tenant-query.js'
+import { platformQuery, tenantQuery, withTenantClient } from '../db/tenant-query.js'
 import { USER_DIRECTORY_VISIBLE_CONDITION_U } from '../lib/user-directory.js'
 import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import { tenantWhereParam } from '../lib/tenant-sql.js'
@@ -118,6 +118,63 @@ async function resolveMembershipGuestCompany(
   }
 }
 
+export async function actorHasGuestProfile(
+  userId: string,
+  tenantId: string,
+): Promise<boolean> {
+  const result = await platformQuery<{ system_key: string | null }>(
+    `SELECT p.system_key
+     FROM crm_tenant_memberships m
+     JOIN crm_access_profiles p ON p.id = m.profile_id
+     WHERE m.user_id = $1 AND m.tenant_id = $2`,
+    [userId, tenantId],
+  )
+  return result.rows[0]?.system_key === 'guest'
+}
+
+/** Usuario invitado válido como solicitante (con empresa asociada). */
+export async function resolveGuestSolicitudRequester(
+  userId: string,
+  tenantId: string,
+): Promise<{
+  userId: string
+  userName: string
+  companyId: string
+  companyName: string
+}> {
+  const result = await platformQuery<{
+    name: string
+    profile_id: string
+    guest_company_id: string | null
+    guest_company_name: string | null
+  }>(
+    `SELECT COALESCE(NULLIF(trim(mem.display_name), ''), u.name) AS name,
+            mem.profile_id,
+            mem.guest_company_id,
+            mem.guest_company_name
+     FROM crm_users u
+     INNER JOIN crm_tenant_memberships mem
+       ON mem.user_id = u.id AND mem.tenant_id = $2
+     WHERE u.id = $1 AND u.deleted_at IS NULL`,
+    [userId, tenantId],
+  )
+  const row = result.rows[0]
+  if (!row) throw badRequest('Usuario no encontrado')
+  if (!(await isGuestProfile(tenantId, row.profile_id))) {
+    throw badRequest('Solo usuarios con perfil Invitado pueden ser solicitantes')
+  }
+  const companyId = row.guest_company_id
+  if (!companyId) {
+    throw badRequest('El usuario invitado no tiene empresa asociada')
+  }
+  return {
+    userId,
+    userName: row.name?.trim() || '',
+    companyId,
+    companyName: row.guest_company_name?.trim() || '',
+  }
+}
+
 export async function getActorGuestCompany(
   userId: string,
   tenantId: string,
@@ -225,27 +282,29 @@ export async function listUsers(
      ${MEMBERSHIP_JOIN}
      ${PROFILE_JOIN}`
 
-  const countResult = await tenantQuery<{ count: string }>(
-    `SELECT count(*)::text AS count
-     ${fromClause}
-     ${where}`,
-    values,
-  )
-  const total = Number.parseInt(countResult.rows[0]?.count ?? '0', 10)
+  return withTenantClient(async (client) => {
+    const countResult = await client.query<{ count: string }>(
+      `SELECT count(*)::text AS count
+       ${fromClause}
+       ${where}`,
+      values,
+    )
+    const total = Number.parseInt(countResult.rows[0]?.count ?? '0', 10)
 
-  const offset = paginationOffset(params.page, params.pageSize)
-  values.push(params.pageSize, offset)
+    const offset = paginationOffset(params.page, params.pageSize)
+    const listValues = [...values, params.pageSize, offset]
 
-  const result = await tenantQuery<UserRow>(
-    `SELECT ${SELECT_LIST_COLUMNS}
-     ${fromClause}
-     ${where}
-     ORDER BY u.name ASC
-     LIMIT $${idx++} OFFSET $${idx}`,
-    values,
-  )
+    const result = await client.query<UserRow>(
+      `SELECT ${SELECT_LIST_COLUMNS}
+       ${fromClause}
+       ${where}
+       ORDER BY u.name ASC
+       LIMIT $${idx++} OFFSET $${idx}`,
+      listValues,
+    )
 
-  return { items: result.rows.map(mapUserRow), total }
+    return { items: result.rows.map(mapUserRow), total }
+  })
 }
 
 /** Directorio mínimo para asignar responsables (sin permiso al módulo Usuarios). */
@@ -257,9 +316,12 @@ export async function listUsersForAssignee(): Promise<UserListItem[]> {
      ${MEMBERSHIP_JOIN}
      ${PROFILE_JOIN}
      WHERE u.deleted_at IS NULL
-       AND u.status = 'Activo'
        AND mem.status = 'active'
        AND ${USER_DIRECTORY_VISIBLE_CONDITION_U}
+       AND (
+         u.status = 'Activo'
+         OR (p.system_key = 'guest' AND u.status <> 'Inactivo')
+       )
      ORDER BY u.name ASC`,
     [tenantId],
   )

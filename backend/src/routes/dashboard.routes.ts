@@ -10,7 +10,8 @@ dashboardRouter.get('/', async (req, res, next) => {
   try {
     const query = dashboardQuerySchema.parse(req.query)
     const period = parseDashboardPeriodQuery(query)
-    const data = await dashboardRepo.getDashboardSnapshot(period)
+    const view = query.view ?? 'ventas'
+    const data = await dashboardRepo.getDashboardSnapshot(period, view)
     res.json({ data })
   } catch (e) {
     next(e)

@@ -269,6 +269,7 @@ export function ProductsPage() {
           filters={filters}
           listScope={listScope}
           recentIds={recentIds}
+          refreshKey={listRefreshKey}
         />
       ) : null}
 

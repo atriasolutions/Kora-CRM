@@ -16,12 +16,14 @@ import { ContactFormInput } from '@/components/contacts/ContactFormField'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useModulePermissions } from '@/hooks/use-module-permissions'
+import { useAuth } from '@/hooks/use-auth'
 import { useOrganizationSettings } from '@/hooks/use-organization-settings'
 import { validateOrganizationSettings } from '@/lib/organization-settings'
 import type { InvoicingMode, OrganizationSettings } from '@/types/organization-settings'
 import { toast } from '@/lib/toast'
 
 export function SiiInvoicingSettingsPanel() {
+  const { session } = useAuth()
   const { canEdit } = useModulePermissions('configuracion')
   const { settings, saveSettings } = useOrganizationSettings()
   const [draft, setDraft] = useState<OrganizationSettings>(settings)
@@ -34,11 +36,12 @@ export function SiiInvoicingSettingsPanel() {
   const [portalRut, setPortalRut] = useState('')
   const [portalPassword, setPortalPassword] = useState('')
   const [consent, setConsent] = useState(false)
-  const [siiEnv, setSiiEnv] = useState<'certification' | 'production'>('production')
+  const [siiEnv, setSiiEnv] = useState<'certification' | 'production'>('certification')
   const [uploadingCert, setUploadingCert] = useState(false)
   const [cafXml, setCafXml] = useState('')
   const [cafRangeStart, setCafRangeStart] = useState('')
   const [cafRangeEnd, setCafRangeEnd] = useState('')
+  const [cafDteType, setCafDteType] = useState<33 | 34 | 56 | 61>(33)
   const [uploadingCaf, setUploadingCaf] = useState(false)
 
   const refreshSii = useCallback(async () => {
@@ -105,12 +108,20 @@ export function SiiInvoicingSettingsPanel() {
       if (result.tokenTest.ok) {
         toast.success('Certificado SII guardado y validado con el SII.')
       } else {
-        const rut = result.tokenTest.certRut ?? result.credential.certRut
-        const rutLine = rut ? ` RUT del certificado: ${rut}.` : ''
-        toast.warning(
-          `Certificado guardado, pero el SII no emitió token.${rutLine} En www.sii.cl → Clave tributaria, habilita autenticación por certificado digital para ese RUT y verifica que sea representante de la empresa.`,
-          12000,
-        )
+        const certRut = result.tokenTest.certRut ?? result.credential.certRut
+        const orgRut = draft.rut?.replace(/\./g, '').trim()
+        const siiDetail = result.tokenTest.error?.replace(/^SII [^:]+:\s*/, '') ?? ''
+        const lines = [
+          'Certificado guardado, pero el SII rechazó la emisión del token (estado 10).',
+          certRut ? `Titular del certificado: RUT ${certRut}.` : null,
+          orgRut ? `Empresa en Kora: RUT ${orgRut}.` : null,
+          orgRut && certRut && orgRut !== certRut
+            ? 'El titular del certificado debe estar autorizado en el SII como representante de la empresa.'
+            : null,
+          siiDetail ? `Detalle SII: ${siiDetail}` : null,
+          'En www.sii.cl → Clave tributaria: habilita autenticación por certificado digital para el RUT del titular y confirma la inscripción en ambiente de certificación de la empresa.',
+        ].filter(Boolean)
+        toast.warning(lines.join(' '), 18000)
       }
       setCertFile(null)
       setCertPassword('')
@@ -130,7 +141,7 @@ export function SiiInvoicingSettingsPanel() {
     setUploadingCaf(true)
     try {
       await uploadCafApi({
-        dteType: 33,
+        dteType: cafDteType,
         cafXml: cafXml.trim(),
         rangeStart: cafRangeStart ? Number.parseInt(cafRangeStart, 10) : undefined,
         rangeEnd: cafRangeEnd ? Number.parseInt(cafRangeEnd, 10) : undefined,
@@ -145,6 +156,17 @@ export function SiiInvoicingSettingsPanel() {
     } finally {
       setUploadingCaf(false)
     }
+  }
+
+  if (!session?.isPlatformOperator) {
+    return (
+      <Card className="shadow-sm">
+        <CardContent className="py-8 text-center text-sm text-muted-foreground">
+          La configuración de facturación electrónica SII solo está disponible para el operador
+          de plataforma.
+        </CardContent>
+      </Card>
+    )
   }
 
   return (
@@ -239,6 +261,18 @@ export function SiiInvoicingSettingsPanel() {
                       : 'completar configuración'}
                   </p>
                 )}
+                {status.folioTypesMissing?.length ? (
+                  <ul className="mt-2 list-inside list-disc text-amber-700 dark:text-amber-400">
+                    {status.folioTypesMissing.map((type) => (
+                      <li key={type}>Falta CAF tipo {type}</li>
+                    ))}
+                  </ul>
+                ) : null}
+                {status.folioTypesAvailable?.length ? (
+                  <p className="mt-2 text-xs">
+                    CAF disponibles: {status.folioTypesAvailable.join(', ')}
+                  </p>
+                ) : null}
               </CardContent>
             </Card>
           ) : null}
@@ -373,19 +407,51 @@ export function SiiInvoicingSettingsPanel() {
 
           <Card className="shadow-sm">
             <CardHeader>
-              <CardTitle className="text-base font-semibold">Folios CAF (tipo 33)</CardTitle>
+              <CardTitle className="text-base font-semibold">Folios CAF</CardTitle>
+              <CardDescription>
+                Registra un CAF por tipo de DTE: 33 factura afecta, 34 exenta, 56 nota de débito,
+                61 nota de crédito.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {folios.length > 0 ? (
                 <ul className="text-sm">
-                  {folios.map((f) => (
-                    <li key={f.id} className="text-muted-foreground">
-                      Tipo {f.dteType}: {f.rangeStart}–{f.rangeEnd} · restantes {f.remaining}
-                    </li>
-                  ))}
+                  {[33, 34, 56, 61].map((type) => {
+                    const ranges = folios.filter((f) => f.dteType === type)
+                    if (ranges.length === 0) {
+                      return (
+                        <li key={type} className="text-muted-foreground">
+                          Tipo {type}: sin CAF registrado
+                        </li>
+                      )
+                    }
+                    return ranges.map((f) => (
+                      <li key={f.id} className="text-muted-foreground">
+                        Tipo {f.dteType}: {f.rangeStart}–{f.rangeEnd} · restantes {f.remaining}
+                      </li>
+                    ))
+                  })}
                 </ul>
               ) : null}
               <fieldset disabled={!canEdit} className="space-y-3 border-0 p-0 m-0">
+                <div>
+                  <label htmlFor="caf-dte-type" className="text-sm font-medium">
+                    Tipo DTE del CAF
+                  </label>
+                  <select
+                    id="caf-dte-type"
+                    className="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
+                    value={cafDteType}
+                    onChange={(event) =>
+                      setCafDteType(Number.parseInt(event.target.value, 10) as 33 | 34 | 56 | 61)
+                    }
+                  >
+                    <option value={33}>33 — Factura electrónica afecta</option>
+                    <option value={34}>34 — Factura electrónica exenta</option>
+                    <option value={56}>56 — Nota de débito electrónica</option>
+                    <option value={61}>61 — Nota de crédito electrónica</option>
+                  </select>
+                </div>
                 <div>
                   <label htmlFor="caf-xml" className="text-sm font-medium">
                     XML CAF

@@ -12,6 +12,10 @@ export type CompanyRow = {
   city: string | null
   employees: string | null
   owner_name: string | null
+  website: string | null
+  email: string | null
+  phone: string | null
+  description: string | null
   lifecycle: CompanyListItem['lifecycle']
   operational_status: CompanyListItem['operationalStatus']
   last_activity_at: Date | null
@@ -41,6 +45,10 @@ export function mapCompanyRow(row: CompanyRow): CompanyListItem {
     city: row.city ?? '',
     employees: row.employees ?? '',
     owner: row.owner_name ?? '',
+    website: row.website?.trim() ?? '',
+    email: row.email?.trim() ?? '',
+    phone: row.phone?.trim() ?? '',
+    description: row.description?.trim() ?? '',
     lifecycle: normalizeCompanyLifecycleFromDb(String(row.lifecycle)),
     operationalStatus: row.operational_status,
     lastActivity: formatActivityLabel(row.last_activity_at),

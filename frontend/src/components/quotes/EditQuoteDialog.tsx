@@ -26,13 +26,13 @@ import {
 } from '@/lib/quote-form'
 import { useProductsRegistry } from '@/hooks/use-products-registry'
 import { useCatalogSettings } from '@/hooks/use-catalog-settings'
-import { computeQuoteTotals } from '@/lib/quote-line-item'
+import { computeQuoteTotals, validateQuoteLineItems } from '@/lib/quote-line-item'
 
 type EditQuoteDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   quote: QuoteDetail
-  onSave: (updated: QuoteDetail) => void
+  onSave: (updated: QuoteDetail) => void | Promise<void>
 }
 
 export function EditQuoteDialog({ open, onOpenChange, quote, onSave }: EditQuoteDialogProps) {
@@ -63,21 +63,29 @@ export function EditQuoteDialog({ open, onOpenChange, quote, onSave }: EditQuote
     })
   }, [open, quote, reloadProducts, reloadCatalog])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.title.trim()) {
       toast.warning('El título es obligatorio.')
       return
     }
-    if (lineItems.length === 0) {
+    const itemsToSave = linesLocked ? quote.lineItems : lineItems
+    if (itemsToSave.length === 0) {
       toast.warning('Agrega al menos una línea a la cotización.')
       return
     }
+    const lineValidation = validateQuoteLineItems(itemsToSave)
+    if (lineValidation) {
+      toast.warning(lineValidation)
+      return
+    }
     setSaving(true)
-    const itemsToSave = linesLocked ? quote.lineItems : lineItems
-    onSave(applyFormValuesToQuote(quote, form, itemsToSave))
-    onOpenChange(false)
-    setSaving(false)
+    try {
+      await onSave(applyFormValuesToQuote(quote, form, itemsToSave))
+      onOpenChange(false)
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (

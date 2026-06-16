@@ -1,3 +1,5 @@
+export type DashboardViewId = 'ventas' | 'operaciones' | 'abastecimiento'
+
 export type DashboardKpiAccent = 'blue' | 'emerald' | 'violet' | 'amber'
 
 export type DashboardKpi = {
@@ -49,14 +51,75 @@ export type DashboardProjectProgress = {
   pct: number
 }
 
+export type DashboardBarDatum = {
+  label: string
+  value: number
+  color?: string
+}
+
+export type DashboardListItem = {
+  id: string
+  title: string
+  subtitle?: string
+  meta?: string
+  badge?: string
+  href?: string
+}
+
+export type DashboardProductSalesItem = {
+  id: string
+  name: string
+  sku?: string
+  quantity: number
+}
+
+export type DashboardProductSalesSection = {
+  title: string
+  description?: string
+  items: DashboardProductSalesItem[]
+}
+
+export type DashboardTimeSeriesPoint = {
+  label: string
+  [seriesKey: string]: string | number
+}
+
+export type DashboardTimeSeriesLine = {
+  key: string
+  label: string
+  color: string
+}
+
+export type DashboardChartSection<T> = {
+  title: string
+  description?: string
+} & T
+
 export type DashboardSnapshot = {
+  view: DashboardViewId
   dateRangeLabel: string
   chartDescription: string
   kpis: DashboardKpi[]
-  funnelStages: DashboardFunnelStage[]
-  revenueExpenseSeries: DashboardRevenueExpensePoint[]
-  pendingActivities: DashboardPendingActivity[]
-  recentOpportunities: DashboardRecentOpportunity[]
-  revenueBySource: DashboardRevenueSource[]
-  tasksByProject: DashboardProjectProgress[]
+  funnelStages?: DashboardFunnelStage[]
+  revenueExpenseSeries?: DashboardRevenueExpensePoint[]
+  pendingActivities?: DashboardPendingActivity[]
+  recentOpportunities?: DashboardRecentOpportunity[]
+  revenueBySource?: DashboardRevenueSource[]
+  tasksByProject?: DashboardProjectProgress[]
+  barChart?: DashboardChartSection<{ items: DashboardBarDatum[] }>
+  donutChart?: DashboardChartSection<{
+    slices: DashboardRevenueSource[]
+    centerLabel?: string
+  }>
+  timeSeries?: DashboardChartSection<{
+    series: DashboardTimeSeriesPoint[]
+    lines: DashboardTimeSeriesLine[]
+  }>
+  listSection?: DashboardChartSection<{ items: DashboardListItem[] }>
+  progressSection?: DashboardChartSection<{ items: DashboardProjectProgress[] }>
+  topProducts?: DashboardProductSalesSection
+  bottomProducts?: DashboardProductSalesSection
 }
+
+/** Alias para compatibilidad con respuestas por vista. */
+export type DashboardViewSnapshot = DashboardSnapshot

@@ -1,4 +1,4 @@
-import { tenantQuery } from '../db/tenant-query.js'
+import { tenantQuery, withTenantClient } from '../db/tenant-query.js'
 import { enforceRecordQuota } from '../lib/tenant-quota-enforce.js'
 import {
   findActiveCompanyIdByName,
@@ -106,25 +106,27 @@ export async function listContacts(
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
 
-  const countResult = await tenantQuery<{ count: string }>(
-    `SELECT count(*)::text AS count FROM crm_contacts ${where}`,
-    values,
-  )
-  const total = Number.parseInt(countResult.rows[0]?.count ?? '0', 10)
+  return withTenantClient(async (client) => {
+    const countResult = await client.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM crm_contacts ${where}`,
+      values,
+    )
+    const total = Number.parseInt(countResult.rows[0]?.count ?? '0', 10)
 
-  const offset = paginationOffset(params.page, params.pageSize)
-  values.push(params.pageSize, offset)
+    const offset = paginationOffset(params.page, params.pageSize)
+    const listValues = [...values, params.pageSize, offset]
 
-  const result = await tenantQuery<ContactRow>(
-    `SELECT ${SELECT_COLUMNS}
-     FROM crm_contacts
-     ${where}
-     ORDER BY updated_at DESC
-     LIMIT $${idx++} OFFSET $${idx}`,
-    values,
-  )
+    const result = await client.query<ContactRow>(
+      `SELECT ${SELECT_COLUMNS}
+       FROM crm_contacts
+       ${where}
+       ORDER BY updated_at DESC
+       LIMIT $${idx++} OFFSET $${idx}`,
+      listValues,
+    )
 
-  return { items: result.rows.map(mapContactRow), total }
+    return { items: result.rows.map(mapContactRow), total }
+  })
 }
 
 export async function getContactById(id: string): Promise<ContactDetail> {

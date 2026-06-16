@@ -156,6 +156,16 @@ export type QuoteTotals = {
   amount: string
 }
 
+export function validateQuoteLineItems(lineItems: QuoteLineItem[]): string | null {
+  for (let i = 0; i < lineItems.length; i += 1) {
+    const li = lineItems[i]!
+    if (li.deferredPayment === true && !li.deferredPaymentText?.trim()) {
+      return `Indica el texto de plazo entrega en la línea ${i + 1}.`
+    }
+  }
+  return null
+}
+
 export function computeQuoteTotals(
   lineItems: QuoteLineItem[],
   options?: { taxPercent?: number; globalDiscountPercent?: string | number },

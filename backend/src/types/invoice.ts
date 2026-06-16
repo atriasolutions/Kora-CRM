@@ -26,6 +26,20 @@ export type InvoicePaymentDto = {
 
 export type DteStatus = 'draft' | 'signed' | 'submitted' | 'accepted' | 'rejected'
 
+export type InvoiceDocumentKind = 'invoice' | 'credit_note' | 'debit_note'
+
+export type InvoiceReferenceCode = 1 | 2 | 3
+
+export type InvoiceSourceSummary = {
+  id: string
+  number: string
+  siiNumber?: string
+  dteType?: number
+  issueDate: string
+  amount: string
+  amountNum: number
+}
+
 export type InvoiceListItem = {
   id: string
   number: string
@@ -48,6 +62,13 @@ export type InvoiceListItem = {
   siiTrackId?: string
   dteStatus?: DteStatus
   siiEmittedAt?: string
+  documentKind?: InvoiceDocumentKind
+  sourceInvoiceId?: string
+  referenceCode?: InvoiceReferenceCode
+  referenceReason?: string
+  taxableAmount?: string
+  exemptAmount?: string
+  taxAmount?: string
   createdAt: string
   createdById: string
   createdByName: string
@@ -61,6 +82,8 @@ export type InvoiceDetail = InvoiceListItem & {
   globalDiscount?: string
   lineItems: InvoiceLineItemDto[]
   payments: InvoicePaymentDto[]
+  sourceInvoice?: InvoiceSourceSummary
+  relatedAdjustments?: InvoiceListItem[]
   exchangeRateDate?: string | null
   exchangeRateUf?: number | null
   exchangeRateUsd?: number | null
@@ -68,6 +91,7 @@ export type InvoiceDetail = InvoiceListItem & {
 }
 
 export type InvoiceLineItemInput = {
+  id?: string
   productId?: string | null
   sku?: string
   productName?: string
@@ -104,3 +128,21 @@ export type CreateInvoiceInput = {
 }
 
 export type UpdateInvoiceInput = Partial<CreateInvoiceInput>
+
+export type CreateInvoiceAdjustmentInput = {
+  mode: 'full' | 'partial'
+  referenceReason: string
+  referenceCode?: InvoiceReferenceCode
+  lineItems?: InvoiceLineItemInput[]
+}
+
+export type ListInvoicesParams = {
+  page: number
+  pageSize: number
+  q?: string
+  status?: string
+  quoteId?: string
+  companyId?: string
+  archivedOnly?: boolean
+  documentKind?: InvoiceDocumentKind | 'all'
+}

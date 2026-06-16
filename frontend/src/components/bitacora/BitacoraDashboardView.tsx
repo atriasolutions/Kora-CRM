@@ -36,7 +36,6 @@ const CHART_MARGIN = { top: 8, right: 8, left: 0, bottom: 0 }
 type BitacoraDashboardViewProps = {
   stats: BitacoraDashboardStats | null
   loading: boolean
-  error: string | null
   fromApi: boolean
 }
 
@@ -105,7 +104,6 @@ const VERTICAL_BAR_CHART_MARGIN = { left: 8, right: 16, top: 8, bottom: 0 }
 export function BitacoraDashboardView({
   stats,
   loading,
-  error,
   fromApi,
 }: BitacoraDashboardViewProps) {
   if (loading || !stats) {
@@ -177,12 +175,6 @@ export function BitacoraDashboardView({
 
   return (
     <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3 pb-8 sm:space-y-6 sm:p-6">
-      {error ? (
-        <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
-          {error} Se muestran datos de respaldo.
-        </p>
-      ) : null}
-
       <section className="relative overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/15 via-primary/5 to-amber-500/10 p-5 shadow-sm sm:p-6">
         <div className="pointer-events-none absolute -end-8 -top-8 size-36 rounded-full bg-primary/15 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-6 start-10 size-24 rounded-full bg-amber-500/20 blur-2xl" />
@@ -200,7 +192,7 @@ export function BitacoraDashboardView({
                 ? `Datos limitados a la empresa ${stats.companyName}.`
                 : fromApi
                   ? 'Totales agregados desde la base de datos según los filtros aplicados.'
-                  : 'Vista de demostración con los registros disponibles en esta sesión.'}
+                  : 'Totales calculados desde los registros visibles en pantalla.'}
             </p>
             <div className="flex flex-wrap gap-2 pt-1">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background/80 px-3 py-1 text-xs font-medium text-foreground backdrop-blur-sm">

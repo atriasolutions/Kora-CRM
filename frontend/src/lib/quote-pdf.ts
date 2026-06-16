@@ -152,7 +152,7 @@ function buildQuoteLineTable(lineItems: QuoteLineItem[]) {
 
   const head = ['SKU', 'Descripción', 'Cant.', 'P. unit.']
   if (showDiscountCol) head.push('Desc.')
-  if (showDeferredCol) head.push('Plazo diferido')
+  if (showDeferredCol) head.push('Plazo entrega')
   head.push('Total')
 
   const body =

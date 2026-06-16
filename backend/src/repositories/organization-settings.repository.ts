@@ -8,6 +8,7 @@ import {
 import { badRequest } from '../middleware/errors.js'
 import * as geoRepo from './geo.repository.js'
 import { validateRegionCommuneInput } from '../services/geo.service.js'
+import { loadTenantScopedUserRow } from './users.repository.js'
 import type {
   OrganizationSettings,
   UpdateOrganizationSettingsInput,
@@ -34,6 +35,23 @@ const DEFAULTS = {
   email: 'hola@kora.io',
   logo_url: '',
   default_vat_percent: 19,
+}
+
+function normalizeOrganizationSettingValue(
+  key: keyof UpdateOrganizationSettingsInput,
+  value: unknown,
+): unknown {
+  if (key === 'defaultSolicitudAssigneeUserId') {
+    if (value == null || value === '') return null
+    if (typeof value !== 'string') {
+      throw badRequest('El responsable predeterminado de solicitudes no es válido.')
+    }
+    return value
+  }
+  if (key === 'logoUrl') {
+    return typeof value === 'string' ? value : ''
+  }
+  return value
 }
 
 async function ensureOrganizationRow(): Promise<OrganizationSettingsRow> {
@@ -120,6 +138,25 @@ export async function updateOrganizationSettings(
     if (geoError) throw badRequest(geoError)
   }
 
+  if (input.defaultSolicitudAssigneeUserId !== undefined) {
+    const assigneeId = input.defaultSolicitudAssigneeUserId
+    if (assigneeId == null || assigneeId === '') {
+      input.defaultSolicitudAssigneeUserId = null
+      if (input.defaultSolicitudAssigneeName === undefined) {
+        input.defaultSolicitudAssigneeName = ''
+      }
+    } else {
+      const assignee = await loadTenantScopedUserRow(
+        assigneeId,
+        getTenantIdOrDefault(),
+      )
+      if (!assignee) {
+        throw badRequest('El responsable predeterminado no existe o no está disponible.')
+      }
+      input.defaultSolicitudAssigneeName = assignee.name?.trim() || ''
+    }
+  }
+
   const sets: string[] = []
   const values: unknown[] = []
   let idx = 1
@@ -147,7 +184,7 @@ export async function updateOrganizationSettings(
   for (const [key, column] of fieldMap) {
     if (input[key] !== undefined) {
       sets.push(`${column} = $${idx++}`)
-      values.push(input[key])
+      values.push(normalizeOrganizationSettingValue(key, input[key]))
     }
   }
 
@@ -159,7 +196,7 @@ export async function updateOrganizationSettings(
   const result = await tenantQuery<OrganizationSettingsRow>(
     `UPDATE crm_organization_settings
      SET ${sets.join(', ')}
-     WHERE id = $${idx} AND ${tenantWhereParam(idx + 1)}
+     WHERE id = $${idx}::uuid AND ${tenantWhereParam(idx + 1)}::uuid
      RETURNING ${SELECT_COLUMNS}`,
     values,
   )

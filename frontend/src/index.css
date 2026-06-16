@@ -365,7 +365,7 @@
   .shell-nav-link-active::before {
     content: '';
     position: absolute;
-    inset-block: 0.35rem;
+    inset-block: 0.2rem;
     inset-inline-start: 0;
     width: 0.2rem;
     border-radius: 0 9999px 9999px 0;

@@ -56,6 +56,8 @@ export function mapUserRow(row: UserRow): UserListItem {
     lastLogin: formatActivityLabel(row.last_login_at),
     status: row.status,
     avatarUrl: imageUrlForList(row.avatar_url),
+    guestCompanyId: row.guest_company_id ?? undefined,
+    guestCompanyName: row.guest_company_name?.trim() || undefined,
   }
 }
 

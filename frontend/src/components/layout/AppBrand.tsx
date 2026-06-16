@@ -49,11 +49,11 @@ export function AppBrand({ className, variant = 'sidebar' }: AppBrandProps) {
         )}
         aria-label={`${displayName}, ir al inicio`}
       >
-        <div className="flex h-11 w-full items-center justify-center px-0.5">
+        <div className="flex h-9 w-full items-center justify-center px-0.5">
           <AppLogoImage
             logoUrl={settings.logoUrl}
             alt={displayName}
-            className="max-h-10 max-w-full object-contain"
+            className="max-h-8 max-w-full object-contain"
           />
         </div>
       </Link>

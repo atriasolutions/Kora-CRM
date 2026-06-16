@@ -12,6 +12,13 @@ export const env = {
   port: Number.parseInt(process.env.PORT ?? '4000', 10),
   nodeEnv: process.env.NODE_ENV ?? 'development',
   databaseUrl: required('DATABASE_URL', 'postgresql://localhost:5432/zenter_crm'),
+  /** Máximo de conexiones del pool pg (default 10). Subir en producción si hay paralelismo (dashboard, búsqueda). */
+  pgPoolMax: Number.parseInt(process.env.PG_POOL_MAX ?? '20', 10),
+  pgPoolIdleTimeoutMs: Number.parseInt(process.env.PG_POOL_IDLE_TIMEOUT_MS ?? '30000', 10),
+  pgPoolConnectionTimeoutMs: Number.parseInt(
+    process.env.PG_POOL_CONNECTION_TIMEOUT_MS ?? '10000',
+    10,
+  ),
   demoUserId: required(
     'DEMO_USER_ID',
     'b1000001-0001-4001-8001-000000000001',

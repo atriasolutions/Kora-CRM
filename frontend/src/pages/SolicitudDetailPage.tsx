@@ -1,14 +1,11 @@
 import {
   ArrowLeft,
   ChevronRight,
-  ClipboardList,
   Clock,
   FolderOpen,
   LayoutList,
-  Pencil,
   Puzzle,
   StickyNote,
-  Trash2,
   Users,
   Zap,
 } from 'lucide-react'
@@ -17,6 +14,7 @@ import { PageScrollArea } from '@/components/layout/PageScrollArea'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { EditSolicitudDialog } from '@/components/solicitudes/EditSolicitudDialog'
+import { SolicitudDetailHeader } from '@/components/solicitudes/SolicitudDetailHeader'
 import { SolicitudDescriptionContent } from '@/components/solicitudes/SolicitudDescriptionContent'
 import { SolicitudFilesPanel } from '@/components/solicitudes/SolicitudFilesPanel'
 import { SolicitudProjectsPanel } from '@/components/solicitudes/SolicitudProjectsPanel'
@@ -26,8 +24,6 @@ import { SolicitudTeamMembersPanel } from '@/components/solicitudes/SolicitudTea
 import { RegisterActivityDialog } from '@/components/contacts/RegisterActivityDialog'
 import { EntityActivitiesSection } from '@/components/shared/EntityActivitiesSection'
 import { EntityNotesPanel } from '@/components/shared/EntityNotesPanel'
-import { Badge } from '@/components/ui/badge'
-import { RecordAuditMeta } from '@/components/shared/RecordAuditMeta'
 import type { SolicitudTeamMember } from '@/data/solicitudes.mock'
 import type { ContactActivity, ContactActivityType } from '@/data/contact-detail.mock'
 import type { SolicitudDetail } from '@/data/solicitudes.mock'
@@ -45,20 +41,18 @@ import {
   dedupeSolicitudTeamMembers,
 } from '@/lib/solicitud-team-access'
 import {
-  solicitudPriorityVariant,
-  solicitudStatusVariant,
-} from '@/lib/solicitud-display'
-import { apiActionErrorMessage } from '@/api/errors'
-import { useModulePermissions } from '@/hooks/use-module-permissions'
-import {
   buildSolicitudStatusHistoryOnTransition,
   canTransition,
   type SolicitudJourneyStage,
 } from '@/lib/solicitud-journey'
 import { toast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
+import { apiActionErrorMessage } from '@/api/errors'
+import { useModulePermissions } from '@/hooks/use-module-permissions'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { RecordAuditMeta } from '@/components/shared/RecordAuditMeta'
 import {
   Dialog,
   DialogContent,
@@ -237,45 +231,15 @@ export function SolicitudDetailPage() {
         <span className="truncate font-medium text-foreground">{solicitud.title}</span>
       </nav>
 
-      <div className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4 shadow-sm sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0 space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <ClipboardList aria-hidden className="size-5 text-primary" />
-            <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
-              {solicitud.title}
-            </h1>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            {solicitud.code} · Responsable: {solicitud.assignee || '—'}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Badge variant={solicitudStatusVariant(solicitud.status)}>{solicitud.status}</Badge>
-            <Badge variant={solicitudPriorityVariant(solicitud.priority)}>
-              {solicitud.priority}
-            </Badge>
-          </div>
-        </div>
-        <div className="flex shrink-0 flex-wrap gap-2">
-          {canEdit ? (
-            <Button type="button" size="sm" variant="outline" onClick={() => setEditDialogOpen(true)}>
-              <Pencil aria-hidden className="size-4" />
-              Editar
-            </Button>
-          ) : null}
-          {canRegisterActivity ? (
-            <Button type="button" size="sm" variant="outline" onClick={() => openRegisterActivity()}>
-              <Zap aria-hidden className="size-4" />
-              Nueva actividad
-            </Button>
-          ) : null}
-          {canDelete ? (
-            <Button type="button" size="sm" variant="destructive" onClick={() => setArchiveOpen(true)}>
-              <Trash2 aria-hidden className="size-4" />
-              Archivar
-            </Button>
-          ) : null}
-        </div>
-      </div>
+      <SolicitudDetailHeader
+        solicitud={solicitud}
+        canEdit={canEdit}
+        canDelete={canDelete}
+        canRegisterActivity={canRegisterActivity}
+        onStartEdit={() => setEditDialogOpen(true)}
+        onRegisterActivity={() => openRegisterActivity()}
+        onArchive={() => setArchiveOpen(true)}
+      />
 
       <RegisterActivityDialog
         open={activityDialogOpen}

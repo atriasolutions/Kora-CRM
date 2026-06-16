@@ -30,6 +30,7 @@ import {
 } from '@/lib/product-form'
 import {
   INVENTORY_REGISTRY_SYNC_EVENT,
+  removeInventoryForProduct,
   syncInventoryFromProduct,
 } from '@/lib/product-inventory-sync'
 import {
@@ -166,26 +167,36 @@ export function ProductsRegistryProvider({ children }: { children: ReactNode }) 
   )
 
   const updateProductFromDetail = useCallback(
-    async (detail: ProductDetail, options?: { previousSku?: string }) => {
-      const list = listItemFromProductDetail(detail)
+    async (
+      detail: ProductDetail,
+      options?: { previousSku?: string },
+    ): Promise<ProductListItem | void> => {
       const existing = userProducts.find((p) => p.id === detail.id)
       const prevSku = options?.previousSku ?? existing?.sku ?? detail.sku
       if (detail.sku.trim().toLowerCase() !== prevSku.trim().toLowerCase()) {
         assertProductSkuAvailable(detail.sku, userProducts, detail.id)
       }
       if (useApi) {
-        await updateProductApi(detail.id, productDetailToApiBody(detail))
-        save(userProducts.map((p) => (p.id === detail.id ? list : p)))
-        return
+        const saved = await updateProductApi(detail.id, productDetailToApiBody(detail))
+        save(userProducts.map((p) => (p.id === detail.id ? saved : p)))
+        notifyInventoryRegistry()
+        return saved
       }
+      const list = listItemFromProductDetail(detail)
       const { saveProductDetail } = await import('@/data/product-detail.mock')
       saveProductDetail(detail)
-      syncInventoryFromProduct(detail, options)
+      const wasTracking = existing?.trackInventory ?? false
+      if (!detail.trackInventory && wasTracking) {
+        removeInventoryForProduct(prevSku)
+      } else {
+        syncInventoryFromProduct(detail, options)
+      }
       if (userProducts.some((p) => p.id === detail.id)) {
         save(userProducts.map((p) => (p.id === detail.id ? list : p)))
       }
+      return list
     },
-    [save, userProducts],
+    [notifyInventoryRegistry, save, userProducts],
   )
 
   const updateProduct = useCallback(

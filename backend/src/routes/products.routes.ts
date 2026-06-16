@@ -41,6 +41,19 @@ productsRouter.get(
 )
 
 productsRouter.get(
+  '/invoice-sales-totals',
+  requirePermission('productos', 'view'),
+  async (_req, res, next) => {
+    try {
+      const items = await productsRepo.listProductInvoiceSalesTotals()
+      res.json({ data: items })
+    } catch (e) {
+      next(e)
+    }
+  },
+)
+
+productsRouter.get(
   '/:id',
   requirePermission('productos', 'view'),
   async (req, res, next) => {

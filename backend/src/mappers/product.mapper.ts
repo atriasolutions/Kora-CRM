@@ -20,6 +20,8 @@ export type ProductRow = {
   stock_qty: number | null
   status: ProductListItem['status']
   track_inventory: boolean
+  min_stock: number | null
+  max_stock: number | null
   barcode: string | null
   image_url: string | null
   created_at: Date
@@ -98,6 +100,9 @@ export function mapProductRow(row: ProductRow): ProductListItem {
     stock,
     stockNum,
     status: row.status,
+    trackInventory: row.track_inventory,
+    minStockNum: row.min_stock ?? 0,
+    maxStockNum: row.max_stock ?? 0,
     owner: row.owner_name?.trim() || row.created_by_name?.trim() || '—',
     imageUrl: imageUrlForList(row.image_url),
     barcode: row.barcode ?? undefined,

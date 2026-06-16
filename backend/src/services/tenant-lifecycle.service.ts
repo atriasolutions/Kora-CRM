@@ -15,6 +15,7 @@ import {
   markTenantDeleted,
 } from '../repositories/tenants.repository.js'
 import { insertDefaultTrialQuotas } from '../repositories/tenant-quotas.repository.js'
+import { seedDefaultProductCategories } from '../repositories/product-categories.repository.js'
 import { insertDefaultTenantProfiles } from './default-tenant-profiles.service.js'
 import { purgeTenantLikeExpiredTrial } from './tenant-purge.service.js'
 import { ATRIA_TENANT_ID } from '../types/tenant.js'
@@ -95,6 +96,8 @@ export async function provisionBlankTenant(input: {
          VALUES ($1, 'Bodega principal', 'MAIN', true, true)`,
         [tenantId],
       )
+
+      await seedDefaultProductCategories(tenantId)
     })
 
     await platformQuery(
@@ -191,6 +194,8 @@ export async function provisionTrialTenant(
          VALUES ($1, 'Bodega principal', 'MAIN', true, true)`,
         [tenantId],
       )
+
+      await seedDefaultProductCategories(tenantId)
     })
 
     await insertDefaultTrialQuotas(tenantId)

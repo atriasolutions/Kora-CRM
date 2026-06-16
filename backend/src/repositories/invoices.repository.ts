@@ -9,16 +9,21 @@ import {
   loadQuoteExchangeRates,
   type ComputedLineWithCurrency,
 } from '../lib/document-line-items.js'
+import {
+  computeInvoiceDteAmounts,
+  dteLineFromComputed,
+} from '../lib/invoice-dte-amounts.js'
 import { getExchangeRatesForDocumentDate } from '../services/exchange-rates.service.js'
 import { withStockTransaction } from '../lib/inventory-stock-lock.js'
 import { resolveCustomerSnapshots } from '../lib/relation-snapshots.js'
 import { pool } from '../db/pool.js'
-import { setTenantLocal, tenantQuery } from '../db/tenant-query.js'
+import { setTenantLocal, tenantQuery, withTenantClient } from '../db/tenant-query.js'
 import { pushTenantCondition, tenantWhereParam } from '../lib/tenant-sql.js'
 import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import {
   mapInvoiceDetail,
   mapInvoiceRow,
+  mapInvoiceSourceSummary,
   type InvoiceLineRow,
   type InvoicePaymentRow,
   type InvoiceRow,
@@ -30,7 +35,11 @@ import type { AuditActor } from '../types/audit.js'
 import type {
   CreateInvoiceInput,
   InvoiceDetail,
+  InvoiceDocumentKind,
+  InvoiceLineItemInput,
   InvoiceListItem,
+  InvoiceReferenceCode,
+  ListInvoicesParams,
   UpdateInvoiceInput,
 } from '../types/invoice.js'
 import { parseDateInput } from '../utils/format.js'
@@ -50,6 +59,8 @@ const INVOICE_COLUMNS = `
   company_id, company_name, quote_id, quote_code, amount_cents,
   issue_date, due_date, status, owner_name, payment_method, sii_number,
   dte_type, sii_track_id, dte_status, dte_xml, sii_emitted_at,
+  document_kind, source_invoice_id, reference_code, reference_reason,
+  taxable_amount_cents, exempt_amount_cents, tax_amount_cents,
   global_discount_pct,
   exchange_rate_uf, exchange_rate_usd, exchange_rate_eur, exchange_rate_date,
   created_at, created_by_id, created_by_name,
@@ -73,14 +84,76 @@ const PAYMENT_COLUMNS = `
   id, invoice_id, amount_cents, paid_at, method, status, reference
 `
 
-export type ListInvoicesParams = {
-  page: number
-  pageSize: number
-  q?: string
-  status?: string
-  quoteId?: string
-  companyId?: string
-  archivedOnly?: boolean
+export type { ListInvoicesParams } from '../types/invoice.js'
+
+export async function sumEmittedAdjustmentTotalCents(
+  sourceInvoiceId: string,
+  documentKind: 'credit_note' | 'debit_note',
+): Promise<number> {
+  const result = await tenantQuery<{ total: string | null }>(
+    `SELECT coalesce(sum(amount_cents), 0)::text AS total
+     FROM crm_invoices
+     WHERE source_invoice_id = $1
+       AND document_kind = $2
+       AND deleted_at IS NULL
+       AND archived_at IS NULL
+       AND status <> 'Borrador'
+       AND sii_number IS NOT NULL
+       AND ${tenantWhereParam(3)}`,
+    [sourceInvoiceId, documentKind, getTenantIdOrDefault()],
+  )
+  return Number.parseInt(result.rows[0]?.total ?? '0', 10)
+}
+
+export async function estimateAdjustmentTotalCents(
+  lineItems: InvoiceLineItemInput[],
+  issueDate: string | null | undefined,
+  globalDiscount?: string,
+): Promise<number> {
+  const org = await orgSettingsRepo.getOrganizationSettings()
+  const { lines } = await prepareInvoiceLines(lineItems, issueDate, null)
+  const dteLines = lines.map((line) =>
+    dteLineFromComputed({
+      totalCents: line.totalCents,
+      subjectToVat: line.subjectToVat,
+      description: line.description ?? line.productName,
+      quantity: line.quantity,
+      unitPriceCents: line.unitPriceCents,
+    }),
+  )
+  const amounts = computeInvoiceDteAmounts(
+    dteLines,
+    resolveGlobalDiscountPct({ globalDiscount }),
+    org.defaultVatPercent,
+  )
+  return amounts.totalCents
+}
+
+async function loadRelatedAdjustments(sourceInvoiceId: string): Promise<InvoiceListItem[]> {
+  const result = await tenantQuery<InvoiceRow>(
+    `SELECT ${INVOICE_COLUMNS}
+     FROM crm_invoices
+     WHERE source_invoice_id = $1
+       AND deleted_at IS NULL
+       AND ${tenantWhereParam(2)}
+     ORDER BY created_at DESC`,
+    [sourceInvoiceId, getTenantIdOrDefault()],
+  )
+  return result.rows.map(mapInvoiceRow)
+}
+
+async function loadSourceInvoiceSummary(
+  sourceInvoiceId: string | null,
+): Promise<ReturnType<typeof mapInvoiceSourceSummary> | undefined> {
+  if (!sourceInvoiceId) return undefined
+  const result = await tenantQuery<InvoiceRow>(
+    `SELECT ${INVOICE_COLUMNS}
+     FROM crm_invoices
+     WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
+    [sourceInvoiceId, getTenantIdOrDefault()],
+  )
+  const row = result.rows[0]
+  return row ? mapInvoiceSourceSummary(row) : undefined
 }
 
 async function loadInvoiceLineItems(invoiceId: string): Promise<InvoiceLineRow[]> {
@@ -105,9 +178,23 @@ async function loadInvoicePayments(invoiceId: string): Promise<InvoicePaymentRow
   return result.rows
 }
 
-async function nextInvoiceNumber(): Promise<string> {
+function documentNumberPrefix(kind: InvoiceDocumentKind): string {
+  switch (kind) {
+    case 'credit_note':
+      return 'NC'
+    case 'debit_note':
+      return 'ND'
+    default:
+      return 'FAC'
+  }
+}
+
+async function nextDocumentNumber(
+  kind: InvoiceDocumentKind = 'invoice',
+): Promise<string> {
   const year = new Date().getFullYear()
-  const prefix = `FAC-${year}-`
+  const label = documentNumberPrefix(kind)
+  const prefix = `${label}-${year}-`
   const tenantId = getTenantIdOrDefault()
   const result = await tenantQuery<{ number: string }>(
     `SELECT number FROM crm_invoices
@@ -283,6 +370,16 @@ export async function listInvoices(
       `(company_id = $${idx} OR (
         company_id IS NULL AND company_name <> ''
         AND company_name = (SELECT name FROM crm_companies WHERE id = $${idx})
+      ) OR quote_id IN (
+        SELECT q.id FROM crm_quotes q
+        WHERE q.deleted_at IS NULL
+          AND (
+            q.company_id = $${idx}
+            OR q.opportunity_id IN (
+              SELECT o.id FROM crm_opportunities o
+              WHERE o.company_id = $${idx} AND o.deleted_at IS NULL
+            )
+          )
       ))`,
     )
     values.push(params.companyId)
@@ -290,31 +387,38 @@ export async function listInvoices(
   }
   if (params.q) {
     conditions.push(
-      `(number ILIKE $${idx} OR client_name ILIKE $${idx} OR company_name ILIKE $${idx} OR contact_name ILIKE $${idx})`,
+      `(number ILIKE $${idx} OR client_name ILIKE $${idx} OR company_name ILIKE $${idx} OR contact_name ILIKE $${idx} OR sii_number ILIKE $${idx})`,
     )
     values.push(`%${params.q}%`)
     idx++
   }
+  if (params.documentKind && params.documentKind !== 'all') {
+    conditions.push(`document_kind = $${idx++}`)
+    values.push(params.documentKind)
+  }
 
   const where = `WHERE ${conditions.join(' AND ')}`
-  const countResult = await tenantQuery<{ count: string }>(
-    `SELECT count(*)::text AS count FROM crm_invoices ${where}`,
-    values,
-  )
-  const total = Number.parseInt(countResult.rows[0]?.count ?? '0', 10)
-  const offset = paginationOffset(params.page, params.pageSize)
-  values.push(params.pageSize, offset)
 
-  const result = await tenantQuery<InvoiceRow>(
-    `SELECT ${INVOICE_COLUMNS}
-     FROM crm_invoices
-     ${where}
-     ORDER BY updated_at DESC
-     LIMIT $${idx++} OFFSET $${idx}`,
-    values,
-  )
+  return withTenantClient(async (client) => {
+    const countResult = await client.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM crm_invoices ${where}`,
+      values,
+    )
+    const total = Number.parseInt(countResult.rows[0]?.count ?? '0', 10)
+    const offset = paginationOffset(params.page, params.pageSize)
+    const listValues = [...values, params.pageSize, offset]
 
-  return { items: result.rows.map(mapInvoiceRow), total }
+    const result = await client.query<InvoiceRow>(
+      `SELECT ${INVOICE_COLUMNS}
+       FROM crm_invoices
+       ${where}
+       ORDER BY updated_at DESC
+       LIMIT $${idx++} OFFSET $${idx}`,
+      listValues,
+    )
+
+    return { items: result.rows.map(mapInvoiceRow), total }
+  })
 }
 
 async function loadInvoiceHeaderRow(id: string): Promise<InvoiceRow> {
@@ -331,11 +435,18 @@ async function loadInvoiceHeaderRow(id: string): Promise<InvoiceRow> {
 
 export async function getInvoiceById(id: string): Promise<InvoiceDetail> {
   const row = await loadInvoiceHeaderRow(id)
-  return mapInvoiceDetail(
-    row,
-    await loadInvoiceLineItems(id),
-    await loadInvoicePayments(id),
-  )
+  const [lineItems, payments, sourceInvoice, relatedAdjustments] = await Promise.all([
+    loadInvoiceLineItems(id),
+    loadInvoicePayments(id),
+    loadSourceInvoiceSummary(row.source_invoice_id),
+    row.document_kind === 'invoice'
+      ? loadRelatedAdjustments(id)
+      : Promise.resolve([] as InvoiceListItem[]),
+  ])
+  return mapInvoiceDetail(row, lineItems, payments, {
+    sourceInvoice,
+    relatedAdjustments,
+  })
 }
 
 export async function createInvoice(
@@ -377,7 +488,7 @@ export async function createInvoice(
   const exchangeRates = linesResult.exchangeRates
   const lineTotal = sumLineTotals(lines)
   const amountCents = resolveAmountCents(input, lineTotal)
-  const number = input.number?.trim() || (await nextInvoiceNumber())
+  const number = input.number?.trim() || (await nextDocumentNumber('invoice'))
   const globalDiscountPct = resolveGlobalDiscountPct(input)
   const clientName = clientNameFromCustomer(
     customerKind,
@@ -712,6 +823,142 @@ export async function restoreInvoice(
   const row = result.rows[0]
   if (!row) throw notFound('Factura no encontrada')
   return mapInvoiceRow(row)
+}
+
+export async function listInvoiceAdjustments(
+  sourceInvoiceId: string,
+): Promise<InvoiceListItem[]> {
+  await loadInvoiceHeaderRow(sourceInvoiceId)
+  return loadRelatedAdjustments(sourceInvoiceId)
+}
+
+export async function createAdjustmentInvoice(
+  sourceInvoiceId: string,
+  documentKind: 'credit_note' | 'debit_note',
+  input: {
+    referenceReason: string
+    referenceCode: InvoiceReferenceCode
+    lineItems: InvoiceLineItemInput[]
+    globalDiscount?: string
+  },
+  actor: AuditActor,
+): Promise<InvoiceDetail> {
+  await enforceRecordQuota(actor)
+  const source = await loadInvoiceHeaderRow(sourceInvoiceId)
+  if ((source.document_kind ?? 'invoice') !== 'invoice') {
+    throw badRequest('Solo se pueden crear ajustes desde una factura.')
+  }
+  if (source.status === 'Borrador' || !source.sii_number?.trim()) {
+    throw badRequest('La factura origen debe estar emitida al SII.')
+  }
+
+  const issueDateForLines =
+    source.issue_date instanceof Date
+      ? source.issue_date.toISOString().slice(0, 10)
+      : typeof source.issue_date === 'string'
+        ? source.issue_date.slice(0, 10)
+        : undefined
+
+  const linesResult = await prepareInvoiceLines(
+    input.lineItems,
+    issueDateForLines,
+    null,
+  )
+  const lines = linesResult.lines
+  if (lines.length === 0) throw badRequest('Agrega al menos una línea al documento.')
+
+  const org = await orgSettingsRepo.getOrganizationSettings()
+  const globalDiscountPct = resolveGlobalDiscountPct({ globalDiscount: input.globalDiscount })
+  const dteLines = lines.map((line) =>
+    dteLineFromComputed({
+      totalCents: line.totalCents,
+      subjectToVat: line.subjectToVat,
+      description: line.description ?? line.productName,
+      quantity: line.quantity,
+      unitPriceCents: line.unitPriceCents,
+    }),
+  )
+  const amounts = computeInvoiceDteAmounts(
+    dteLines,
+    globalDiscountPct,
+    org.defaultVatPercent,
+  )
+  const number = await nextDocumentNumber(documentKind)
+  const issueDate = new Date().toISOString().slice(0, 10)
+  const dueDate =
+    source.due_date instanceof Date
+      ? source.due_date.toISOString().slice(0, 10)
+      : typeof source.due_date === 'string'
+        ? source.due_date.slice(0, 10)
+        : issueDate
+
+  const detail = await withTenantClient(async (client) => {
+    const result = await client.query<InvoiceRow>(
+      `INSERT INTO crm_invoices (
+        number, client_name, customer_kind, contact_id, contact_name,
+        company_id, company_name, quote_id, quote_code, amount_cents,
+        issue_date, due_date, status, owner_name, payment_method,
+        document_kind, source_invoice_id, reference_code, reference_reason,
+        taxable_amount_cents, exempt_amount_cents, tax_amount_cents,
+        global_discount_pct,
+        exchange_rate_uf, exchange_rate_usd, exchange_rate_eur, exchange_rate_date,
+        created_by_id, created_by_name, updated_by_id, updated_by_name, tenant_id
+      ) VALUES (
+        $1, $2, $3, $4, $5,
+        $6, $7, $8, $9, $10,
+        $11, $12, $13, $14, $15,
+        $16, $17, $18, $19,
+        $20, $21, $22,
+        $23,
+        $24, $25, $26, $27,
+        $28, $29, $28, $29, $30
+      )
+      RETURNING ${INVOICE_COLUMNS}`,
+      [
+        number,
+        source.client_name,
+        source.customer_kind,
+        source.contact_id,
+        source.contact_name,
+        source.company_id,
+        source.company_name,
+        source.quote_id,
+        source.quote_code,
+        amounts.totalCents,
+        issueDate,
+        dueDate,
+        'Borrador',
+        source.owner_name ?? actor.userName,
+        source.payment_method ?? 'Transferencia',
+        documentKind,
+        sourceInvoiceId,
+        input.referenceCode,
+        input.referenceReason.trim(),
+        amounts.taxableCents,
+        amounts.exemptCents,
+        amounts.taxCents,
+        globalDiscountPct,
+        linesResult.exchangeRates.exchangeRateUf,
+        linesResult.exchangeRates.exchangeRateUsd,
+        linesResult.exchangeRates.exchangeRateEur,
+        linesResult.exchangeRates.exchangeRateDate,
+        actor.userId,
+        actor.userName,
+        getTenantIdOrDefault(),
+      ],
+    )
+    const row = result.rows[0]!
+    await insertInvoiceLineItems(client, row.id, lines)
+    const [lineRows, paymentRows] = await Promise.all([
+      loadInvoiceLineItems(row.id),
+      loadInvoicePayments(row.id),
+    ])
+    return mapInvoiceDetail(row, lineRows, paymentRows, {
+      sourceInvoice: mapInvoiceSourceSummary(source),
+    })
+  })
+
+  return detail
 }
 
 /** Elimina definitivamente una factura archivada y sus datos relacionados. */

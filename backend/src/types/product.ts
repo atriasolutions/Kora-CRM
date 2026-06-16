@@ -16,6 +16,9 @@ export type ProductListItem = {
   stock: string
   stockNum: number
   status: ProductStatus
+  trackInventory: boolean
+  minStockNum: number
+  maxStockNum: number
   owner: string
   imageUrl?: string
   barcode?: string

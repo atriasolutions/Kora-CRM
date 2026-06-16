@@ -6,6 +6,7 @@ import {
 } from '@/lib/dashboard-period'
 import type {
   DashboardData,
+  DashboardViewId,
   FunnelStage,
   KpiAccent,
   KpiDatum,
@@ -235,10 +236,222 @@ function chartDescriptionForMock(period: DashboardPeriod): string {
   return 'Últimos 6 meses'
 }
 
-export function getDashboardMock(period: DashboardPeriod): DashboardData {
-  return {
+export function getDashboardMock(
+  period: DashboardPeriod,
+  view: DashboardViewId = 'ventas',
+): DashboardData {
+  const base = {
     dateRangeLabel: labelForPeriod(period),
     chartDescription: chartDescriptionForMock(period),
+  }
+
+  if (view === 'operaciones') {
+    return {
+      view: 'operaciones',
+      ...base,
+      kpis: [
+        {
+          id: 'solicitudes',
+          title: 'Solicitudes nuevas',
+          value: '24',
+          changePercent: 12,
+          subtitle: 'vs. mes anterior',
+          accent: 'blue',
+        },
+        {
+          id: 'projects',
+          title: 'Proyectos activos',
+          value: '11',
+          changePercent: 8,
+          subtitle: 'vs. mes anterior',
+          accent: 'violet',
+        },
+        {
+          id: 'hours',
+          title: 'Horas registradas',
+          value: '186 h',
+          changePercent: 15,
+          subtitle: 'vs. mes anterior',
+          accent: 'emerald',
+        },
+        {
+          id: 'activities',
+          title: 'Actividades abiertas',
+          value: '42',
+          changePercent: -5,
+          subtitle: 'vs. mes anterior',
+          accent: 'amber',
+        },
+      ],
+      barChart: {
+        title: 'Solicitudes por estado',
+        description: 'Distribución en el periodo seleccionado',
+        items: [
+          { label: 'En Proceso', value: 9, color: 'hsl(217 91% 55%)' },
+          { label: 'Planificación', value: 6, color: 'hsl(142 76% 45%)' },
+          { label: 'En espera de Cliente', value: 4, color: 'hsl(27 96% 61%)' },
+          { label: 'Entregado a Cliente', value: 3, color: 'hsl(262 83% 58%)' },
+        ],
+      },
+      donutChart: {
+        title: 'Salud de proyectos',
+        description: 'Estado actual del portafolio',
+        centerLabel: 'Proyectos',
+        slices: [
+          { name: 'En plazo', value: 7, pct: 58.3, color: 'hsl(142 76% 45%)' },
+          { name: 'En riesgo', value: 3, pct: 25, color: 'hsl(27 96% 61%)' },
+          { name: 'Retrasado', value: 2, pct: 16.7, color: 'hsl(340 82% 52%)' },
+        ],
+      },
+      timeSeries: {
+        title: 'Horas en bitácora',
+        description: chartDescriptionForMock(period),
+        series: [
+          { label: 'Ene', facturables: 120, noFacturables: 18 },
+          { label: 'Feb', facturables: 132, noFacturables: 22 },
+          { label: 'Mar', facturables: 148, noFacturables: 16 },
+          { label: 'Abr', facturables: 156, noFacturables: 20 },
+          { label: 'May', facturables: 168, noFacturables: 14 },
+          { label: 'Jun', facturables: 186, noFacturables: 19 },
+        ],
+        lines: [
+          { key: 'facturables', label: 'Facturables', color: 'hsl(217 91% 55%)' },
+          { key: 'noFacturables', label: 'No facturables', color: 'hsl(27 96% 61%)' },
+        ],
+      },
+      listSection: {
+        title: 'Solicitudes que requieren atención',
+        description: 'Detenidas, en espera o en proceso',
+        items: [
+          {
+            id: 's1',
+            title: 'SOL-2026-0042 · Migración ERP',
+            subtitle: 'Industrial Plus',
+            meta: 'Camilo Torres',
+            badge: 'En espera de Cliente',
+            href: '/solicitudes/s1',
+          },
+          {
+            id: 's2',
+            title: 'SOL-2026-0038 · Soporte crítico',
+            subtitle: 'Tech Solutions',
+            meta: 'Rodrigo Carvallo',
+            badge: 'En Proceso',
+            href: '/solicitudes/s2',
+          },
+        ],
+      },
+      progressSection: {
+        title: 'Proyectos con menor avance',
+        description: 'Prioriza seguimiento operativo',
+        items: [
+          { id: 'pr3', name: 'Capacitación ventas LATAM', pct: 30 },
+          { id: 'pr2', name: 'Migración datos ERP', pct: 60 },
+          { id: 'pr1', name: 'Implementación SaaS Core', pct: 75 },
+        ],
+      },
+    }
+  }
+
+  if (view === 'abastecimiento') {
+    return {
+      view: 'abastecimiento',
+      ...base,
+      kpis: [
+        {
+          id: 'purchasesAmount',
+          title: 'Monto en compras',
+          value: '$138k',
+          changePercent: 9,
+          subtitle: 'vs. mes anterior',
+          accent: 'emerald',
+        },
+        {
+          id: 'purchasesCount',
+          title: 'Órdenes emitidas',
+          value: '18',
+          changePercent: 6,
+          subtitle: 'vs. mes anterior',
+          accent: 'blue',
+        },
+        {
+          id: 'lowStock',
+          title: 'Posiciones críticas',
+          value: '7',
+          changePercent: 0,
+          subtitle: 'Stock bajo o sin stock',
+          accent: 'amber',
+        },
+        {
+          id: 'receipts',
+          title: 'Ingresos confirmados',
+          value: '12',
+          changePercent: 20,
+          subtitle: 'vs. mes anterior',
+          accent: 'violet',
+        },
+      ],
+      barChart: {
+        title: 'Compras por estado',
+        description: 'Órdenes del periodo seleccionado',
+        items: [
+          { label: 'Confirmada', value: 10, color: 'hsl(142 76% 45%)' },
+          { label: 'Emitida', value: 8, color: 'hsl(217 91% 55%)' },
+          { label: 'Borrador', value: 4, color: 'hsl(27 96% 61%)' },
+        ],
+      },
+      donutChart: {
+        title: 'Inventario por estado',
+        description: 'Posiciones de stock actuales',
+        centerLabel: 'Posiciones',
+        slices: [
+          { name: 'En stock', value: 142, pct: 71, color: 'hsl(142 76% 45%)' },
+          { name: 'Stock bajo', value: 28, pct: 14, color: 'hsl(27 96% 61%)' },
+          { name: 'Sin stock', value: 18, pct: 9, color: 'hsl(340 82% 52%)' },
+          { name: 'En tránsito', value: 12, pct: 6, color: 'hsl(217 91% 55%)' },
+        ],
+      },
+      timeSeries: {
+        title: 'Evolución de compras',
+        description: chartDescriptionForMock(period),
+        series: [
+          { label: 'Ene', compras: 98000 },
+          { label: 'Feb', compras: 105000 },
+          { label: 'Mar', compras: 112000 },
+          { label: 'Abr', compras: 118000 },
+          { label: 'May', compras: 128000 },
+          { label: 'Jun', compras: 138000 },
+        ],
+        lines: [{ key: 'compras', label: 'Compras', color: 'hsl(142 76% 45%)' }],
+      },
+      listSection: {
+        title: 'Alertas y compras recientes',
+        description: 'Stock crítico y últimas órdenes',
+        items: [
+          {
+            id: 'inv1',
+            title: 'Router Mikrotik RB4011',
+            subtitle: 'RB4011 · Bodega central',
+            meta: 'Disp: 2 / Mín: 8',
+            badge: 'Stock bajo',
+            href: '/inventario',
+          },
+          {
+            id: 'p1',
+            title: 'OC-2026-0088',
+            subtitle: 'Distribuidora Tech S.A.',
+            meta: '$42.500',
+            badge: 'Confirmada',
+            href: '/compras/p1',
+          },
+        ],
+      },
+    }
+  }
+
+  return {
+    view: 'ventas',
+    ...base,
     kpis: dashboardKpis,
     funnelStages,
     revenueExpenseSeries,

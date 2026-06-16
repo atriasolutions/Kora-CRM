@@ -3,6 +3,7 @@ import { fetchJSON } from '@/api/client'
 import { fetchAllPages } from '@/api/list-all'
 import type { ApiItemResponse } from '@/api/types'
 import type { ProductDetail } from '@/data/product-detail.mock'
+import { buildDetailFromList } from '@/data/product-detail.mock'
 import type { ProductListItem } from '@/data/products.mock'
 import type { CreateProductFormValues } from '@/lib/product-create'
 import { parseStockNum } from '@/lib/product-display'
@@ -66,8 +67,8 @@ export function productFormToApiBody(
     imageUrl: values.imageUrl?.trim() || undefined,
     barcode: values.barcode?.trim() || undefined,
     trackInventory,
-    minStock: trackInventory && minStockNum > 0 ? minStockNum : undefined,
-    maxStock: trackInventory && maxStockNum > 0 ? maxStockNum : undefined,
+    minStock: trackInventory && minStockNum >= 0 ? minStockNum : undefined,
+    maxStock: trackInventory && maxStockNum >= 0 ? maxStockNum : undefined,
   }
 }
 
@@ -97,8 +98,24 @@ export function productDetailToApiBody(detail: ProductDetail): ProductApiBody {
     imageUrl: detail.imageUrl?.trim() || undefined,
     barcode: detail.barcode,
     trackInventory: detail.trackInventory,
-    minStock: detail.trackInventory && minStock !== undefined ? minStock : undefined,
-    maxStock: detail.trackInventory && maxStock !== undefined ? maxStock : undefined,
+    minStock: detail.trackInventory ? (minStock ?? 0) : undefined,
+    maxStock: detail.trackInventory ? (maxStock ?? 0) : undefined,
+  }
+}
+
+export function mergeProductDetailFromListItem(
+  detail: ProductDetail,
+  saved: ProductListItem,
+): ProductDetail {
+  const refreshed = buildDetailFromList(saved, detail.id)
+  return {
+    ...detail,
+    ...saved,
+    trackInventory: refreshed.trackInventory,
+    minStock: refreshed.minStock,
+    maxStock: refreshed.maxStock,
+    stock: saved.stock,
+    stockNum: saved.stockNum,
   }
 }
 
@@ -150,4 +167,20 @@ export async function restoreProductApi(id: string): Promise<ProductListItem> {
 
 export async function deleteProductApi(id: string): Promise<void> {
   await fetchJSON(`${BASE}/${id}`, { method: 'DELETE' })
+}
+
+export type ProductInvoiceSalesTotalApiRow = {
+  productId: string | null
+  sku: string
+  productName: string
+  totalQuantity: number
+}
+
+export async function fetchProductInvoiceSalesTotalsApi(): Promise<
+  ProductInvoiceSalesTotalApiRow[]
+> {
+  const res = await fetchJSON<{ data: ProductInvoiceSalesTotalApiRow[] }>(
+    `${BASE}/invoice-sales-totals`,
+  )
+  return res.data
 }

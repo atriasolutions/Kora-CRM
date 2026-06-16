@@ -6,7 +6,7 @@ export type OrganizationSettingsContextValue = {
   settings: OrganizationSettings
   isLoading: boolean
   updateSettings: (patch: Partial<OrganizationSettings>) => void
-  saveSettings: (settings: OrganizationSettings) => Promise<void>
+  saveSettings: (patch: Partial<OrganizationSettings>) => Promise<void>
   resetSettings: () => void
 }
 

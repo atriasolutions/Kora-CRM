@@ -1,8 +1,11 @@
 import type {
   InvoiceDetail,
+  InvoiceDocumentKind,
   InvoiceLineItemDto,
   InvoiceListItem,
   InvoicePaymentDto,
+  InvoiceReferenceCode,
+  InvoiceSourceSummary,
 } from '../types/invoice.js'
 import {
   formatForeignAmount,
@@ -38,6 +41,13 @@ export type InvoiceRow = {
   dte_status: string | null
   dte_xml: string | null
   sii_emitted_at: Date | string | null
+  document_kind: string | null
+  source_invoice_id: string | null
+  reference_code: number | null
+  reference_reason: string | null
+  taxable_amount_cents: string | number | null
+  exempt_amount_cents: string | number | null
+  tax_amount_cents: string | number | null
   exchange_rate_date: Date | string | null
   exchange_rate_uf: string | number | null
   exchange_rate_usd: string | number | null
@@ -154,6 +164,20 @@ export function mapInvoiceRow(row: InvoiceRow): InvoiceListItem {
     siiTrackId: row.sii_track_id ?? undefined,
     dteStatus: (row.dte_status as InvoiceListItem['dteStatus']) ?? undefined,
     siiEmittedAt: row.sii_emitted_at ? toIsoString(row.sii_emitted_at) : undefined,
+    documentKind: (row.document_kind as InvoiceDocumentKind | null) ?? 'invoice',
+    sourceInvoiceId: row.source_invoice_id ?? undefined,
+    referenceCode: (row.reference_code as InvoiceReferenceCode | null) ?? undefined,
+    referenceReason: row.reference_reason?.trim() || undefined,
+    taxableAmount:
+      row.taxable_amount_cents != null
+        ? formatCentsToMoney(row.taxable_amount_cents)
+        : undefined,
+    exemptAmount:
+      row.exempt_amount_cents != null
+        ? formatCentsToMoney(row.exempt_amount_cents)
+        : undefined,
+    taxAmount:
+      row.tax_amount_cents != null ? formatCentsToMoney(row.tax_amount_cents) : undefined,
     createdAt: toIsoString(row.created_at),
     createdById: row.created_by_id ?? '',
     createdByName: row.created_by_name ?? '',
@@ -167,6 +191,10 @@ export function mapInvoiceDetail(
   row: InvoiceRow,
   lineItems: InvoiceLineRow[],
   payments: InvoicePaymentRow[],
+  extras?: {
+    sourceInvoice?: InvoiceSourceSummary
+    relatedAdjustments?: InvoiceListItem[]
+  },
 ): InvoiceDetail {
   const exchange = mapDocumentExchangeRates(row)
   return {
@@ -175,9 +203,24 @@ export function mapInvoiceDetail(
     globalDiscount: formatDiscountPct(row.global_discount_pct),
     lineItems: lineItems.map(mapInvoiceLineRow),
     payments: payments.map(mapInvoicePaymentRow),
+    sourceInvoice: extras?.sourceInvoice,
+    relatedAdjustments: extras?.relatedAdjustments,
     exchangeRateDate: exchange.exchangeRateDate,
     exchangeRateUf: exchange.exchangeRateUf,
     exchangeRateUsd: exchange.exchangeRateUsd,
     exchangeRateEur: exchange.exchangeRateEur,
+  }
+}
+
+export function mapInvoiceSourceSummary(row: InvoiceRow): InvoiceSourceSummary {
+  const amountCents = Number(row.amount_cents ?? 0)
+  return {
+    id: row.id,
+    number: row.number,
+    siiNumber: row.sii_number ?? undefined,
+    dteType: row.dte_type ?? undefined,
+    issueDate: formatDateLabel(row.issue_date),
+    amount: formatCentsToMoney(amountCents),
+    amountNum: Math.round(amountCents / 100),
   }
 }

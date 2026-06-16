@@ -289,10 +289,7 @@ export function ReportsRegistryProvider({ children }: { children: ReactNode }) {
         try {
           const report = await createReportApi({
             ...input,
-            templateId: 'tabla-dinamica',
             schedule: 'Manual',
-            reportType: input.reportType.trim() || 'Tabla dinámica',
-            tableConfig: input.tableConfig ?? createDefaultReportTableConfig(),
           })
           saveTree({ ...tree, reports: [...tree.reports, report] })
           expandFolder(input.folderId)
@@ -304,7 +301,7 @@ export function ReportsRegistryProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      const templateId = 'tabla-dinamica'
+      const templateId = input.templateId ?? 'tabla-dinamica'
       const report: ReportItem = {
         id: createId('rpt'),
         name: input.name.trim(),
@@ -316,10 +313,7 @@ export function ReportsRegistryProvider({ children }: { children: ReactNode }) {
         description: input.description.trim(),
         updatedAt: 'Recién creado',
         templateId,
-        tableConfig:
-          templateId === 'tabla-dinamica'
-            ? (input.tableConfig ?? createDefaultReportTableConfig())
-            : undefined,
+        tableConfig: input.tableConfig ?? createDefaultReportTableConfig(),
       }
       saveTree({ ...tree, reports: [...tree.reports, report] })
       expandFolder(input.folderId)
@@ -341,7 +335,6 @@ export function ReportsRegistryProvider({ children }: { children: ReactNode }) {
           const { lastRun: _lastRun, ...payload } = input
           const report = await updateReportApi(id, {
             ...payload,
-            templateId: 'tabla-dinamica',
             schedule: 'Manual',
           })
           saveTree({

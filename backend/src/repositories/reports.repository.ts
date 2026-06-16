@@ -1,5 +1,5 @@
 import { pool } from '../db/pool.js'
-import { setTenantLocal, tenantQuery } from '../db/tenant-query.js'
+import { setTenantLocal, tenantQuery, withTenantClient } from '../db/tenant-query.js'
 import { tenantWhereParam } from '../lib/tenant-sql.js'
 import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import {
@@ -26,24 +26,27 @@ const REPORT_COLUMNS = `
 `
 
 export async function getReportsTree(): Promise<ReportsTreeData> {
-  const foldersResult = await tenantQuery<ReportFolderRow>(
-    `SELECT ${FOLDER_COLUMNS}
-     FROM crm_report_folders
-     WHERE ${tenantWhereParam(1)}
-     ORDER BY sort_order ASC, name ASC`,
-    [getTenantIdOrDefault()],
-  )
-  const reportsResult = await tenantQuery<ReportRow>(
-    `SELECT ${REPORT_COLUMNS}
-     FROM crm_reports
-     WHERE ${tenantWhereParam(1)}
-     ORDER BY name ASC`,
-    [getTenantIdOrDefault()],
-  )
-  return {
-    folders: foldersResult.rows.map(mapReportFolderRow),
-    reports: reportsResult.rows.map(mapReportRow),
-  }
+  const tenantId = getTenantIdOrDefault()
+  return withTenantClient(async (client) => {
+    const foldersResult = await client.query<ReportFolderRow>(
+      `SELECT ${FOLDER_COLUMNS}
+       FROM crm_report_folders
+       WHERE ${tenantWhereParam(1)}
+       ORDER BY sort_order ASC, name ASC`,
+      [tenantId],
+    )
+    const reportsResult = await client.query<ReportRow>(
+      `SELECT ${REPORT_COLUMNS}
+       FROM crm_reports
+       WHERE ${tenantWhereParam(1)}
+       ORDER BY name ASC`,
+      [tenantId],
+    )
+    return {
+      folders: foldersResult.rows.map(mapReportFolderRow),
+      reports: reportsResult.rows.map(mapReportRow),
+    }
+  })
 }
 
 export async function getReportById(id: string): Promise<ReportItem> {
@@ -153,7 +156,6 @@ export async function createReport(
     templateId,
     tableConfig: input.tableConfig,
   })
-
   const result = await tenantQuery<ReportRow>(
     `INSERT INTO crm_reports (
       folder_id, name, report_type, author_name, schedule, description,
@@ -275,20 +277,22 @@ export async function recordReportRun(
   actor: AuditActor,
 ): Promise<ReportItem> {
   const now = new Date()
-  await tenantQuery(
-    `INSERT INTO crm_report_runs (report_id, run_at, result_meta)
-     VALUES ($1, $2, $3)`,
-    [id, now, JSON.stringify({ triggeredBy: actor.userName })],
-  )
+  return withTenantClient(async (client) => {
+    await client.query(
+      `INSERT INTO crm_report_runs (report_id, run_at, result_meta)
+       VALUES ($1, $2, $3)`,
+      [id, now, JSON.stringify({ triggeredBy: actor.userName })],
+    )
 
-  const result = await tenantQuery<ReportRow>(
-    `UPDATE crm_reports
-     SET last_run_at = $2, updated_at = now()
-     WHERE id = $1
-     RETURNING ${REPORT_COLUMNS}`,
-    [id, now],
-  )
-  const row = result.rows[0]
-  if (!row) throw notFound('Reporte no encontrado')
-  return mapReportRow(row)
+    const result = await client.query<ReportRow>(
+      `UPDATE crm_reports
+       SET last_run_at = $2, updated_at = now()
+       WHERE id = $1
+       RETURNING ${REPORT_COLUMNS}`,
+      [id, now],
+    )
+    const row = result.rows[0]
+    if (!row) throw notFound('Reporte no encontrado')
+    return mapReportRow(row)
+  })
 }

@@ -1,4 +1,5 @@
 import type { BitacoraListItem } from '@/data/bitacora.mock'
+import { renderBitacoraSolicitudNameCell } from '@/components/bitacora/BitacoraSolicitudNameLink'
 import type { ModuleListConfig } from '@/types/list-module'
 import { formatBitacoraHours, formatBitacoraWorkDate } from '@/lib/bitacora-form'
 
@@ -21,12 +22,11 @@ export const bitacoraListConfig: ModuleListConfig<BitacoraListItem> = {
     (row.companyName ?? '').toLowerCase().includes(q),
   columns: [
     {
-      kind: 'primary',
+      kind: 'custom',
       header: 'Solicitud',
       sortable: true,
       className: 'w-[220px]',
-      title: (r) => r.solicitudTitle,
-      subtitle: (r) => r.solicitudCode,
+      render: renderBitacoraSolicitudNameCell,
     },
     {
       kind: 'text',

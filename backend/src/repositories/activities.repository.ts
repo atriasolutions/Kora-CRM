@@ -1,4 +1,4 @@
-import { tenantQuery } from '../db/tenant-query.js'
+import { tenantQuery, withTenantClient } from '../db/tenant-query.js'
 import { enforceRecordQuota } from '../lib/tenant-quota-enforce.js'
 import { pushTenantCondition, tenantWhereParam } from '../lib/tenant-sql.js'
 import { getTenantIdOrDefault } from '../lib/tenant-context.js'
@@ -64,9 +64,9 @@ async function resolveRelatedSnapshot(
   const companyOverride = companyName?.trim()
 
   const queries: Record<string, string> = {
-    contacto: `SELECT name, company_name FROM crm_contacts WHERE id = $1`,
+    contacto: `SELECT name, company_name FROM crm_contacts WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
     empresa: `SELECT name FROM crm_companies WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
-    oportunidad: `SELECT name, company_name FROM crm_opportunities WHERE id = $1`,
+    oportunidad: `SELECT name, company_name FROM crm_opportunities WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
     cotizacion: `SELECT code AS name, company_name FROM crm_quotes WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
     compra: `SELECT reference AS name, supplier_name AS company_name FROM crm_purchases WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
     factura: `SELECT number AS name, client_name AS company_name FROM crm_invoices WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
@@ -134,24 +134,27 @@ export async function listActivities(
   }
 
   const where = `WHERE ${conditions.join(' AND ')}`
-  const countResult = await tenantQuery<{ count: string }>(
-    `SELECT count(*)::text AS count FROM crm_activities ${where}`,
-    values,
-  )
-  const total = Number.parseInt(countResult.rows[0]?.count ?? '0', 10)
-  const offset = paginationOffset(params.page, params.pageSize)
-  values.push(params.pageSize, offset)
 
-  const result = await tenantQuery<ActivityRow>(
-    `SELECT ${ACTIVITY_COLUMNS}
-     FROM crm_activities
-     ${where}
-     ORDER BY COALESCE(due_at, scheduled_at, created_at) DESC
-     LIMIT $${idx++} OFFSET $${idx}`,
-    values,
-  )
+  return withTenantClient(async (client) => {
+    const countResult = await client.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM crm_activities ${where}`,
+      values,
+    )
+    const total = Number.parseInt(countResult.rows[0]?.count ?? '0', 10)
+    const offset = paginationOffset(params.page, params.pageSize)
+    const listValues = [...values, params.pageSize, offset]
 
-  return { items: result.rows.map(mapActivityRow), total }
+    const result = await client.query<ActivityRow>(
+      `SELECT ${ACTIVITY_COLUMNS}
+       FROM crm_activities
+       ${where}
+       ORDER BY COALESCE(due_at, scheduled_at, created_at) DESC
+       LIMIT $${idx++} OFFSET $${idx}`,
+      listValues,
+    )
+
+    return { items: result.rows.map(mapActivityRow), total }
+  })
 }
 
 export async function getActivityById(id: string): Promise<ActivityDetail> {

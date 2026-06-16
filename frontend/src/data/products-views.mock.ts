@@ -37,7 +37,9 @@ export type ProductSegment = {
   name: string
   description: string
   accentClass: string
-  matches: (item: ProductListItem) => boolean
+  matches?: (item: ProductListItem) => boolean
+  /** Ranking por unidades en facturas emitidas (top = más comprados). */
+  salesRank?: 'top' | 'bottom'
 }
 
 export const productSegments: ProductSegment[] = [
@@ -69,11 +71,26 @@ export const productSegments: ProductSegment[] = [
     accentClass: 'border-s-violet-500',
     matches: (p) => p.status === 'Borrador',
   },
+  {
+    id: 'top-purchased',
+    name: 'Más comprados',
+    description: 'Mayor cantidad facturada en facturas emitidas.',
+    accentClass: 'border-s-emerald-500',
+    salesRank: 'top',
+  },
+  {
+    id: 'bottom-purchased',
+    name: 'Menos comprados',
+    description: 'Menor cantidad facturada, excluyendo los del top de ventas.',
+    accentClass: 'border-s-rose-500',
+    salesRank: 'bottom',
+  },
 ]
 
 export function countSegmentMatches(
   items: ProductListItem[],
   segment: ProductSegment,
 ): number {
+  if (!segment.matches) return 0
   return items.filter(segment.matches).length
 }

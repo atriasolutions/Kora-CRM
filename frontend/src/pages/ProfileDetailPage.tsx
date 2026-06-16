@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useProfilesRegistry } from '@/hooks/use-profiles-registry'
 import { useMenuAccess } from '@/hooks/use-menu-access'
 import { useAuth } from '@/hooks/use-auth'
+import { useProfilePermissionGrants } from '@/hooks/use-profile-permission-grants'
 import {
   canEditProfilePermissions,
   canModifyLockedProfile,
@@ -28,6 +29,10 @@ import {
   SYSTEM_PROFILE_ACCESS_MESSAGE,
 } from '@/lib/access-profile-admin'
 import { normalizeProfilePermissions } from '@/lib/menu-modules'
+import {
+  mergeEditorPermissionsIntoProfile,
+  permissionsForProfileEditor,
+} from '@/lib/profile-permission-grants'
 import { getProfilesListPath } from '@/lib/profile-routes'
 import { toast } from '@/lib/toast'
 import type { AccessProfile } from '@/types/access-profile'
@@ -36,6 +41,7 @@ export function ProfileDetailPage() {
   const { profileId } = useParams<{ profileId: string }>()
   const navigate = useNavigate()
   const { session } = useAuth()
+  const { ceiling } = useProfilePermissionGrants()
   const { findById, updateProfile, removeProfile } = useProfilesRegistry()
   const { can } = useMenuAccess()
   const canEditModule = can('perfiles', 'edit')
@@ -93,6 +99,18 @@ export function ProfileDetailPage() {
       ? '1 usuario tiene asignado este perfil. Reasígnalo antes de eliminar.'
       : `${profile.userCount} usuarios tienen asignado este perfil. Reasígnalos antes de eliminar.`
   }, [profile, locked])
+
+  const editorPermissions = useMemo(
+    () => permissionsForProfileEditor(permissions, ceiling),
+    [permissions, ceiling],
+  )
+
+  const handlePermissionsChange = useCallback(
+    (nextEditor: AccessProfile['permissions']) => {
+      setPermissions(mergeEditorPermissionsIntoProfile(permissions, nextEditor, ceiling))
+    },
+    [permissions, ceiling],
+  )
 
   const handleSave = useCallback(async () => {
     if (!profile || !canEdit) return
@@ -254,9 +272,10 @@ export function ProfileDetailPage() {
             </CardHeader>
             <CardContent>
               <ProfilePermissionsEditor
-                permissions={permissions}
-                onChange={setPermissions}
+                permissions={editorPermissions}
+                onChange={handlePermissionsChange}
                 disabled={!canEditPermissions}
+                grantCeiling={ceiling}
               />
             </CardContent>
           </Card>

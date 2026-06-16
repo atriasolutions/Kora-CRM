@@ -10,8 +10,7 @@ import type {
   ReportItem,
   ReportsTreeData,
 } from '@/types/reports-tree'
-import type { ReportTableConfig } from '@/types/report-table'
-import type { ReportTableRunResult } from '@/types/report-table'
+import type { ReportTableConfig, ReportTableRunResult } from '@/types/report-table'
 
 const BASE = `${API_V1}/reports`
 

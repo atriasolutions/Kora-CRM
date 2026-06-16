@@ -24,6 +24,12 @@ export type InventoryListItem = {
   updatedAt: string
 }
 
+export type InventoryMovementAdjustmentDetail = {
+  quantityBefore: number
+  quantityAfter: number
+  quantityDelta: number
+}
+
 export type InventoryMovementLine = {
   id: string
   type: 'Entrada' | 'Salida' | 'Ajuste' | 'Traslado' | 'Reserva'
@@ -34,6 +40,7 @@ export type InventoryMovementLine = {
   author: string
   sourceKind?: string
   sourceId?: string
+  adjustmentDetail?: InventoryMovementAdjustmentDetail
 }
 
 export type InventoryDetail = InventoryListItem & {

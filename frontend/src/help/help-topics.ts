@@ -625,27 +625,26 @@ export const HELP_CONTENT: Record<string, HelpTopic> = {
   ...listDetail('reportes', {
     titleList: 'Reportes',
     summary:
-      'Reportes configurables organizados en carpetas. Creas vistas tipo tabla con fuente de datos, columnas ordenables y filtros.',
+      'Reportes configurables en carpetas: tablas dinámicas con filtros, columnas y exportación a Excel. El Dashboard del inicio es distinto: es el panel comercial fijo.',
     actions: [
       'Navegar el árbol de carpetas y reportes.',
-      'Ejecutar un reporte para ver la tabla en pantalla.',
-      'Exportar cuando exista opción Excel u otro formato.',
+      'Configurar columnas y filtros, ejecutar y exportar la tabla.',
     ],
-    actionsIfCreate: ['Nueva carpeta o nuevo reporte (tabla dinámica).'],
+    actionsIfCreate: ['Nueva carpeta o tabla dinámica.'],
     actionsIfEdit: ['Editar nombre, filtros y columnas del informe.', 'Eliminar reporte vacío si tu rol lo permite.'],
     tips: [
       'Columnas compactas con «Todas» / «Quitar todas». El orden se arrastra con el ícono de asa.',
       'Eliminar reporte también borra el historial de ejecuciones en base de datos.',
     ],
-    keywords: ['informe', 'exportar', 'Excel', 'filtros'],
+    keywords: ['informe', 'exportar', 'Excel', 'filtros', 'tabla dinámica'],
   }, {
     titleDetail: 'Reportes · detalle',
     summary:
-      'Al seleccionar un reporte en el árbol verás su configuración o resultado de ejecución según el panel activo.',
+      'Al seleccionar un reporte verás la configuración de columnas y filtros, y el resultado al ejecutar.',
     actions: [
-      'Editar columnas, filtros y fuente de datos del informe.',
-      'Ejecutar para refrescar la tabla.',
-      'Exportar a Excel si está disponible.',
+      'Editar columnas, filtros y fuente de datos.',
+      'Guardar configuración y ejecutar.',
+      'Exportar el resultado a Excel.',
     ],
     actionsIfEdit: ['Renombrar o mover el reporte entre carpetas si tu rol lo permite.'],
   }),

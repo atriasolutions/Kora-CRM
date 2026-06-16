@@ -208,6 +208,8 @@ export function listItemFromUserDetail(user: UserDetail): UserListItem {
     lastLogin: user.lastLogin,
     status: user.status,
     avatarUrl: user.avatarUrl,
+    guestCompanyId: user.guestCompanyId,
+    guestCompanyName: user.guestCompanyName,
   }
 }
 

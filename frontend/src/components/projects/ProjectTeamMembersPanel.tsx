@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { ProjectDetail, ProjectTeamMember } from '@/data/project-detail.mock'
 import { useAssigneeDirectory } from '@/hooks/use-assignee-directory'
+import { usePrefetchUserAvatarsById } from '@/hooks/use-user-avatar-url'
 import {
   collectProjectTeamMemberNames,
   dedupeProjectTeamMembers,
@@ -34,7 +35,7 @@ export function ProjectTeamMembersPanel({
   canEdit = false,
   onTeamChange,
 }: ProjectTeamMembersPanelProps) {
-  const { allUsers, ensureLoaded } = useAssigneeDirectory(canEdit)
+  const { allUsers, ensureLoaded } = useAssigneeDirectory(true)
   const [pending, setPending] = useState(false)
   const [pickUserId, setPickUserId] = useState('')
 
@@ -42,6 +43,12 @@ export function ProjectTeamMembersPanel({
     () => normalizeProjectTeamMembers(project.team, project.manager),
     [project.team, project.manager],
   )
+
+  const teamAvatarUserIds = useMemo(
+    () => team.map((m) => m.userId?.trim()).filter(Boolean) as string[],
+    [team],
+  )
+  usePrefetchUserAvatarsById(teamAvatarUserIds)
 
   const addableUsers = useMemo(() => {
     return allUsers.filter(
@@ -63,8 +70,8 @@ export function ProjectTeamMembersPanel({
   }, [addableUsers])
 
   useEffect(() => {
-    if (canEdit) ensureLoaded()
-  }, [canEdit, ensureLoaded])
+    ensureLoaded()
+  }, [ensureLoaded])
 
   const persistTeam = async (next: ProjectTeamMember[]) => {
     setPending(true)
@@ -176,7 +183,11 @@ export function ProjectTeamMembersPanel({
                     key={memberKey(member)}
                     className="flex flex-wrap items-center gap-3 px-3 py-3"
                   >
-                    <UserAssigneeAvatar name={member.name} className="size-10 shrink-0" />
+                    <UserAssigneeAvatar
+                      name={member.name}
+                      userId={member.userId ?? user?.id}
+                      className="size-10 shrink-0"
+                    />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="font-medium text-foreground">{member.name}</p>

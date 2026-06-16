@@ -27,11 +27,18 @@ export function findUserByName(
 export function searchUsers(
   users: UserListItem[],
   query: string,
-  options?: { limit?: number; activeOnly?: boolean },
+  options?: {
+    limit?: number
+    activeOnly?: boolean
+    userFilter?: (user: UserListItem) => boolean
+  },
 ): UserListItem[] {
   const limit = options?.limit ?? 12
   const activeOnly = options?.activeOnly !== false
   let pool = activeOnly ? users.filter((u) => u.status === 'Activo') : users
+  if (options?.userFilter) {
+    pool = pool.filter(options.userFilter)
+  }
   const q = query.trim().toLowerCase()
   if (q) {
     pool = pool.filter(

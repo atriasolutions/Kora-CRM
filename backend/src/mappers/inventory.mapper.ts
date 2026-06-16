@@ -37,6 +37,25 @@ export type StockMovementRow = {
   author_name: string | null
   source_kind: string | null
   source_id: string | null
+  adjustment_detail?: unknown
+}
+
+function parseAdjustmentDetail(
+  raw: unknown,
+): InventoryMovementLine['adjustmentDetail'] {
+  if (!raw || typeof raw !== 'object') return undefined
+  const obj = raw as Record<string, unknown>
+  const quantityBefore = Number(obj.quantityBefore)
+  const quantityAfter = Number(obj.quantityAfter)
+  const quantityDelta = Number(obj.quantityDelta)
+  if (
+    !Number.isFinite(quantityBefore) ||
+    !Number.isFinite(quantityAfter) ||
+    !Number.isFinite(quantityDelta)
+  ) {
+    return undefined
+  }
+  return { quantityBefore, quantityAfter, quantityDelta }
 }
 
 function formatQtyLabel(value: number): string {
@@ -140,6 +159,7 @@ export function mapMovementRow(
     author: row.author_name ?? 'Sistema',
     sourceKind: row.source_kind ?? undefined,
     sourceId: row.source_id ?? undefined,
+    adjustmentDetail: parseAdjustmentDetail(row.adjustment_detail),
   }
 }
 

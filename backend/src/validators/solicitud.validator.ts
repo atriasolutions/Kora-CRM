@@ -37,6 +37,7 @@ export const createSolicitudSchema = z.object({
   priority: solicitudPrioritySchema.optional(),
   assigneeName: z.string().max(255).optional(),
   assigneeUserId: z.string().uuid().nullish(),
+  requesterUserId: z.string().uuid().nullish(),
   team: z.array(teamMemberSchema).optional(),
 })
 

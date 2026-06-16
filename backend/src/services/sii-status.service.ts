@@ -4,11 +4,15 @@ import { listSiiCredentials } from './sii-credential.service.js'
 import { tenantQuery } from '../db/tenant-query.js'
 import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 
+const REQUIRED_DTE_TYPES = [33, 34, 56, 61] as const
+
 export type SiiIntegrationStatus = {
   invoicingMode: 'manual' | 'sii'
   configured: boolean
   credentialsCount: number
   folioRangesCount: number
+  folioTypesAvailable: number[]
+  folioTypesMissing: number[]
   lastRcvSyncAt: string | null
   readyToEmit: boolean
   missing: string[]
@@ -24,28 +28,41 @@ export async function getSiiIntegrationStatus(): Promise<SiiIntegrationStatus> {
     [getTenantIdOrDefault()],
   )
 
-  const missing: string[] = []
+  const folioTypesAvailable = [
+    ...new Set(
+      folios.filter((folio) => folio.remaining > 0).map((folio) => folio.dteType),
+    ),
+  ].sort((a, b) => a - b)
+
+  const folioTypesMissing = REQUIRED_DTE_TYPES.filter(
+    (type) => !folioTypesAvailable.includes(type),
+  )
+
+  const coreMissing: string[] = []
   if (org.invoicingMode === 'sii') {
-    if (!org.rut.trim()) missing.push('RUT emisor')
-    if (!org.legalName.trim()) missing.push('Razón social')
-    if (!org.giro.trim()) missing.push('Giro')
-    if (!org.commune.trim()) missing.push('Comuna')
-    if (org.economicActivityCode == null) missing.push('Actividad económica')
-    if (credentials.length === 0) missing.push('Certificado digital')
-    if (folios.length === 0) missing.push('CAF / folios')
+    if (!org.rut.trim()) coreMissing.push('RUT emisor')
+    if (!org.legalName.trim()) coreMissing.push('Razón social')
+    if (!org.giro.trim()) coreMissing.push('Giro')
+    if (!org.commune.trim()) coreMissing.push('Comuna')
+    if (org.economicActivityCode == null) coreMissing.push('Actividad económica')
+    if (credentials.length === 0) coreMissing.push('Certificado digital')
+    if (folioTypesAvailable.length === 0) coreMissing.push('CAF / folios')
   }
+
+  const cafWarnings = folioTypesMissing.map((type) => `CAF tipo ${type}`)
 
   return {
     invoicingMode: org.invoicingMode,
-    configured: org.invoicingMode === 'manual' || missing.length === 0,
+    configured: org.invoicingMode === 'manual' || coreMissing.length === 0,
     credentialsCount: credentials.length,
     folioRangesCount: folios.length,
+    folioTypesAvailable,
+    folioTypesMissing: [...folioTypesMissing],
     lastRcvSyncAt: settingsRow.rows[0]?.last_rcv_sync_at?.toISOString() ?? null,
     readyToEmit:
       org.invoicingMode === 'sii' &&
-      credentials.length > 0 &&
-      folios.some((f) => f.remaining > 0) &&
-      missing.filter((m) => m !== 'CAF / folios').length === 0,
-    missing,
+      coreMissing.length === 0 &&
+      folioTypesAvailable.includes(33),
+    missing: [...coreMissing, ...cafWarnings],
   }
 }

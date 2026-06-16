@@ -14,6 +14,74 @@ import type {
 
 const SELECT_COLUMNS = `id, name, active`
 
+export const DEFAULT_PRODUCT_CATEGORY_NAME = 'General'
+
+/** Crea la categoría por defecto si la instancia aún no tiene ninguna. */
+export async function seedDefaultProductCategories(
+  tenantId?: string,
+): Promise<void> {
+  const scopedTenantId = tenantId ?? getTenantIdOrDefault()
+  const existing = await tenantQuery<{ count: string }>(
+    `SELECT count(*)::text AS count
+     FROM crm_product_categories
+     WHERE deleted_at IS NULL AND ${tenantWhereParam(1)}`,
+    [scopedTenantId],
+  )
+  if (Number.parseInt(existing.rows[0]?.count ?? '0', 10) > 0) return
+
+  await tenantQuery(
+    `INSERT INTO crm_product_categories (name, active, tenant_id)
+     VALUES ($1, true, $2)`,
+    [DEFAULT_PRODUCT_CATEGORY_NAME, scopedTenantId],
+  )
+}
+
+/**
+ * Resuelve categoría por nombre **solo dentro del tenant actual**.
+ * Si no existe, la crea en ese tenant (nunca reutiliza categorías de otra instancia).
+ */
+export async function resolveProductCategoryIdByName(
+  categoryName?: string,
+): Promise<string | null> {
+  const name = categoryName?.trim() || DEFAULT_PRODUCT_CATEGORY_NAME
+  const tenantId = getTenantIdOrDefault()
+
+  const existing = await tenantQuery<{ id: string }>(
+    `SELECT id
+     FROM crm_product_categories
+     WHERE deleted_at IS NULL
+       AND active = true
+       AND lower(trim(name)) = lower($1)
+       AND ${tenantWhereParam(2)}
+     LIMIT 1`,
+    [name, tenantId],
+  )
+  if (existing.rows[0]) return existing.rows[0].id
+
+  const inserted = await tenantQuery<{ id: string }>(
+    `INSERT INTO crm_product_categories (name, active, tenant_id)
+     VALUES ($1, true, $2)
+     RETURNING id`,
+    [name, tenantId],
+  )
+  return inserted.rows[0]?.id ?? null
+}
+
+export async function assertProductCategoryBelongsToTenant(
+  categoryId: string | null | undefined,
+): Promise<void> {
+  if (!categoryId) return
+  const result = await tenantQuery(
+    `SELECT 1
+     FROM crm_product_categories
+     WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
+    [categoryId, getTenantIdOrDefault()],
+  )
+  if (!result.rowCount) {
+    throw badRequest('La categoría no pertenece a esta instancia.')
+  }
+}
+
 export async function listProductCategories(): Promise<ProductCategory[]> {
   const result = await tenantQuery<ProductCategoryRow>(
     `SELECT ${SELECT_COLUMNS}

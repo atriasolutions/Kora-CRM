@@ -29,6 +29,7 @@ type UserLookupFieldProps = {
   placeholder?: string
   helperText?: string
   activeOnly?: boolean
+  userFilter?: (user: UserListItem) => boolean
 }
 
 function SelectedUserAvatar({
@@ -60,6 +61,7 @@ export function UserLookupField({
   placeholder = 'Buscar usuario del CRM…',
   helperText = 'Selecciona un usuario activo del equipo.',
   activeOnly = true,
+  userFilter,
 }: UserLookupFieldProps) {
   const generatedId = useId()
   const inputId = `crm-user-lookup-${generatedId.replace(/:/g, '')}`
@@ -87,8 +89,9 @@ export function UserLookupField({
       searchUsers(allUsers, query, {
         limit: 12,
         activeOnly,
+        userFilter,
       }),
-    [allUsers, query, activeOnly],
+    [allUsers, query, activeOnly, userFilter],
   )
 
   useEffect(() => {
@@ -140,7 +143,13 @@ export function UserLookupField({
               <p className="truncate text-sm font-medium text-foreground">{displayName}</p>
               <p className="truncate text-xs text-muted-foreground">
                 {selectedUser
-                  ? `${selectedUser.role} · ${selectedUser.email}`
+                  ? [
+                      selectedUser.guestCompanyName?.trim(),
+                      selectedUser.role,
+                      selectedUser.email,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')
                   : 'Usuario no encontrado en el directorio'}
               </p>
             </div>

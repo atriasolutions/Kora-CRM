@@ -40,7 +40,7 @@ export function BitacoraDetailPage() {
   const navigate = useNavigate()
   const { bitacoraId } = useParams<{ bitacoraId: string }>()
   const { canEdit, canDelete } = useModulePermissions('bitacora')
-  const { updateBitacoraFromForm, deleteBitacora } = useBitacoraRegistry()
+  const { updateBitacoraFromForm, archiveBitacora } = useBitacoraRegistry()
   const [entry, setEntry] = useState<BitacoraListItem | null>(null)
   const { loadState, reason, unavailableDetail, reload } = useRecordDetail({
     id: bitacoraId,
@@ -69,11 +69,11 @@ export function BitacoraDetailPage() {
   const handleDelete = async () => {
     if (!entry) return
     try {
-      await deleteBitacora(entry.id)
-      toast.success('Registro de bitácora eliminado.')
+      await archiveBitacora(entry.id)
+      toast.success('Registro de bitácora archivado.')
       navigate('/bitacora')
     } catch (error) {
-      toast.error(apiActionErrorMessage(error, 'No se pudo eliminar la bitácora.'))
+      toast.error(apiActionErrorMessage(error, 'No se pudo archivar la bitácora.'))
     } finally {
       setDeleteOpen(false)
     }
@@ -134,9 +134,9 @@ export function BitacoraDetailPage() {
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Eliminar registro</DialogTitle>
+            <DialogTitle>Archivar registro</DialogTitle>
             <DialogDescription>
-              Se eliminará este registro de bitácora ({entry.solicitudCode || 'sin código'}). Esta
+              Este registro de bitácora ({entry.solicitudCode || 'sin código'}) irá a Archivados. Esta
               acción no se puede deshacer.
             </DialogDescription>
           </DialogHeader>
@@ -145,7 +145,7 @@ export function BitacoraDetailPage() {
               Cancelar
             </Button>
             <Button type="button" variant="destructive" onClick={() => void handleDelete()}>
-              Eliminar
+              Archivar
             </Button>
           </DialogFooter>
         </DialogContent>

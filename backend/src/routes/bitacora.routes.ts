@@ -58,6 +58,7 @@ bitacoraRouter.get(
           workDateFrom: query.workDateFrom,
           workDateTo: query.workDateTo,
           companyId: companyScope.companyId,
+          archivedOnly: query.archived === true,
         })
         res.json({
           data: result.items,
@@ -83,6 +84,7 @@ bitacoraRouter.get(
         workDateFrom: query.workDateFrom,
         workDateTo: query.workDateTo,
         companyId: query.companyId,
+        archivedOnly: query.archived === true,
       })
       res.json({
         data: result.items,
@@ -231,12 +233,44 @@ bitacoraRouter.patch(
   },
 )
 
+bitacoraRouter.post(
+  '/:id/archive',
+  requirePermission('bitacora', 'delete'),
+  async (req, res, next) => {
+    try {
+      const item = await bitacoraRepo.archiveBitacora(
+        routeParam(req),
+        getAuditActor(req),
+      )
+      res.json({ data: item })
+    } catch (e) {
+      next(e)
+    }
+  },
+)
+
+bitacoraRouter.post(
+  '/:id/restore',
+  requirePermission('bitacora', 'delete'),
+  async (req, res, next) => {
+    try {
+      const item = await bitacoraRepo.restoreBitacora(
+        routeParam(req),
+        getAuditActor(req),
+      )
+      res.json({ data: item })
+    } catch (e) {
+      next(e)
+    }
+  },
+)
+
 bitacoraRouter.delete(
   '/:id',
   requirePermission('bitacora', 'delete'),
   async (req, res, next) => {
     try {
-      await bitacoraRepo.deleteBitacora(routeParam(req), getAuditActor(req))
+      await bitacoraRepo.permanentlyDeleteBitacora(routeParam(req))
       res.status(204).send()
     } catch (e) {
       next(e)

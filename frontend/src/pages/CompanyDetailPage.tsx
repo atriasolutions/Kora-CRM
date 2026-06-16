@@ -18,6 +18,7 @@ import { CompanyDetailHeader } from '@/components/companies/CompanyDetailHeader'
 import { CompanyFilesPanel } from '@/components/companies/CompanyFilesPanel'
 import { CompanyLocationsPanel } from '@/components/companies/CompanyLocationsPanel'
 import { CompanyOpportunitiesPanel } from '@/components/companies/CompanyOpportunitiesPanel'
+import { CompanySalesSummaryCard } from '@/components/companies/CompanySalesSummaryCard'
 import { CompanyDetailSidebar } from '@/components/companies/CompanyDetailSidebar'
 import { EditCompanyDialog } from '@/components/companies/EditCompanyDialog'
 import { ContactActivitiesPanel } from '@/components/contacts/ContactActivitiesPanel'
@@ -46,6 +47,8 @@ import { useCompaniesRegistry } from '@/hooks/use-companies-registry'
 import { useContactsRegistry } from '@/hooks/use-contacts-registry'
 import { useOpportunitiesRegistry } from '@/hooks/use-opportunities-registry'
 import { useActivitiesRegistry } from '@/hooks/use-activities-registry'
+import { useInvoicesRegistry } from '@/hooks/use-invoices-registry'
+import { useQuotesRegistry } from '@/hooks/use-quotes-registry'
 import { buildCompanyDetailMetrics } from '@/lib/company-detail-metrics'
 import { recordEntityView } from '@/lib/entity-recently-viewed'
 import { lastContactLabelFromActivity } from '@/lib/contact-activity'
@@ -75,6 +78,8 @@ export function CompanyDetailPage() {
   const { canEdit, canDelete } = useModulePermissions('empresas')
   const { archiveCompany, isArchived, updateCompanyFromDetail } = useCompaniesRegistry()
   const { allOpportunities } = useOpportunitiesRegistry()
+  const { allQuotes } = useQuotesRegistry()
+  const { allInvoices } = useInvoicesRegistry()
   const { allContacts, reloadFromApi: reloadContacts } = useContactsRegistry()
   const { allActivities } = useActivitiesRegistry()
   const tab: CompanyDetailTab = parseCompanyDetailTab(searchParams) ?? 'detalle'
@@ -350,6 +355,12 @@ export function CompanyDetailPage() {
 
           {tab === 'detalle' ? (
             <div className="space-y-4">
+              <CompanySalesSummaryCard
+                company={company}
+                opportunities={allOpportunities}
+                quotes={allQuotes}
+                invoices={allInvoices}
+              />
               <CompanyDetailSidebar company={company} />
               {company.description?.trim() ? (
                 <Card className="shadow-sm">

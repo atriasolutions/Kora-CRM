@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { SolicitudDetail, SolicitudTeamMember } from '@/data/solicitudes.mock'
 import { useAssigneeDirectory } from '@/hooks/use-assignee-directory'
+import { usePrefetchUserAvatarsById } from '@/hooks/use-user-avatar-url'
 import {
   collectSolicitudTeamMemberNames,
   dedupeSolicitudTeamMembers,
@@ -34,14 +35,28 @@ export function SolicitudTeamMembersPanel({
   canEdit = false,
   onTeamChange,
 }: SolicitudTeamMembersPanelProps) {
-  const { allUsers, ensureLoaded } = useAssigneeDirectory(canEdit)
+  const { allUsers, ensureLoaded } = useAssigneeDirectory(true)
   const [pending, setPending] = useState(false)
   const [pickUserId, setPickUserId] = useState('')
 
   const team = useMemo(
-    () => normalizeSolicitudTeamMembers(solicitud.team, solicitud.assignee),
-    [solicitud.team, solicitud.assignee],
+    () =>
+      normalizeSolicitudTeamMembers(
+        solicitud.team,
+        solicitud.assignee,
+        solicitud.assigneeUserId,
+      ),
+    [solicitud.team, solicitud.assignee, solicitud.assigneeUserId],
   )
+
+  const teamAvatarUserIds = useMemo(() => {
+    const ids = team.map((m) => m.userId?.trim()).filter(Boolean) as string[]
+    const assigneeId = solicitud.assigneeUserId?.trim()
+    if (assigneeId && !ids.includes(assigneeId)) ids.push(assigneeId)
+    return ids
+  }, [team, solicitud.assigneeUserId])
+
+  usePrefetchUserAvatarsById(teamAvatarUserIds)
 
   const addableUsers = useMemo(() => {
     return allUsers.filter(
@@ -63,8 +78,8 @@ export function SolicitudTeamMembersPanel({
   }, [addableUsers])
 
   useEffect(() => {
-    if (canEdit) ensureLoaded()
-  }, [canEdit, ensureLoaded])
+    ensureLoaded()
+  }, [ensureLoaded])
 
   const persistTeam = async (next: SolicitudTeamMember[]) => {
     setPending(true)
@@ -175,7 +190,11 @@ export function SolicitudTeamMembersPanel({
                     key={memberKey(member)}
                     className="flex flex-wrap items-center gap-3 px-3 py-3"
                   >
-                    <UserAssigneeAvatar name={member.name} className="size-10 shrink-0" />
+                    <UserAssigneeAvatar
+                      name={member.name}
+                      userId={member.userId ?? user?.id}
+                      className="size-10 shrink-0"
+                    />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="font-medium text-foreground">{member.name}</p>

@@ -37,7 +37,7 @@ export function RevenueBySourceCard({ slices, className }: RevenueBySourceCardPr
       <CardHeader className="p-4 pb-2 sm:p-6 sm:pb-4">
         <CardTitle className="text-sm font-semibold sm:text-base">Ingresos por fuente</CardTitle>
         <CardDescription className="text-xs sm:text-sm">
-          Distribución del pipeline
+          Facturas pagadas en el periodo, por origen de la oportunidad
         </CardDescription>
       </CardHeader>
       <CardContent className="grid min-w-0 gap-4 px-4 pb-4 sm:gap-6 sm:px-6 sm:pb-6 md:grid-cols-[minmax(0,240px),minmax(0,1fr)] lg:grid-cols-[240px,minmax(0,1fr)]">

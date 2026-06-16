@@ -7,8 +7,10 @@ import {
   bitacoraFiltersToDashboardQuery,
   computeBitacoraDashboardStats,
 } from '@/lib/bitacora-dashboard'
+import { labelForBitacoraDateFilter } from '@/lib/bitacora-date-filter'
 import type { BitacoraFilters } from '@/lib/bitacora-filters'
 import { bitacoraMatchesListScope, type BitacoraListScope } from '@/lib/bitacora-list-scope'
+import { emptyBitacoraDashboardStats } from '@/lib/production-empty-data'
 import type { BitacoraDashboardStats } from '@/types/bitacora-dashboard'
 
 type UseBitacoraDashboardOptions = {
@@ -28,7 +30,6 @@ export function useBitacoraDashboard({
 }: UseBitacoraDashboardOptions) {
   const [stats, setStats] = useState<BitacoraDashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [fromApi, setFromApi] = useState(false)
 
   useEffect(() => {
@@ -36,7 +37,6 @@ export function useBitacoraDashboard({
 
     async function load() {
       setLoading(true)
-      setError(null)
 
       try {
         if (isApiEnabled()) {
@@ -60,12 +60,10 @@ export function useBitacoraDashboard({
         }
       } catch {
         if (!cancelled) {
-          setError('No se pudo cargar el resumen de bitácora.')
-          const scopedRows = rows.filter((row) =>
-            bitacoraMatchesListScope(row, listScope, recentIds),
+          setStats(
+            emptyBitacoraDashboardStats(labelForBitacoraDateFilter(filters.date)),
           )
-          setStats(computeBitacoraDashboardStats(scopedRows, filters))
-          setFromApi(false)
+          setFromApi(true)
         }
       } finally {
         if (!cancelled) setLoading(false)
@@ -78,5 +76,5 @@ export function useBitacoraDashboard({
     }
   }, [filters, listScope, recentIds, rows, resetKey])
 
-  return { stats, loading, error, fromApi }
+  return { stats, loading, fromApi }
 }

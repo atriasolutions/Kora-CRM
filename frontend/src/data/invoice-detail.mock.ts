@@ -51,6 +51,16 @@ export type InvoicePayment = {
   status: 'Confirmado' | 'Pendiente' | 'Rechazado'
 }
 
+export type InvoiceSourceSummary = {
+  id: string
+  number: string
+  siiNumber?: string
+  dteType?: number
+  issueDate: string
+  amount: string
+  amountNum: number
+}
+
 export type InvoiceDetail = InvoiceListItem & {
   description: string
   quoteCode?: string
@@ -58,7 +68,7 @@ export type InvoiceDetail = InvoiceListItem & {
   taxableSubtotal?: string
   exemptSubtotal?: string
   taxPercent: string
-  taxAmount: string
+  taxAmount?: string
   discountPercent?: string
   discountAmount?: string
   globalDiscount?: string
@@ -71,6 +81,8 @@ export type InvoiceDetail = InvoiceListItem & {
   activities: ContactActivity[]
   notes: ContactNote[]
   files: InvoiceFile[]
+  sourceInvoice?: InvoiceSourceSummary
+  relatedAdjustments?: InvoiceListItem[]
   exchangeRateDate?: string | null
   exchangeRateUf?: number | null
   exchangeRateUsd?: number | null

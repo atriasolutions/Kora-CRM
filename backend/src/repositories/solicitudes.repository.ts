@@ -2,7 +2,7 @@ import type { PoolClient } from 'pg'
 import { enforceRecordQuota } from '../lib/tenant-quota-enforce.js'
 
 import { pool } from '../db/pool.js'
-import { setTenantLocal, tenantQuery } from '../db/tenant-query.js'
+import { setTenantLocal, tenantQuery, withTenantClient } from '../db/tenant-query.js'
 import {
   TEAM_MEMBER_USER_NAME_SQL,
   teamMemberUserJoins,
@@ -25,7 +25,11 @@ import {
 } from '../mappers/solicitud.mapper.js'
 import { badRequest, forbidden, notFound } from '../middleware/errors.js'
 import { getOrganizationSettings } from '../repositories/organization-settings.repository.js'
-import { getActorGuestCompany } from '../repositories/users.repository.js'
+import {
+  actorHasGuestProfile,
+  getActorGuestCompany,
+  resolveGuestSolicitudRequester,
+} from '../repositories/users.repository.js'
 import { notifySolicitudAssignment } from '../services/notifications.service.js'
 import { notifyAndEmailNewSolicitudTeamMembers } from '../services/solicitud-team-member.service.js'
 import { purgeEntityNotesAndFiles } from '../services/entity-purge.service.js'
@@ -367,33 +371,36 @@ export async function listSolicitudes(
   }
 
   const where = `WHERE ${conditions.join(' AND ')}`
-  const countResult = await tenantQuery<{ count: string }>(
-    `SELECT count(*)::text AS count FROM crm_solicitudes ${where}`,
-    values,
-  )
-  const total = Number.parseInt(countResult.rows[0]?.count ?? '0', 10)
-  const offset = paginationOffset(params.page, params.pageSize)
-  values.push(params.pageSize, offset)
 
-  const result = await tenantQuery<SolicitudRow>(
-    `SELECT ${SOLICITUD_COLUMNS}
-     FROM crm_solicitudes
-     ${where}
-     ORDER BY updated_at DESC
-     LIMIT $${idx++} OFFSET $${idx}`,
-    values,
-  )
+  return withTenantClient(async (client) => {
+    const countResult = await client.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM crm_solicitudes ${where}`,
+      values,
+    )
+    const total = Number.parseInt(countResult.rows[0]?.count ?? '0', 10)
+    const offset = paginationOffset(params.page, params.pageSize)
+    const listValues = [...values, params.pageSize, offset]
 
-  const solicitudIds = result.rows.map((row) => row.id)
-  const teamsBySolicitud = await loadTeamsBySolicitudIds(solicitudIds)
+    const result = await client.query<SolicitudRow>(
+      `SELECT ${SOLICITUD_COLUMNS}
+       FROM crm_solicitudes
+       ${where}
+       ORDER BY updated_at DESC
+       LIMIT $${idx++} OFFSET $${idx}`,
+      listValues,
+    )
 
-  return {
-    items: result.rows.map((row) => ({
-      ...mapSolicitudRow(row),
-      teamMembers: mapTeamRowsToListMembers(teamsBySolicitud.get(row.id)),
-    })),
-    total,
-  }
+    const solicitudIds = result.rows.map((row) => row.id)
+    const teamsBySolicitud = await loadTeamsBySolicitudIds(solicitudIds)
+
+    return {
+      items: result.rows.map((row) => ({
+        ...mapSolicitudRow(row),
+        teamMembers: mapTeamRowsToListMembers(teamsBySolicitud.get(row.id)),
+      })),
+      total,
+    }
+  })
 }
 
 export async function getSolicitudById(id: string): Promise<SolicitudDetail> {
@@ -419,7 +426,29 @@ export async function createSolicitud(
   const assignee = await resolveAssignee(input, actor, defaultAssignee)
   const code = await nextSolicitudCode()
   const tenantId = getTenantIdOrDefault()
-  const guestCompany = await getActorGuestCompany(actor.userId, tenantId)
+  const actorIsGuest = await actorHasGuestProfile(actor.userId, tenantId)
+  const requesterId = input.requesterUserId?.trim() || null
+
+  if (requesterId && actorIsGuest) {
+    throw forbidden('Los invitados no pueden crear solicitudes a petición de otro usuario')
+  }
+
+  let createdById = actor.userId
+  let createdByName = actor.userName
+  let companyId: string | null = null
+  let companyName = ''
+
+  if (requesterId) {
+    const requester = await resolveGuestSolicitudRequester(requesterId, tenantId)
+    createdById = requester.userId
+    createdByName = requester.userName
+    companyId = requester.companyId
+    companyName = requester.companyName
+  } else if (actorIsGuest) {
+    const guestCompany = await getActorGuestCompany(actor.userId, tenantId)
+    companyId = guestCompany.companyId
+    companyName = guestCompany.companyName
+  }
 
   const client = await pool.connect()
   try {
@@ -435,7 +464,7 @@ export async function createSolicitud(
         $1, $2, $3, $4, $5,
         $6, $7,
         $8, $9,
-        $10, $11, $10, $11, $12
+        $10, $11, $12, $13, $14
       )
       RETURNING ${SOLICITUD_COLUMNS}`,
       [
@@ -446,8 +475,10 @@ export async function createSolicitud(
         input.priority ?? 'Media',
         assignee.userId,
         assignee.userName,
-        guestCompany.companyId,
-        guestCompany.companyName,
+        companyId,
+        companyName,
+        createdById,
+        createdByName,
         actor.userId,
         actor.userName,
         tenantId,
@@ -460,7 +491,7 @@ export async function createSolicitud(
       input.team,
       assignee.userName,
       assignee.userId,
-      { userId: actor.userId, userName: actor.userName },
+      { userId: createdById, userName: createdByName },
     )
     await client.query('COMMIT')
     const detail = mapSolicitudDetail(row, await loadSolicitudTeam(row.id))
@@ -641,6 +672,7 @@ export async function permanentlyDeleteSolicitud(id: string): Promise<void> {
     await client.query(`DELETE FROM crm_solicitud_team_members WHERE solicitud_id = $1`, [
       id,
     ])
+    // Bitácora y actividades conservan la referencia (solicitud_id / related_id + snapshots).
     await purgeEntityNotesAndFiles('solicitud', id, client)
     await client.query(`DELETE FROM crm_solicitudes WHERE id = $1`, [id])
 

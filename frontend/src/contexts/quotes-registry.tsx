@@ -22,7 +22,7 @@ import type { QuoteListItem } from '@/data/quotes.mock'
 import { syncRegistryQuotes } from '@/data/quotes-registry-store'
 import { formValuesToListItem, type CreateQuoteFormValues } from '@/lib/quote-create'
 import { stampRecordAuditOnUpdate } from '@/lib/record-audit'
-import { normalizeQuoteDetailFromApi } from '@/lib/quote-detail-normalize'
+import { loadQuoteDetail } from '@/lib/entity-detail-loaders'
 import { listItemFromQuoteDetail } from '@/lib/quote-form'
 import {
   type ArchivedQuoteStore,
@@ -111,21 +111,14 @@ export function QuotesRegistryProvider({ children }: { children: ReactNode }) {
     ): Promise<QuoteDetail> => {
       const list = listItemFromQuoteDetail(detail)
       if (useApi) {
-        const updated = await updateQuoteApi(
-          detail.id,
-          quoteDetailToApiBody(detail, options),
-        )
-        const normalized = normalizeQuoteDetailFromApi({
-          ...detail,
-          ...(updated as QuoteDetail),
-          lineItems: (updated as QuoteDetail).lineItems ?? detail.lineItems,
-        })
+        await updateQuoteApi(detail.id, quoteDetailToApiBody(detail, options))
+        const refreshed = await loadQuoteDetail(detail.id)
         save(
           userQuotes.map((q) =>
-            q.id === detail.id ? listItemFromQuoteDetail(normalized) : q,
+            q.id === detail.id ? listItemFromQuoteDetail(refreshed) : q,
           ),
         )
-        return normalized
+        return refreshed
       }
       if (userQuotes.some((q) => q.id === detail.id)) {
         save(userQuotes.map((q) => (q.id === detail.id ? list : q)))

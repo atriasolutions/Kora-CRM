@@ -1,3 +1,4 @@
+import { isApiEnabled } from '@/api/config'
 import type { InventoryMovementLine } from '@/data/inventory-detail.mock'
 import type { InventoryListItem, InventoryStatus } from '@/data/inventory.mock'
 import { getAllWarehouseLocationNames } from '@/lib/catalog-settings'
@@ -273,6 +274,8 @@ export function stockMovementsForSku(sku: string): InventoryMovementLine[] {
   if (merged.length > 0) {
     return merged.sort((a, b) => b.when.localeCompare(a.when, 'es'))
   }
+
+  if (isApiEnabled()) return []
 
   const demo = product.locationRows[0]
   if (!demo) return []

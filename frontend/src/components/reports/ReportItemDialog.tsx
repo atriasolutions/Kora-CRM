@@ -79,7 +79,7 @@ export function ReportItemDialog({
         <DialogHeader>
           <DialogTitle>{mode === 'create' ? 'Nuevo reporte' : 'Editar reporte'}</DialogTitle>
           <DialogDescription>
-            Los reportes se generan como tabla dinámica con columnas y filtros configurables.
+            Crea un reporte de tabla dinámica: elige columnas, filtros y exporta a Excel.
           </DialogDescription>
         </DialogHeader>
         <form className="space-y-4" onSubmit={handleSubmit}>

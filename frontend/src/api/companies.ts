@@ -38,6 +38,10 @@ export type CompanyApiBody = {
   ownerName?: string
   lifecycle?: string
   operationalStatus?: string
+  website?: string
+  email?: string
+  phone?: string
+  description?: string
 }
 
 export function companyFormToApiBody(
@@ -54,6 +58,10 @@ export function companyFormToApiBody(
     ownerName: values.ownerName?.trim() || undefined,
     lifecycle: values.lifecycle,
     operationalStatus: values.operationalStatus,
+    website: values.website?.trim() || undefined,
+    email: values.email?.trim() || undefined,
+    phone: values.phone?.trim() || undefined,
+    description: values.description?.trim() || undefined,
   }
 }
 
@@ -178,6 +186,10 @@ export function companyDetailToApiBody(detail: CompanyDetail): CompanyApiBody {
     ownerName: detail.owner,
     lifecycle: detail.lifecycle,
     operationalStatus: detail.operationalStatus,
+    website: detail.website?.trim() || undefined,
+    email: detail.email?.trim() || undefined,
+    phone: detail.phone?.trim() || undefined,
+    description: detail.description?.trim() || undefined,
   }
 }
 

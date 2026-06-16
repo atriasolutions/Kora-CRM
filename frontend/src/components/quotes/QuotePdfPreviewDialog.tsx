@@ -2,7 +2,7 @@ import { FileDown } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
 import { listBankAccountsApi, type BankAccount } from '@/api/bank-accounts'
-import { quoteDetailToApiBody, updateQuoteApi } from '@/api/quotes'
+import { getQuoteApi, quoteDetailToApiBody, updateQuoteApi } from '@/api/quotes'
 import { isApiEnabled } from '@/api/config'
 import { Button } from '@/components/ui/button'
 import {
@@ -21,6 +21,7 @@ import { getRegistryCompanyById } from '@/data/companies-registry-store'
 import { useOrganizationSettings } from '@/hooks/use-organization-settings'
 import { loadCompanyDetail } from '@/lib/entity-detail-loaders'
 import type { CompanyAddressRecord } from '@/lib/company-location'
+import { normalizeQuoteDetailFromApi } from '@/lib/quote-detail-normalize'
 import {
   downloadQuotePdf,
   generateQuotePdf,
@@ -43,14 +44,49 @@ export function QuotePdfPreviewDialog({ quote, open, onOpenChange }: QuotePdfPre
   >()
   const [customerCompany, setCustomerCompany] = useState<CompanyListItem | undefined>()
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([])
+  const [resolvedQuote, setResolvedQuote] = useState<QuoteDetail>(quote)
   const [includeBankDetails, setIncludeBankDetails] = useState(quote.includeBankDetails === true)
   const [bankAccountId, setBankAccountId] = useState(quote.bankAccountId ?? '')
 
   useEffect(() => {
     if (!open) return
-    setIncludeBankDetails(quote.includeBankDetails === true)
-    setBankAccountId(quote.bankAccountId ?? '')
-  }, [open, quote.includeBankDetails, quote.bankAccountId])
+    let cancelled = false
+
+    const applyQuote = (next: QuoteDetail) => {
+      if (cancelled) return
+      setResolvedQuote(next)
+      setIncludeBankDetails(next.includeBankDetails === true)
+      setBankAccountId(next.bankAccountId ?? '')
+    }
+
+    if (!isApiEnabled()) {
+      applyQuote(quote)
+      return () => {
+        cancelled = true
+      }
+    }
+
+    void getQuoteApi(quote.id)
+      .then((api) => {
+        applyQuote({
+          ...normalizeQuoteDetailFromApi(
+            {
+              ...api,
+              lineItems: api.lineItems ?? [],
+            },
+            { contactEmail: quote.contactEmail },
+          ),
+          activities: quote.activities,
+          notes: quote.notes,
+          files: quote.files,
+        })
+      })
+      .catch(() => applyQuote(quote))
+
+    return () => {
+      cancelled = true
+    }
+  }, [open, quote])
 
   useEffect(() => {
     if (!isApiEnabled()) return
@@ -60,12 +96,12 @@ export function QuotePdfPreviewDialog({ quote, open, onOpenChange }: QuotePdfPre
   }, [])
 
   useEffect(() => {
-    if (!quote.companyId?.trim()) {
+    if (!resolvedQuote.companyId?.trim()) {
       setCustomerHeadquarters(undefined)
       setCustomerCompany(undefined)
       return
     }
-    const companyId = quote.companyId.trim()
+    const companyId = resolvedQuote.companyId.trim()
     if (isApiEnabled()) {
       void loadCompanyDetail(companyId)
         .then((detail) => {
@@ -81,15 +117,15 @@ export function QuotePdfPreviewDialog({ quote, open, onOpenChange }: QuotePdfPre
     const detail = getCompanyDetail(companyId)
     setCustomerHeadquarters(detail.headquarters)
     setCustomerCompany(detail)
-  }, [quote.companyId])
+  }, [resolvedQuote.companyId])
 
   const pdfQuote = useMemo(
     (): QuoteDetail => ({
-      ...quote,
+      ...resolvedQuote,
       includeBankDetails,
       bankAccountId: bankAccountId || null,
     }),
-    [quote, includeBankDetails, bankAccountId],
+    [resolvedQuote, includeBankDetails, bankAccountId],
   )
 
   const selectedBankAccount = useMemo(
@@ -103,7 +139,9 @@ export function QuotePdfPreviewDialog({ quote, open, onOpenChange }: QuotePdfPre
       organization,
       customerCompany:
         customerCompany ??
-        (quote.companyId ? getRegistryCompanyById(quote.companyId) : undefined),
+        (resolvedQuote.companyId
+          ? getRegistryCompanyById(resolvedQuote.companyId)
+          : undefined),
       customerHeadquarters,
       bankAccount: includeBankDetails ? selectedBankAccount : undefined,
     }),
@@ -111,7 +149,7 @@ export function QuotePdfPreviewDialog({ quote, open, onOpenChange }: QuotePdfPre
       pdfQuote,
       organization,
       customerCompany,
-      quote.companyId,
+      resolvedQuote.companyId,
       customerHeadquarters,
       includeBankDetails,
       selectedBankAccount,
@@ -159,9 +197,9 @@ export function QuotePdfPreviewDialog({ quote, open, onOpenChange }: QuotePdfPre
 
   const persistBankPrefs = async () => {
     if (!isApiEnabled()) return
-    await updateQuoteApi(quote.id, {
+    await updateQuoteApi(resolvedQuote.id, {
       ...quoteDetailToApiBody({
-        ...quote,
+        ...resolvedQuote,
         includeBankDetails,
         bankAccountId: bankAccountId || null,
       }),
@@ -173,7 +211,7 @@ export function QuotePdfPreviewDialog({ quote, open, onOpenChange }: QuotePdfPre
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] gap-0 overflow-hidden p-0 sm:max-w-3xl">
         <DialogHeader className="border-b border-border px-6 py-4">
-          <DialogTitle>Vista previa PDF — {quote.code}</DialogTitle>
+          <DialogTitle>Vista previa PDF — {resolvedQuote.code}</DialogTitle>
           <DialogDescription>
             Cliente desde la ficha de empresa; emisor desde Configuración.
           </DialogDescription>
@@ -197,7 +235,7 @@ export function QuotePdfPreviewDialog({ quote, open, onOpenChange }: QuotePdfPre
             <p className="py-20 text-center text-sm text-muted-foreground">Generando PDF…</p>
           ) : previewUrl ? (
             <iframe
-              title={`Vista previa ${quote.code}`}
+              title={`Vista previa ${resolvedQuote.code}`}
               src={previewUrl}
               className="h-[min(70vh,640px)] w-full rounded-lg border border-border bg-white"
             />

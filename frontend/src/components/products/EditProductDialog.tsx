@@ -99,6 +99,7 @@ export function EditProductDialog({
         <form className="space-y-5" onSubmit={handleSubmit} autoComplete="off">
           <ProductFormFields
             form={form}
+            inventoryContextSku={product.sku}
             onChange={(patch) => setForm((prev) => ({ ...prev, ...patch }))}
           />
           {submitError ? (

@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from '@/lib/toast'
 
+import { apiActionErrorMessage } from '@/api/errors'
 import { UserLookupField } from '@/components/shared/UserLookupField'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useModulePermissions } from '@/hooks/use-module-permissions'
 import { useOrganizationSettings } from '@/hooks/use-organization-settings'
+import { organizationSolicitudesSettingsFrom } from '@/lib/organization-settings'
 import type { OrganizationSettings } from '@/types/organization-settings'
 
 export function SolicitudesSettingsPanel() {
@@ -28,14 +30,12 @@ export function SolicitudesSettingsPanel() {
     if (!canEdit) return
     setSaving(true)
     try {
-      await saveSettings({
-        ...settings,
-        defaultSolicitudAssigneeUserId: draft.defaultSolicitudAssigneeUserId,
-        defaultSolicitudAssigneeName: draft.defaultSolicitudAssigneeName,
-      })
+      await saveSettings(organizationSolicitudesSettingsFrom(draft))
       toast.success('Responsable predeterminado de solicitudes guardado.')
-    } catch {
-      toast.error('No se pudo guardar la configuración de solicitudes.')
+    } catch (error) {
+      toast.error(
+        apiActionErrorMessage(error, 'No se pudo guardar la configuración de solicitudes.'),
+      )
     } finally {
       setSaving(false)
     }

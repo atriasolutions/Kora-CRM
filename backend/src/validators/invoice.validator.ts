@@ -45,10 +45,18 @@ export const listInvoicesQuerySchema = z.object({
   status: z.string().optional(),
   quoteId: z.string().uuid().optional(),
   companyId: z.string().uuid().optional(),
+  documentKind: z.enum(['invoice', 'credit_note', 'debit_note', 'all']).optional(),
   archived: z
     .union([z.literal('true'), z.literal('false')])
     .optional()
     .transform((v) => v === 'true'),
+})
+
+export const createInvoiceAdjustmentSchema = z.object({
+  mode: z.enum(['full', 'partial']),
+  referenceReason: z.string().trim().min(1).max(500),
+  referenceCode: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
+  lineItems: z.array(invoiceLineSchema).optional(),
 })
 
 export const createInvoiceSchema = z.object({

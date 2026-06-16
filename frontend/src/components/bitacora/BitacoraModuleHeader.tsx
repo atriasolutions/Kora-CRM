@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { BarChart3, List, Plus } from 'lucide-react'
+import { Archive, BarChart3, List, Plus } from 'lucide-react'
 
 import { BitacoraFiltersMenu } from '@/components/bitacora/BitacoraFiltersMenu'
 import { ModuleListScopeSwitcher } from '@/components/list/ModuleListScopeSwitcher'
@@ -22,7 +22,7 @@ import {
 import { useAuth } from '@/hooks/use-auth'
 import { useModulePermissions } from '@/hooks/use-module-permissions'
 
-export type BitacoraViewId = 'lista' | 'dashboard'
+export type BitacoraViewId = 'lista' | 'dashboard' | 'archivados'
 
 const BITACORA_VIEW_OPTIONS: ModuleViewOption<BitacoraViewId>[] = [
   {
@@ -37,6 +37,12 @@ const BITACORA_VIEW_OPTIONS: ModuleViewOption<BitacoraViewId>[] = [
     description: 'Resumen visual de horas para presentar al cliente',
     Icon: BarChart3,
   },
+  {
+    id: 'archivados',
+    label: 'Archivados',
+    description: 'Papelera: restaurar o eliminar registros',
+    Icon: Archive,
+  },
 ]
 
 type BitacoraModuleHeaderProps = {
@@ -50,6 +56,7 @@ type BitacoraModuleHeaderProps = {
   listScope: BitacoraListScope
   onListScopeChange: (scope: BitacoraListScope) => void
   guestCompany?: GuestCompanyRef | null
+  archivedCount?: number
   toolbarEnd?: ReactNode
 }
 
@@ -64,11 +71,13 @@ export function BitacoraModuleHeader({
   listScope,
   onListScopeChange,
   guestCompany = null,
+  archivedCount = 0,
   toolbarEnd,
 }: BitacoraModuleHeaderProps) {
   const { profile } = useAuth()
   const { canCreate } = useModulePermissions('bitacora')
   const scopeOptions = bitacoraListScopeOptionsForProfile(profile)
+  const showListScope = view !== 'archivados' && onListScopeChange != null
   const activeFilters =
     view === 'dashboard'
       ? countActiveBitacoraDashboardFilters(filters)
@@ -82,9 +91,11 @@ export function BitacoraModuleHeader({
             Bitácora
           </h1>
           <p className="mt-1 hidden text-sm text-muted-foreground md:block">
-            {view === 'dashboard'
-              ? 'Dashboard de horas facturables y no facturables, listo para compartir con el cliente.'
-              : 'Registro de horas invertidas en solicitudes del equipo.'}
+            {view === 'archivados'
+              ? 'Papelera de reciclaje: restaura o elimina registros archivados.'
+              : view === 'dashboard'
+                ? 'Dashboard de horas facturables y no facturables, listo para compartir con el cliente.'
+                : 'Registro de horas invertidas en solicitudes del equipo.'}
             {activeFilters > 0
               ? ` · ${activeFilters} filtro${activeFilters === 1 ? '' : 's'} activo${activeFilters === 1 ? '' : 's'}`
               : ''}
@@ -98,7 +109,7 @@ export function BitacoraModuleHeader({
             variant={view === 'dashboard' ? 'dashboard' : 'list'}
             guestCompany={guestCompany}
           />
-          {canCreate ? (
+          {view !== 'archivados' && canCreate ? (
             <Button
               size="sm"
               className="size-8 px-0 shadow-sm md:h-9 md:w-auto md:px-4"
@@ -119,29 +130,35 @@ export function BitacoraModuleHeader({
             onChange={onViewChange}
             options={BITACORA_VIEW_OPTIONS}
             tablistAriaLabel="Vista de bitácora"
+            archivedViewId="archivados"
+            archivedCount={archivedCount}
             showLabel
           />
         }
         scopeSwitcher={
-          <ModuleListScopeSwitcher
-            value={view === 'dashboard' && listScope === 'recent' ? 'all' : listScope}
-            onChange={onListScopeChange}
-            options={
-              view === 'dashboard'
-                ? scopeOptions.filter((option) => option.id !== 'recent')
-                : scopeOptions
-            }
-            shortLabels={BITACORA_SCOPE_SHORT_LABELS}
-            showLabel
-          />
+          showListScope ? (
+            <ModuleListScopeSwitcher
+              value={view === 'dashboard' && listScope === 'recent' ? 'all' : listScope}
+              onChange={onListScopeChange}
+              options={
+                view === 'dashboard'
+                  ? scopeOptions.filter((option) => option.id !== 'recent')
+                  : scopeOptions
+              }
+              shortLabels={BITACORA_SCOPE_SHORT_LABELS}
+              showLabel
+            />
+          ) : undefined
         }
         search={
-          view === 'lista' ? (
+          view === 'lista' || view === 'archivados' ? (
             <ModuleSearchField
               value={query}
               onChange={onQueryChange}
               ariaLabel="Buscar bitácora"
-              placeholder="Buscar bitácora…"
+              placeholder={
+                view === 'archivados' ? 'Buscar en archivados…' : 'Buscar bitácora…'
+              }
               className="relative w-full"
             />
           ) : undefined

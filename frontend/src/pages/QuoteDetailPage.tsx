@@ -450,8 +450,8 @@ export function QuoteDetailPage() {
             }
 
             try {
-              await updateQuoteFromDetail(nextQuote, { previousStatus })
-              setQuote(nextQuote)
+              const persisted = await updateQuoteFromDetail(nextQuote, { previousStatus })
+              setQuote(persisted)
               if (useApi) {
                 refreshInventoryFromServer()
                 if (shouldReserveQuoteOnStatus(stage)) {

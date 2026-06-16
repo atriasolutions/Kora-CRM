@@ -57,6 +57,10 @@ export const bitacoraDashboardQuerySchema = z.object({
 export const listBitacoraQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(200).default(50),
+  archived: z
+    .union([z.literal('true'), z.literal('false')])
+    .optional()
+    .transform((v) => v === 'true'),
   q: z.string().optional(),
   solicitudId: z.string().uuid().optional(),
   mine: z

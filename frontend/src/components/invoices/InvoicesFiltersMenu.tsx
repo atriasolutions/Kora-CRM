@@ -13,6 +13,7 @@ import {
   countActiveInvoiceFilters,
   createDefaultInvoiceFilters,
   INVOICE_DUE_OPTIONS,
+  INVOICE_DOCUMENT_KIND_OPTIONS,
   INVOICE_PAYMENT_METHOD_OPTIONS,
   INVOICE_STATUS_OPTIONS,
   type InvoiceFilters,
@@ -102,6 +103,16 @@ export function InvoicesFiltersMenu({ filters, onFiltersChange }: InvoicesFilter
                 : [...filters.paymentMethods, method]
               onFiltersChange({ ...filters, paymentMethods })
             }}
+          />
+        ))}
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel>Tipo de documento</DropdownMenuLabel>
+        {INVOICE_DOCUMENT_KIND_OPTIONS.map(({ value, label }) => (
+          <CheckboxRow
+            key={value}
+            checked={filters.documentKind === value}
+            label={label}
+            onClick={() => onFiltersChange({ ...filters, documentKind: value })}
           />
         ))}
         <DropdownMenuSeparator />

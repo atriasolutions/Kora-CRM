@@ -4,6 +4,10 @@ import {
   invoiceStatusVariant,
   resolveInvoiceListStage,
 } from '@/lib/invoice-display'
+import {
+  documentKindLabel,
+  dteTypeLabel,
+} from '@/lib/invoice-dte'
 import type { ModuleListConfig } from '@/types/list-module'
 
 export type { InvoiceListItem }
@@ -24,11 +28,30 @@ export const invoicingListConfig: ModuleListConfig<InvoiceListItem> = {
   columns: [
     {
       kind: 'primary',
-      header: 'Factura',
+      header: 'Documento',
       sortable: true,
-      className: 'w-[160px]',
+      className: 'w-[180px]',
       title: (r) => r.number,
-      subtitle: (r) => r.client,
+      subtitle: (r) => documentKindLabel(r.documentKind),
+    },
+    {
+      kind: 'text',
+      header: 'Folio SII',
+      sortable: false,
+      className: 'w-[100px]',
+      cell: (r) =>
+        r.siiNumber
+          ? r.siiNumber
+          : r.documentKind === 'invoice'
+            ? dteTypeLabel(undefined, r.documentKind)
+            : '—',
+    },
+    {
+      kind: 'text',
+      header: 'Cliente',
+      sortable: true,
+      className: 'w-[150px]',
+      cell: (r) => r.client,
     },
     {
       kind: 'text',

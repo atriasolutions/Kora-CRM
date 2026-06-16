@@ -11,6 +11,7 @@ import * as projectsRepo from '../repositories/projects.repository.js'
 import * as purchasesRepo from '../repositories/purchases.repository.js'
 import * as quotesRepo from '../repositories/quotes.repository.js'
 import * as solicitudesRepo from '../repositories/solicitudes.repository.js'
+import * as bitacoraRepo from '../repositories/bitacora.repository.js'
 import * as stockReceiptsRepo from '../repositories/stock-receipts.repository.js'
 import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import type { AuditActor } from '../types/audit.js'
@@ -143,6 +144,14 @@ export async function purgeExpiredArchivedRecords(): Promise<ArchivePurgeRunResu
           false,
         ),
         deleteFn: (id) => activitiesRepo.permanentlyDeleteActivity(id),
+      },
+      {
+        entity: 'bitacora',
+        ids: await listExpiredIds(
+          `SELECT id FROM crm_bitacora_entries WHERE __CUTOFF__`,
+          false,
+        ),
+        deleteFn: (id) => bitacoraRepo.permanentlyDeleteBitacora(id),
       },
       {
         entity: 'recepcion',

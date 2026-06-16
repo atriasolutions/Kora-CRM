@@ -13,8 +13,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { PageScrollArea } from '@/components/layout/PageScrollArea'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { apiActionErrorMessage } from '@/api/errors'
+import { mergeProductDetailFromListItem } from '@/api/products'
 import { useModulePermissions } from '@/hooks/use-module-permissions'
-import { toast } from '@/lib/toast'
+import { getCurrentUser } from '@/lib/current-user'
 
 import { EditProductDialog } from '@/components/products/EditProductDialog'
 import { ProductDetailHeader } from '@/components/products/ProductDetailHeader'
@@ -129,8 +130,10 @@ export function ProductDetailPage() {
 
   const handleProductSaved = useCallback(
     async (updated: ProductDetail, previousSku?: string) => {
-      await updateProductFromDetail(updated, { previousSku })
-      setProduct(updated)
+      const saved = await updateProductFromDetail(updated, { previousSku })
+      setProduct(
+        saved ? mergeProductDetailFromListItem(updated, saved) : updated,
+      )
       toast.success(`Producto «${updated.name}» actualizado correctamente.`)
     },
     [updateProductFromDetail],
@@ -250,7 +253,7 @@ export function ProductDetailPage() {
         contactId={product.id}
         contactName={product.name}
         companyName={product.sku}
-        defaultAuthor="María López"
+        defaultAuthor={product.owner?.trim() || getCurrentUser().name}
         presetType={activityPresetType}
         onSaved={handleActivitySaved}
       />

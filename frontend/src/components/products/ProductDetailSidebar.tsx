@@ -55,6 +55,7 @@ export function ProductDetailSidebar({
           <CardContent>
             <ProductFormFields
               form={form}
+              inventoryContextSku={product.sku}
               onChange={onFormChange}
               showImage={false}
             />

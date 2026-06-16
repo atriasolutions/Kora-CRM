@@ -17,6 +17,7 @@ export type SolicitudApiBody = {
   priority?: string
   assigneeName?: string
   assigneeUserId?: string | null
+  requesterUserId?: string | null
   team?: { userId?: string; userName?: string; roleLabel?: string }[]
 }
 
@@ -28,6 +29,7 @@ export function solicitudFormToApiBody(values: CreateSolicitudFormValues): Solic
     priority: values.priority,
     assigneeName: values.assigneeName.trim() || undefined,
     assigneeUserId: values.assigneeUserId?.trim() || null,
+    requesterUserId: values.requesterUserId?.trim() || null,
   }
 }
 

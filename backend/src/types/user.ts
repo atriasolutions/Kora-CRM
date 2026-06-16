@@ -16,6 +16,8 @@ export type UserListItem = {
   lastLogin: string
   status: UserStatus
   avatarUrl?: string
+  guestCompanyId?: string
+  guestCompanyName?: string
 }
 
 export type UserDetail = UserListItem & {

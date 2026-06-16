@@ -14,6 +14,10 @@ export type CompanyListItem = {
   lifecycle: CompanyLifecycle
   operationalStatus: CompanyOperationalStatus
   lastActivity: string
+  website: string
+  email: string
+  phone: string
+  description: string
   createdAt: string
   createdById: string
   createdByName: string
@@ -33,6 +37,10 @@ export type CreateCompanyInput = {
   ownerName?: string
   lifecycle?: CompanyLifecycle
   operationalStatus?: CompanyOperationalStatus
+  website?: string
+  email?: string
+  phone?: string
+  description?: string
 }
 
 export type UpdateCompanyInput = Partial<CreateCompanyInput>

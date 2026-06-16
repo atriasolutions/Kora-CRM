@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { entityImageUrlSchema } from './image-url.schema.js'
+
 export const invoicingModeSchema = z.enum(['manual', 'sii'])
 
 export const updateOrganizationSettingsSchema = z.object({
@@ -14,7 +16,7 @@ export const updateOrganizationSettingsSchema = z.object({
   commune: z.string().max(128).optional(),
   phone: z.string().max(64).optional(),
   email: z.string().max(320).optional(),
-  logoUrl: z.string().optional(),
+  logoUrl: entityImageUrlSchema,
   defaultVatPercent: z.number().min(0).max(100).optional(),
   invoicingMode: invoicingModeSchema.optional(),
   economicActivityCode: z.number().int().positive().max(99999999).nullable().optional(),

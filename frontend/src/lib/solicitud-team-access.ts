@@ -73,13 +73,16 @@ export function dedupeSolicitudTeamMembers(
 export function normalizeSolicitudTeamMembers(
   team: SolicitudTeamMember[] | undefined,
   assigneeName?: string,
+  assigneeUserId?: string,
 ): SolicitudTeamMember[] {
   const assignee = assigneeName?.trim()
+  const assigneeId = assigneeUserId?.trim()
   const list = dedupeSolicitudTeamMembers(team, assignee)
   if (assignee && !list.some((m) => m.name.trim().toLowerCase() === assignee.toLowerCase())) {
     list.unshift({
-      id: `assignee-${assignee}`,
+      id: assigneeId ? `assignee-${assigneeId}` : `assignee-${assignee}`,
       name: assignee,
+      userId: assigneeId || undefined,
       role: 'Responsable',
     })
   }

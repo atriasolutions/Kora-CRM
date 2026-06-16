@@ -13,10 +13,15 @@ export async function getOrganizationSettingsApi(): Promise<OrganizationSettings
 export async function updateOrganizationSettingsApi(
   body: Partial<OrganizationSettings>,
 ): Promise<OrganizationSettings> {
+  const payload = Object.fromEntries(
+    Object.entries(body).filter(
+      ([key, value]) => key !== 'id' && value !== undefined,
+    ),
+  )
   const res = await fetchJSON<ApiItemResponse<OrganizationSettings>>(BASE, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify(payload),
   })
   return res.data
 }

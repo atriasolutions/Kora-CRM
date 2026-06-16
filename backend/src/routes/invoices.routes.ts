@@ -10,9 +10,11 @@ import type {
 } from '../types/invoice.js'
 import {
   createInvoiceSchema,
+  createInvoiceAdjustmentSchema,
   listInvoicesQuerySchema,
   updateInvoiceSchema,
 } from '../validators/invoice.validator.js'
+import type { CreateInvoiceAdjustmentInput } from '../types/invoice.js'
 
 export const invoicesRouter = Router()
 
@@ -30,6 +32,7 @@ invoicesRouter.get(
         quoteId: query.quoteId,
         companyId: query.companyId,
         archivedOnly: query.archived === true,
+        documentKind: query.documentKind,
       })
       res.json({
         data: result.items,
@@ -133,6 +136,49 @@ invoicesRouter.delete(
         getAuditActor(req),
       )
       res.status(204).send()
+    } catch (e) {
+      next(e)
+    }
+  },
+)
+
+invoicesRouter.post(
+  '/:id/credit-notes',
+  requirePermission('facturacion', 'edit'),
+  async (req, res, next) => {
+    try {
+      const body = createInvoiceAdjustmentSchema.parse(req.body) as CreateInvoiceAdjustmentInput
+      const { createCreditNote } = await import('../services/invoice-adjustment.service.js')
+      const item = await createCreditNote(routeParam(req), body, getAuditActor(req))
+      res.status(201).json({ data: item })
+    } catch (e) {
+      next(e)
+    }
+  },
+)
+
+invoicesRouter.post(
+  '/:id/debit-notes',
+  requirePermission('facturacion', 'edit'),
+  async (req, res, next) => {
+    try {
+      const body = createInvoiceAdjustmentSchema.parse(req.body) as CreateInvoiceAdjustmentInput
+      const { createDebitNote } = await import('../services/invoice-adjustment.service.js')
+      const item = await createDebitNote(routeParam(req), body, getAuditActor(req))
+      res.status(201).json({ data: item })
+    } catch (e) {
+      next(e)
+    }
+  },
+)
+
+invoicesRouter.get(
+  '/:id/adjustments',
+  requirePermission('facturacion', 'view'),
+  async (req, res, next) => {
+    try {
+      const items = await invoicesRepo.listInvoiceAdjustments(routeParam(req))
+      res.json({ data: items })
     } catch (e) {
       next(e)
     }

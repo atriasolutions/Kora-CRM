@@ -9,6 +9,8 @@ export type SiiIntegrationStatus = {
   configured: boolean
   credentialsCount: number
   folioRangesCount: number
+  folioTypesAvailable: number[]
+  folioTypesMissing: number[]
   lastRcvSyncAt: string | null
   readyToEmit: boolean
   missing: string[]

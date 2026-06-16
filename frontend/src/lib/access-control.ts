@@ -42,7 +42,12 @@ export function filterNavSections(
       if (section.type === 'items') {
         return { type: 'items' as const, items }
       }
-      return { type: 'group' as const, heading: section.heading, items }
+      return {
+        type: 'group' as const,
+        heading: section.heading,
+        items,
+        defaultOpen: section.defaultOpen,
+      }
     })
     .filter((s): s is NavSectionDef => s !== null)
 }

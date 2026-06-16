@@ -16,6 +16,10 @@ export const createCompanySchema = z.object({
   ownerName: z.string().max(255).optional(),
   lifecycle: lifecycle.optional(),
   operationalStatus: operationalStatus.optional(),
+  website: z.string().max(512).optional(),
+  email: z.string().max(255).optional(),
+  phone: z.string().max(64).optional(),
+  description: z.string().max(10000).optional(),
 })
 
 export const updateCompanySchema = createCompanySchema.partial()

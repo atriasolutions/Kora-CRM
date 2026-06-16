@@ -22,6 +22,8 @@ export type UserListItem = {
   lastLogin: string
   status: UserStatus
   avatarUrl?: string
+  guestCompanyId?: string
+  guestCompanyName?: string
 }
 
 type UserListSeedRow = Omit<UserListItem, 'profileId' | 'profileName'>

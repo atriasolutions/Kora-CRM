@@ -68,6 +68,11 @@ function defaultDimensionsFor(type: ProductType): ProductDimensions {
   return { length: '', width: '', height: '', unit: 'cm' }
 }
 
+function formatInventoryThreshold(num: number | undefined, unit: string): string {
+  if (num == null || num <= 0) return `0 ${unit}`
+  return `${num} ${unit}`
+}
+
 export function buildDetailFromList(base: ProductListItem, id: string): ProductDetail {
   const isPhysical = base.productType === 'Físico'
   const isFood = base.category.includes('Cárnic') || base.category.includes('Aliment')
@@ -75,6 +80,12 @@ export function buildDetailFromList(base: ProductListItem, id: string): ProductD
     base.productType === 'Digital' ||
     base.productType === 'Suscripción' ||
     base.category.includes('Software')
+  const unit = base.unitOfMeasure?.trim() || 'ud'
+
+  const trackInventory =
+    typeof base.trackInventory === 'boolean'
+      ? base.trackInventory
+      : isPhysical && base.stockNum >= 0
 
   const savedBillingPeriod = base.billingPeriod
   const hasSavedBillingPeriod =
@@ -101,9 +112,13 @@ export function buildDetailFromList(base: ProductListItem, id: string): ProductD
               : 'Único',
     taxRate: '19',
     taxIncluded: true,
-    trackInventory: isPhysical && base.stockNum >= 0,
-    minStock: isPhysical ? '10 u.' : '—',
-    maxStock: isPhysical ? '500 u.' : '—',
+    trackInventory,
+    minStock: trackInventory
+      ? formatInventoryThreshold(base.minStockNum, unit)
+      : '—',
+    maxStock: trackInventory
+      ? formatInventoryThreshold(base.maxStockNum, unit)
+      : '—',
     dimensions: defaultDimensionsFor(base.productType),
     weight: isPhysical ? (base.unitOfMeasure === 'kg' ? '1' : '0.5') : '',
     weightUnit: 'kg',

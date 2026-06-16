@@ -274,8 +274,9 @@ export function InvoicesPage() {
             listScope === 'recent'
               ? undefined
               : {
-                  fetchPage: (params) => fetchInvoicesServerPage(params, false),
-                  resetKey: `${listRefreshKey}-${listScope}`,
+                  fetchPage: (params) =>
+                    fetchInvoicesServerPage(params, false, filters.documentKind),
+                  resetKey: `${listRefreshKey}-${listScope}-${filters.documentKind}`,
                 }
           }
           rowPredicate={rowPredicate}

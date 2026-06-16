@@ -38,6 +38,7 @@ import {
   formatSiiInvoiceNumberDisplay,
   invoiceRequiresSiiNumber,
 } from '@/lib/invoice-sii'
+import { dteTypeLabel, documentKindLabel, resolvePreviewInvoiceDteType } from '@/lib/invoice-dte'
 import { useDetailHeaderPermissions } from '@/hooks/use-detail-header-permissions'
 import { cn } from '@/lib/utils'
 
@@ -49,6 +50,8 @@ type InvoiceDetailHeaderProps = {
   onStartEdit?: () => void
   onRegisterActivity?: (presetType?: ContactActivityType) => void
   onArchive?: () => void
+  onCreateCreditNote?: () => void
+  onCreateDebitNote?: () => void
 }
 
 export function InvoiceDetailHeader({
@@ -59,6 +62,8 @@ export function InvoiceDetailHeader({
   onStartEdit,
   onRegisterActivity,
   onArchive,
+  onCreateCreditNote,
+  onCreateDebitNote,
 }: InvoiceDetailHeaderProps) {
   const { showEdit, showArchive } = useDetailHeaderPermissions('facturacion', {
     onStartEdit,
@@ -66,6 +71,13 @@ export function InvoiceDetailHeader({
   })
 
   const displayStatus = invoiceStageDisplayName(invoice.status as InvoiceJourneyStage)
+  const previewDte =
+    invoice.dteType ??
+    (invoice.documentKind === 'credit_note'
+      ? 61
+      : invoice.documentKind === 'debit_note'
+        ? 56
+        : resolvePreviewInvoiceDteType(invoice.lineItems ?? []))
   const displayClient =
     isEditing && form
       ? saleCustomerDisplayName(form)
@@ -86,6 +98,7 @@ export function InvoiceDetailHeader({
   }
 
   const customerKind = invoice.customerKind ?? (invoice.contactId ? 'contacto' : 'empresa')
+  const showAdjustments = Boolean(onCreateCreditNote || onCreateDebitNote)
 
   return (
     <section
@@ -148,10 +161,15 @@ export function InvoiceDetailHeader({
                     <h1 className="break-words text-2xl font-semibold tracking-tight text-foreground">
                       {displayClient}
                     </h1>
-                    <Badge variant={invoiceStatusVariant(displayStatus)}>
+                    <Badge variant={invoiceStatusVariant(invoice.status)}>
                       {displayStatus}
                     </Badge>
+                    <Badge variant="outline">{documentKindLabel(invoice.documentKind)}</Badge>
+                    <Badge variant="outline">
+                      {dteTypeLabel(previewDte, invoice.documentKind)}
+                    </Badge>
                   </div>
+                  <p className="font-mono text-sm text-muted-foreground">{invoice.number}</p>
                   <p className="text-sm text-muted-foreground">
                     Responsable {invoice.owner}
                   </p>
@@ -210,27 +228,40 @@ export function InvoiceDetailHeader({
                   Editar
                 </Button>
               ) : null}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="icon" className="border-border shadow-sm">
-                    <MoreHorizontal aria-hidden className="size-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem>Registrar pago</DropdownMenuItem>
-                  <DropdownMenuItem>Enviar recordatorio</DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem className="text-destructive">Anular factura</DropdownMenuItem>
-                  {showArchive ? (
-                    <DropdownMenuItem
-                      className="text-destructive focus:text-destructive"
-                      onClick={onArchive}
-                    >
-                      Archivar
-                    </DropdownMenuItem>
-                  ) : null}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {showAdjustments || showArchive ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="icon" className="border-border shadow-sm">
+                      <MoreHorizontal aria-hidden className="size-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-52">
+                    {showAdjustments ? (
+                      <>
+                        {onCreateCreditNote ? (
+                          <DropdownMenuItem onSelect={onCreateCreditNote}>
+                            Nota de crédito
+                          </DropdownMenuItem>
+                        ) : null}
+                        {onCreateDebitNote ? (
+                          <DropdownMenuItem onSelect={onCreateDebitNote}>
+                            Nota de débito
+                          </DropdownMenuItem>
+                        ) : null}
+                        {showArchive ? <DropdownMenuSeparator /> : null}
+                      </>
+                    ) : null}
+                    {showArchive ? (
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={onArchive}
+                      >
+                        Archivar
+                      </DropdownMenuItem>
+                    ) : null}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : null}
             </div>
           ) : null}
         </div>

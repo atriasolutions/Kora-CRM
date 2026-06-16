@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 import {
   ContactFormCheckbox,
   ContactFormField,
@@ -5,6 +7,15 @@ import {
   ContactFormSelect,
 } from '@/components/contacts/ContactFormField'
 import { AvatarImageUpload } from '@/components/shared/AvatarImageUpload'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Separator } from '@/components/ui/separator'
 import type { ProductStatus } from '@/data/products.mock'
 import { UserLookupField } from '@/components/shared/UserLookupField'
@@ -22,6 +33,13 @@ import { ProductPriceInput } from '@/components/products/ProductPriceInput'
 import { useProductCategoryOptions } from '@/hooks/use-catalog-options'
 import { inventoryQuantityInputValue, parseStockNum } from '@/lib/product-display'
 import {
+  formatProductInventoryStockSummary,
+  hasInventoryPositions,
+  hasSignificantInventoryStock,
+  resolveProductInventoryStockSummary,
+  type ProductInventoryStockSummary,
+} from '@/lib/product-track-inventory-toggle'
+import {
   formatProductPriceAmount,
   parseProductPrice,
 } from '@/lib/product-currency-input'
@@ -31,6 +49,8 @@ type ProductFormFieldsProps = {
   onChange: (patch: Partial<ProductFormValues>) => void
   showImage?: boolean
   compact?: boolean
+  /** SKU del producto en edición (para evaluar inventario al desactivar control de stock). */
+  inventoryContextSku?: string
 }
 
 export function ProductFormFields({
@@ -38,9 +58,60 @@ export function ProductFormFields({
   onChange,
   showImage = true,
   compact = false,
+  inventoryContextSku,
 }: ProductFormFieldsProps) {
   const categoryOptions = useProductCategoryOptions()
   const patch = (partial: Partial<ProductFormValues>) => onChange(partial)
+  const [disableTrackDialogOpen, setDisableTrackDialogOpen] = useState(false)
+  const [disableTrackLoading, setDisableTrackLoading] = useState(false)
+  const [disableTrackSummary, setDisableTrackSummary] =
+    useState<ProductInventoryStockSummary | null>(null)
+
+  const applyDisableTrackInventory = () => {
+    patch({ trackInventory: false, stock: '—', minStock: '', maxStock: '' })
+    setDisableTrackDialogOpen(false)
+    setDisableTrackSummary(null)
+  }
+
+  const handleTrackInventoryChange = (trackInventory: boolean) => {
+    if (trackInventory) {
+      const toInt = (s: string) => {
+        const n = parseStockNum(s)
+        return n < 0 ? '' : String(n)
+      }
+      patch({
+        trackInventory,
+        stock: '0',
+        minStock: toInt(form.minStock),
+        maxStock: toInt(form.maxStock),
+      })
+      return
+    }
+
+    const sku = (inventoryContextSku ?? form.sku).trim()
+    if (!sku || !form.trackInventory) {
+      applyDisableTrackInventory()
+      return
+    }
+
+    setDisableTrackLoading(true)
+    void (async () => {
+      try {
+        const summary = await resolveProductInventoryStockSummary(sku)
+        if (!hasInventoryPositions(summary)) {
+          applyDisableTrackInventory()
+          return
+        }
+        setDisableTrackSummary(summary)
+        setDisableTrackDialogOpen(true)
+      } catch {
+        setDisableTrackSummary({ positionCount: 1, onHandQty: 0, availableQty: 0, reservedQty: 0 })
+        setDisableTrackDialogOpen(true)
+      } finally {
+        setDisableTrackLoading(false)
+      }
+    })()
+  }
 
   const minStockInputValue = inventoryQuantityInputValue(form.minStock, form.trackInventory)
   const maxStockInputValue = inventoryQuantityInputValue(form.maxStock, form.trackInventory)
@@ -215,22 +286,8 @@ export function ProductFormFields({
           id="pd-form-track-inv"
           label="Controlar stock de este producto"
           checked={form.trackInventory}
-          onChange={(trackInventory) => {
-            if (trackInventory) {
-              const toInt = (s: string) => {
-                const n = parseStockNum(s)
-                return n < 0 ? '' : String(n)
-              }
-              patch({
-                trackInventory,
-                stock: '0',
-                minStock: toInt(form.minStock),
-                maxStock: toInt(form.maxStock),
-              })
-            } else {
-              patch({ trackInventory, stock: '—', minStock: '', maxStock: '' })
-            }
-          }}
+          disabled={disableTrackLoading}
+          onChange={handleTrackInventoryChange}
         />
         {form.trackInventory ? (
           <>
@@ -345,6 +402,66 @@ export function ProductFormFields({
           />
         </ContactFormField>
       ) : null}
+
+      <Dialog
+        open={disableTrackDialogOpen}
+        onOpenChange={(open) => {
+          setDisableTrackDialogOpen(open)
+          if (!open) setDisableTrackSummary(null)
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {disableTrackSummary && hasSignificantInventoryStock(disableTrackSummary)
+                ? 'Quitar control de stock'
+                : 'Eliminar registro de inventario'}
+            </DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                {disableTrackSummary && hasSignificantInventoryStock(disableTrackSummary) ? (
+                  <>
+                    <p>
+                      Este producto tiene stock en inventario (
+                      {formatProductInventoryStockSummary(disableTrackSummary)}).
+                    </p>
+                    <p>
+                      Al quitar el control de stock se eliminarán las posiciones en bodega, los
+                      movimientos y las reservas asociadas a este SKU. Esta acción no se puede
+                      deshacer.
+                    </p>
+                  </>
+                ) : (
+                  <p>
+                    Se eliminará el registro de inventario de este producto (sin unidades en
+                    bodega). Los movimientos históricos también se borrarán.
+                  </p>
+                )}
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDisableTrackDialogOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant={
+                disableTrackSummary && hasSignificantInventoryStock(disableTrackSummary)
+                  ? 'destructive'
+                  : 'default'
+              }
+              onClick={applyDisableTrackInventory}
+            >
+              Quitar control de stock
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

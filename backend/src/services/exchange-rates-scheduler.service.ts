@@ -19,7 +19,7 @@ export async function runDailyExchangeRateSync(): Promise<void> {
   )
   lastSyncedDate = snapshot.rateDate
   console.log(
-    `[exchange-rates] Tasas ${snapshot.rateDate}: UF=${snapshot.ufClp} USD=${snapshot.usdClp} EUR=${snapshot.eurClp}`,
+    `[exchange-rates] Tasas ${snapshot.rateDate} (${snapshot.source}): UF=${snapshot.ufClp} USD=${snapshot.usdClp} EUR=${snapshot.eurClp}`,
   )
 }
 

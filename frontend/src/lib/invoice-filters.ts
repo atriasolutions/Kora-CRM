@@ -5,9 +5,15 @@ import type {
 } from '@/data/invoices.mock'
 import { resolveInvoiceListStage } from '@/lib/invoice-display'
 import {
+  INVOICE_DOCUMENT_KIND_OPTIONS,
+  type InvoiceDocumentKindFilter,
+} from '@/lib/invoice-dte'
+import {
   INVOICE_PAYMENT_METHOD_OPTIONS,
   INVOICE_STATUS_OPTIONS,
 } from '@/data/invoices.mock'
+
+export { INVOICE_DOCUMENT_KIND_OPTIONS, type InvoiceDocumentKindFilter }
 
 export type InvoiceDueFilter = 'all' | 'month' | 'overdue'
 
@@ -15,6 +21,7 @@ export type InvoiceFilters = {
   statuses: InvoiceStatus[]
   paymentMethods: InvoicePaymentMethod[]
   due: InvoiceDueFilter
+  documentKind: InvoiceDocumentKindFilter
 }
 
 export { INVOICE_STATUS_OPTIONS, INVOICE_PAYMENT_METHOD_OPTIONS }
@@ -29,7 +36,7 @@ export const INVOICE_DUE_OPTIONS: {
 ]
 
 export function createDefaultInvoiceFilters(): InvoiceFilters {
-  return { statuses: [], paymentMethods: [], due: 'all' }
+  return { statuses: [], paymentMethods: [], due: 'all', documentKind: 'all' }
 }
 
 export function countActiveInvoiceFilters(filters: InvoiceFilters): number {
@@ -37,6 +44,7 @@ export function countActiveInvoiceFilters(filters: InvoiceFilters): number {
   if (filters.statuses.length > 0) n += 1
   if (filters.paymentMethods.length > 0) n += 1
   if (filters.due !== 'all') n += 1
+  if (filters.documentKind !== 'all') n += 1
   return n
 }
 
@@ -72,5 +80,11 @@ export function invoiceRowMatchesFilters(
     return false
   }
   if (!matchesDue(row.dueDate, resolveInvoiceListStage(row), filters.due)) return false
+  if (
+    filters.documentKind !== 'all' &&
+    (row.documentKind ?? 'invoice') !== filters.documentKind
+  ) {
+    return false
+  }
   return true
 }

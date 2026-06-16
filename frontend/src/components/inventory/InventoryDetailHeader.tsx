@@ -1,7 +1,6 @@
 import {
   Boxes,
   MapPin,
-  MoreHorizontal,
   Package,
   Pencil,
   Warehouse,
@@ -15,12 +14,6 @@ import {
 import { RegisterActivityHeaderButton } from '@/components/shared/RegisterActivityHeaderButton'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import type { InventoryDetail } from '@/data/inventory-detail.mock'
 import type { ContactActivityType } from '@/data/contact-detail.mock'
 import type { InventoryStatus } from '@/data/inventory.mock'
@@ -169,16 +162,6 @@ export function InventoryDetailHeader({
                   Ajustar stock
                 </Button>
               ) : null}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="icon" className="border-border shadow-sm">
-                    <MoreHorizontal aria-hidden className="size-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem>Registrar movimiento</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
             </div>
           ) : null}
         </div>

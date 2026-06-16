@@ -12,6 +12,8 @@ export type InvoicePaymentMethod =
 
 import type { SaleCustomerKind } from '@/lib/sale-customer'
 
+export type InvoiceDocumentKind = 'invoice' | 'credit_note' | 'debit_note'
+
 export type InvoiceListItem = {
   id: string
   number: string
@@ -31,10 +33,18 @@ export type InvoiceListItem = {
   paymentMethod: InvoicePaymentMethod
   /** Folio del DTE en el SII (obligatorio al emitir). */
   siiNumber?: string
+  dteType?: number
   /** Estado del DTE en integración SII. */
   dteStatus?: string
   /** Track ID devuelto por el SII al enviar el DTE. */
   siiTrackId?: string
+  documentKind?: InvoiceDocumentKind
+  sourceInvoiceId?: string
+  referenceCode?: 1 | 2 | 3
+  referenceReason?: string
+  taxableAmount?: string
+  exemptAmount?: string
+  taxAmount?: string
 } & RecordAuditFields
 
 export const INVOICE_LIST_TOTAL_DEMO = 312

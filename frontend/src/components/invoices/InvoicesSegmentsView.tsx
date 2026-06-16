@@ -53,7 +53,9 @@ export function InvoicesSegmentsView({
       invoiceRowMatchesFilters(inv, filters),
     ).filter(
       (inv) =>
-        !isArchived(inv.id) && invoiceMatchesListScope(inv, listScope, recentIds),
+        !isArchived(inv.id) &&
+        invoiceMatchesListScope(inv, listScope, recentIds) &&
+        (inv.documentKind ?? 'invoice') === 'invoice',
     )
     if (listScope === 'recent') {
       result = sortInvoicesByRecentlyViewed(result, recentIds)

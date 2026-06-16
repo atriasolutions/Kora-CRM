@@ -11,11 +11,13 @@ import { PageScrollArea } from '@/components/layout/PageScrollArea'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { EditInvoiceDialog } from '@/components/invoices/EditInvoiceDialog'
+import { CreateInvoiceAdjustmentDialog } from '@/components/invoices/CreateInvoiceAdjustmentDialog'
 import { InvoiceDetailHeader } from '@/components/invoices/InvoiceDetailHeader'
 import { InvoiceDetailSidebar } from '@/components/invoices/InvoiceDetailSidebar'
 import { InvoiceEmitSiiDialog } from '@/components/invoices/InvoiceEmitSiiDialog'
 import { InvoiceFilesPanel } from '@/components/invoices/InvoiceFilesPanel'
 import { InvoiceLineItemsPanel } from '@/components/invoices/InvoiceLineItemsPanel'
+import { InvoiceRelatedAdjustmentsPanel } from '@/components/invoices/InvoiceRelatedAdjustmentsPanel'
 import { InvoiceSiiFolioCard } from '@/components/invoices/InvoiceSiiFolioCard'
 import { InvoiceSuccessPath } from '@/components/invoices/InvoiceSuccessPath'
 import { RegisterActivityDialog } from '@/components/contacts/RegisterActivityDialog'
@@ -55,11 +57,17 @@ import {
 } from '@/lib/invoice-journey'
 import { INVOICE_EMITTED_STATUS } from '@/lib/invoice-sii'
 import { emitInvoiceToSiiApi } from '@/api/sii'
+import {
+  createCreditNoteApi,
+  createDebitNoteApi,
+  type CreateInvoiceAdjustmentBody,
+} from '@/api/invoices'
 import { useOrganizationSettings } from '@/hooks/use-organization-settings'
 import { apiActionErrorMessage } from '@/api/errors'
 import { isApiEnabled } from '@/api/config'
 import { handleInvoiceStatusStockChange } from '@/lib/stock-service'
 import { toast } from '@/lib/toast'
+import { canCreateAdjustments } from '@/lib/invoice-dte'
 import { cn } from '@/lib/utils'
 
 type DetailTab = 'detalle' | 'actividad' | 'archivos' | 'notas'
@@ -100,6 +108,10 @@ export function InvoiceDetailPage() {
   const [emittingSii, setEmittingSii] = useState(false)
   const [pendingEmitStage, setPendingEmitStage] = useState<InvoiceJourneyStage | null>(
     null,
+  )
+  const [adjustmentOpen, setAdjustmentOpen] = useState(false)
+  const [adjustmentKind, setAdjustmentKind] = useState<'credit_note' | 'debit_note'>(
+    'credit_note',
   )
 
   const handleEmitToSii = useCallback(async () => {
@@ -297,6 +309,30 @@ export function InvoiceDetailPage() {
     }
   }, [archiveInvoice, invoiceId, navigate])
 
+  const handleCreateAdjustment = useCallback(
+    async (body: CreateInvoiceAdjustmentBody) => {
+      if (!invoice || !canEdit) return
+      if (!isApiEnabled()) {
+        toast.warning('Los ajustes NC/ND requieren conexión al servidor.')
+        return
+      }
+      try {
+        const created =
+          adjustmentKind === 'credit_note'
+            ? await createCreditNoteApi(invoice.id, body)
+            : await createDebitNoteApi(invoice.id, body)
+        toast.success(
+          `${adjustmentKind === 'credit_note' ? 'Nota de crédito' : 'Nota de débito'} «${created.number}» creada.`,
+        )
+        navigate(`/facturacion/${created.id}`)
+      } catch (err) {
+        toast.error(apiActionErrorMessage(err, 'No se pudo crear el documento de ajuste.'))
+        throw err
+      }
+    },
+    [adjustmentKind, canEdit, invoice, navigate],
+  )
+
   if (loadState === 'loading') {
     return <RecordDetailLoading />
   }
@@ -340,7 +376,33 @@ export function InvoiceDetailPage() {
         onStartEdit={canEdit ? () => setEditDialogOpen(true) : undefined}
         onRegisterActivity={openRegisterActivity}
         onArchive={canDelete ? () => setArchiveOpen(true) : undefined}
+        onCreateCreditNote={
+          canEdit && canCreateAdjustments(invoice)
+            ? () => {
+                setAdjustmentKind('credit_note')
+                setAdjustmentOpen(true)
+              }
+            : undefined
+        }
+        onCreateDebitNote={
+          canEdit && canCreateAdjustments(invoice)
+            ? () => {
+                setAdjustmentKind('debit_note')
+                setAdjustmentOpen(true)
+              }
+            : undefined
+        }
       />
+
+      {canEdit ? (
+        <CreateInvoiceAdjustmentDialog
+          open={adjustmentOpen}
+          onOpenChange={setAdjustmentOpen}
+          kind={adjustmentKind}
+          invoice={invoice}
+          onSubmit={handleCreateAdjustment}
+        />
+      ) : null}
 
       <RegisterActivityDialog
         open={activityDialogOpen}
@@ -470,6 +532,9 @@ export function InvoiceDetailPage() {
                 </CardContent>
               </Card>
               <InvoiceLineItemsPanel lineItems={invoice.lineItems} />
+              {invoice.relatedAdjustments?.length ? (
+                <InvoiceRelatedAdjustmentsPanel adjustments={invoice.relatedAdjustments} />
+              ) : null}
               {invoice.status === 'Pagada' && invoice.payments.length > 0 ? (
                 <Card className="border-dashed shadow-sm">
                   <CardHeader className="pb-2">

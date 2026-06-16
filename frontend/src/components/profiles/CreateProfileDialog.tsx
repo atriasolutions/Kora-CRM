@@ -14,7 +14,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { createFullModulePermissions } from '@/lib/menu-modules'
+import { useProfilePermissionGrants } from '@/hooks/use-profile-permission-grants'
+import {
+  clampPermissionsToGrant,
+  createEmptyGrantablePermissions,
+} from '@/lib/profile-permission-grants'
 import { toast } from '@/lib/toast'
 import type { AccessProfile } from '@/types/access-profile'
 
@@ -29,18 +33,21 @@ export function CreateProfileDialog({
   onOpenChange,
   onSubmit,
 }: CreateProfileDialogProps) {
+  const { ceiling } = useProfilePermissionGrants()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [permissions, setPermissions] = useState(createFullModulePermissions)
+  const [permissions, setPermissions] = useState(() =>
+    createEmptyGrantablePermissions(ceiling),
+  )
 
   useEffect(() => {
     if (!open) return
     queueMicrotask(() => {
       setName('')
       setDescription('')
-      setPermissions(createFullModulePermissions())
+      setPermissions(createEmptyGrantablePermissions(ceiling))
     })
-  }, [open])
+  }, [open, ceiling])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -51,7 +58,7 @@ export function CreateProfileDialog({
     onSubmit({
       name: name.trim(),
       description: description.trim(),
-      permissions,
+      permissions: clampPermissionsToGrant(permissions, ceiling),
     })
     onOpenChange(false)
   }
@@ -88,6 +95,7 @@ export function CreateProfileDialog({
           <ProfilePermissionsEditor
             permissions={permissions}
             onChange={setPermissions}
+            grantCeiling={ceiling}
           />
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

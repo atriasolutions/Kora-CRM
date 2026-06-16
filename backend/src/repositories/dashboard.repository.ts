@@ -21,6 +21,7 @@ import type {
   DashboardRevenueExpensePoint,
   DashboardRevenueSource,
   DashboardSnapshot,
+  DashboardViewId,
 } from '../types/dashboard.js'
 import { formatActivityLabel } from '../utils/format.js'
 import { formatCentsToMoney } from '../utils/money.js'
@@ -237,6 +238,23 @@ async function loadRevenueExpenseSeries(
 
 export async function getDashboardSnapshot(
   period: DashboardPeriod = defaultDashboardPeriod(),
+  view: DashboardViewId = 'ventas',
+): Promise<DashboardSnapshot> {
+  if (view === 'operaciones') {
+    const { getOperacionesDashboardSnapshot } = await import('./dashboard-views.repository.js')
+    return getOperacionesDashboardSnapshot(period)
+  }
+  if (view === 'abastecimiento') {
+    const { getAbastecimientoDashboardSnapshot } = await import('./dashboard-views.repository.js')
+    return getAbastecimientoDashboardSnapshot(period)
+  }
+
+  const snapshot = await getVentasDashboardSnapshot(period)
+  return { ...snapshot, view: 'ventas' }
+}
+
+async function getVentasDashboardSnapshot(
+  period: DashboardPeriod = defaultDashboardPeriod(),
 ): Promise<DashboardSnapshot> {
   const now = new Date()
   const { rangeStart, rangeEnd, prevRangeStart, prevRangeEnd, compareLabel } =
@@ -357,16 +375,22 @@ export async function getDashboardSnapshot(
       [rangeStart, rangeEnd],
     ),
     tenantQuery<{ source: string; total: string }>(
-      `SELECT coalesce(nullif(trim(source), ''), 'Sin origen') AS source,
-              coalesce(sum(amount_cents), 0)::text AS total
-       FROM crm_opportunities
-       WHERE deleted_at IS NULL AND archived_at IS NULL
-         AND created_at >= $1 AND created_at <= $2
-         AND ${dashTenantFilter()}
+      `SELECT coalesce(nullif(trim(o.source), ''), 'Sin origen') AS source,
+              coalesce(sum(i.amount_cents), 0)::text AS total
+       FROM crm_invoices i
+       LEFT JOIN crm_quotes q
+         ON q.id = i.quote_id AND q.deleted_at IS NULL
+       LEFT JOIN crm_opportunities o
+         ON o.id = q.opportunity_id
+         AND o.deleted_at IS NULL AND o.archived_at IS NULL
+       WHERE i.deleted_at IS NULL AND i.archived_at IS NULL
+         AND lower(trim(i.status::text)) = 'pagada'
+         AND i.issue_date >= $1::date AND i.issue_date <= $2::date
+         AND ${dashTenantFilter('i')}
        GROUP BY 1
-       ORDER BY sum(amount_cents) DESC
+       ORDER BY sum(i.amount_cents) DESC
        LIMIT 6`,
-      [rangeStart, rangeEnd],
+      [rangeStartIso, rangeEndIso],
     ),
     tenantQuery<{ id: string; name: string; progress_pct: number | null }>(
       `SELECT id, name, progress_pct
@@ -478,6 +502,7 @@ export async function getDashboardSnapshot(
   }))
 
   return {
+    view: 'ventas',
     dateRangeLabel: buildDashboardDateRangeLabel(period),
     chartDescription: chartDescriptionForPeriod(period),
     kpis,

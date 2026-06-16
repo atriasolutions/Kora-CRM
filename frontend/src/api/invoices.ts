@@ -135,6 +135,18 @@ export async function listInvoicesApi(archived: boolean): Promise<InvoiceListIte
   })
 }
 
+/** Facturas vinculadas a una empresa (ficha empresa, resumen comercial). */
+export async function listInvoicesForCompanyApi(
+  companyId: string,
+): Promise<InvoiceListItem[]> {
+  const id = companyId.trim()
+  if (!id) return []
+  return fetchAllPages<InvoiceListItem>(BASE, {
+    companyId: id,
+    archived: 'false',
+  })
+}
+
 export async function getInvoiceApi(id: string): Promise<InvoiceDetail> {
   const res = await fetchJSON<ApiItemResponse<InvoiceDetail>>(`${BASE}/${id}`)
   return res.data
@@ -191,5 +203,51 @@ export async function patchInvoiceStatusApi(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(patch),
   })
+  return res.data
+}
+
+export type CreateInvoiceAdjustmentBody = {
+  mode: 'full' | 'partial'
+  referenceReason: string
+  referenceCode?: 1 | 2 | 3
+  lineItems?: { id?: string; quantity?: number; unitPrice?: string; discount?: string }[]
+}
+
+export async function createCreditNoteApi(
+  sourceInvoiceId: string,
+  body: CreateInvoiceAdjustmentBody,
+): Promise<InvoiceDetail> {
+  const res = await fetchJSON<ApiItemResponse<InvoiceDetail>>(
+    `${BASE}/${sourceInvoiceId}/credit-notes`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+  )
+  return res.data
+}
+
+export async function createDebitNoteApi(
+  sourceInvoiceId: string,
+  body: CreateInvoiceAdjustmentBody,
+): Promise<InvoiceDetail> {
+  const res = await fetchJSON<ApiItemResponse<InvoiceDetail>>(
+    `${BASE}/${sourceInvoiceId}/debit-notes`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+  )
+  return res.data
+}
+
+export async function listInvoiceAdjustmentsApi(
+  sourceInvoiceId: string,
+): Promise<InvoiceListItem[]> {
+  const res = await fetchJSON<ApiItemResponse<InvoiceListItem[]>>(
+    `${BASE}/${sourceInvoiceId}/adjustments`,
+  )
   return res.data
 }

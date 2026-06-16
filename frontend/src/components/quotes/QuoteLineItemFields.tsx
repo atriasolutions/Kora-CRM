@@ -246,7 +246,7 @@ export function QuoteLineItemFields({
       />
       <ContactFormCheckbox
         id={`${idPrefix}-deferred-${line.id}`}
-        label="Plazo diferido"
+        label="Plazo entrega"
         checked={line.deferredPayment === true}
         onChange={(deferredPayment) =>
           patchRecalc({
@@ -258,7 +258,7 @@ export function QuoteLineItemFields({
       {line.deferredPayment ? (
         <ContactFormInput
           id={`${idPrefix}-deferred-text-${line.id}`}
-          label="Texto plazo diferido"
+          label="Texto plazo entrega"
           placeholder="Ej. 30 días desde emisión"
           value={line.deferredPaymentText ?? ''}
           onChange={(deferredPaymentText) => patchRecalc({ deferredPaymentText })}

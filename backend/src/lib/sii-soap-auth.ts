@@ -203,25 +203,58 @@ export async function authenticateSii(config: SiiAuthenticateConfig): Promise<Si
   }
 }
 
+const RUT_PATTERN = /(\d{1,2}(?:\.\d{3}){2}-[\dkK])|(\d{7,8}-[\dkK])/i
+
+function normalizeRut(raw: string | undefined): string | null {
+  if (!raw) return null
+  const match = raw.match(RUT_PATTERN)
+  const value = match?.[1] ?? match?.[2]
+  return value?.replace(/\./g, '') ?? null
+}
+
+function extensionText(value: unknown): string {
+  if (typeof value === 'string') return value
+  if (value == null) return ''
+  try {
+    const raw =
+      typeof value === 'object' && 'data' in value
+        ? String((value as { data: string }).data)
+        : String(value)
+    return Buffer.from(raw, 'binary').toString('latin1')
+  } catch {
+    return String(value)
+  }
+}
+
+function extractCertRut(certificate: forge.pki.Certificate): string | null {
+  const subjectText = [
+    certificate.subject.toString(),
+    ...certificate.subject.attributes.map((a) => String(a.value ?? '')),
+  ].join(' ')
+  const fromSubject = normalizeRut(subjectText)
+  if (fromSubject) return fromSubject
+
+  const serialField = certificate.subject.getField('serialNumber')
+  const fromSerial = normalizeRut(String(serialField?.value ?? ''))
+  if (fromSerial) return fromSerial
+
+  for (const ext of certificate.extensions ?? []) {
+    if (ext.name !== 'subjectAltName' && ext.name !== 'issuerAltName') continue
+    const fromExt = normalizeRut(extensionText(ext.value))
+    if (fromExt) return fromExt
+  }
+
+  return null
+}
+
 export function extractCertMetadata(certBase64: string, certPassword: string): {
   certRut: string | null
   certExpiresAt: Date | null
 } {
   const certData = loadCertFromBase64(certBase64, certPassword)
-  const subject = certData.certificate.subject.attributes as Array<{
-    shortName?: string
-    name?: string
-    value?: string
-  }>
-  const subjectText = [
-    certData.certificate.subject.toString(),
-    ...subject.map((a) => String(a.value ?? '')),
-  ].join(' ')
-  const rutMatch = subjectText.match(/(\d{1,2}(?:\.\d{3}){2}-[\dkK])|(\d{7,8}-[\dkK])/i)
-  const rawRut = rutMatch?.[1] ?? rutMatch?.[2]
   const expiresAt = certData.certificate.validity.notAfter
   return {
-    certRut: rawRut?.replace(/\./g, '') ?? null,
+    certRut: extractCertRut(certData.certificate),
     certExpiresAt: expiresAt ?? null,
   }
 }

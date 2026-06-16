@@ -100,3 +100,11 @@ export function syncInventoryFromProduct(
 
   persistUserInventory(items)
 }
+
+/** Elimina filas de inventario locales al desactivar control de stock. */
+export function removeInventoryForProduct(sku: string): void {
+  const key = normalizeSku(sku)
+  if (!key) return
+  const items = loadUserInventory().filter((row) => normalizeSku(row.sku) !== key)
+  persistUserInventory(items)
+}

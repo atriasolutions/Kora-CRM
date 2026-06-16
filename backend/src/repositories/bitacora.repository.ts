@@ -1,5 +1,5 @@
 import { enforceRecordQuota } from '../lib/tenant-quota-enforce.js'
-import { tenantQuery } from '../db/tenant-query.js'
+import { tenantQuery, withTenantClient } from '../db/tenant-query.js'
 import { pushTenantCondition, tenantWhereParam } from '../lib/tenant-sql.js'
 import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import {
@@ -39,6 +39,7 @@ export type ListBitacoraParams = {
   workDateFrom?: string
   workDateTo?: string
   companyId?: string
+  archivedOnly?: boolean
 }
 
 async function resolveSolicitudSnapshot(
@@ -92,7 +93,7 @@ function buildListWhere(params: ListBitacoraParams): {
   where: string
   values: unknown[]
 } {
-  const conditions = ['deleted_at IS NULL']
+  const conditions = [params.archivedOnly ? 'deleted_at IS NOT NULL' : 'deleted_at IS NULL']
   const values: unknown[] = []
   let idx = 1
 
@@ -148,24 +149,27 @@ export async function listBitacora(
   params: ListBitacoraParams,
 ): Promise<{ items: BitacoraListItem[]; total: number }> {
   const { where, values } = buildListWhere(params)
-  const countResult = await tenantQuery<{ count: string }>(
-    `SELECT count(*)::text AS count FROM crm_bitacora_entries ${where}`,
-    values,
-  )
-  const total = Number(countResult.rows[0]?.count ?? 0)
 
-  const offset = paginationOffset(params.page, params.pageSize)
-  values.push(params.pageSize, offset)
-  const result = await tenantQuery<BitacoraRow>(
-    `SELECT ${BITACORA_COLUMNS}
-     FROM crm_bitacora_entries
-     ${where}
-     ORDER BY work_date DESC, created_at DESC
-     LIMIT $${values.length - 1} OFFSET $${values.length}`,
-    values,
-  )
+  return withTenantClient(async (client) => {
+    const countResult = await client.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM crm_bitacora_entries ${where}`,
+      values,
+    )
+    const total = Number(countResult.rows[0]?.count ?? 0)
 
-  return { items: result.rows.map(mapBitacoraRow), total }
+    const offset = paginationOffset(params.page, params.pageSize)
+    const listValues = [...values, params.pageSize, offset]
+    const result = await client.query<BitacoraRow>(
+      `SELECT ${BITACORA_COLUMNS}
+       FROM crm_bitacora_entries
+       ${where}
+       ORDER BY work_date DESC, created_at DESC
+       LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
+      listValues,
+    )
+
+    return { items: result.rows.map(mapBitacoraRow), total }
+  })
 }
 
 export async function listBitacoraForSolicitud(
@@ -581,15 +585,56 @@ export async function getBitacoraDashboardStats(
   }
 }
 
-export async function deleteBitacora(id: string, actor: AuditActor): Promise<void> {
-  const result = await tenantQuery(
+export async function archiveBitacora(
+  id: string,
+  actor: AuditActor,
+): Promise<BitacoraListItem> {
+  const result = await tenantQuery<BitacoraRow>(
     `UPDATE crm_bitacora_entries SET
       deleted_at = now(),
       updated_at = now(),
       updated_by_id = $1,
       updated_by_name = $2
-     WHERE id = $3 AND deleted_at IS NULL AND ${tenantWhereParam(4)}`,
+     WHERE id = $3 AND deleted_at IS NULL AND ${tenantWhereParam(4)}
+     RETURNING ${BITACORA_COLUMNS}`,
     [actor.userId, actor.userName, id, getTenantIdOrDefault()],
   )
-  if (result.rowCount === 0) throw notFound('Registro de bitácora no encontrado')
+  const row = result.rows[0]
+  if (!row) throw notFound('Registro de bitácora no encontrado o ya archivado')
+  return mapBitacoraRow(row)
+}
+
+/** @deprecated Usar archiveBitacora */
+export async function deleteBitacora(id: string, actor: AuditActor): Promise<void> {
+  await archiveBitacora(id, actor)
+}
+
+export async function restoreBitacora(
+  id: string,
+  actor: AuditActor,
+): Promise<BitacoraListItem> {
+  const result = await tenantQuery<BitacoraRow>(
+    `UPDATE crm_bitacora_entries SET
+      deleted_at = NULL,
+      updated_at = now(),
+      updated_by_id = $1,
+      updated_by_name = $2
+     WHERE id = $3 AND deleted_at IS NOT NULL AND ${tenantWhereParam(4)}
+     RETURNING ${BITACORA_COLUMNS}`,
+    [actor.userId, actor.userName, id, getTenantIdOrDefault()],
+  )
+  const row = result.rows[0]
+  if (!row) throw notFound('Registro de bitácora no encontrado en archivados')
+  return mapBitacoraRow(row)
+}
+
+export async function permanentlyDeleteBitacora(id: string): Promise<void> {
+  const result = await tenantQuery(
+    `DELETE FROM crm_bitacora_entries
+     WHERE id = $1 AND deleted_at IS NOT NULL AND ${tenantWhereParam(2)}`,
+    [id, getTenantIdOrDefault()],
+  )
+  if ((result.rowCount ?? 0) === 0) {
+    throw notFound('Registro de bitácora no encontrado en archivados')
+  }
 }

@@ -33,3 +33,19 @@ describe('SII services tenant isolation', () => {
     assert.deepEqual(missing, [], `Servicios SII sin tenantQuery: ${missing.join(', ')}`)
   })
 })
+
+describe('sii-status.service DTE types', () => {
+  it('expone checklist de CAF 33/34/56/61', () => {
+    const content = readFileSync(
+      join(process.cwd(), 'src/services/sii-status.service.ts'),
+      'utf8',
+    )
+    assert.match(content, /folioTypesAvailable/)
+    assert.match(content, /folioTypesMissing/)
+    assert.match(content, /REQUIRED_DTE_TYPES/)
+    assert.match(content, /33/)
+    assert.match(content, /34/)
+    assert.match(content, /56/)
+    assert.match(content, /61/)
+  })
+})

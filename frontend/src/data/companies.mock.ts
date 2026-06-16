@@ -21,6 +21,10 @@ export type CompanyListItem = {
   lifecycle: CompanyLifecycleStatus
   operationalStatus: CompanyOperationalStatus
   lastActivity: string
+  website?: string
+  email?: string
+  phone?: string
+  description?: string
 } & RecordAuditFields
 
 export const COMPANY_LIST_TOTAL_DEMO = 86

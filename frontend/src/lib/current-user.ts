@@ -1,3 +1,4 @@
+import { ANONYMOUS_CURRENT_USER } from '@/lib/production-empty-data'
 import { loadAuthSession } from '@/lib/auth-session'
 
 export type CurrentUser = {
@@ -6,13 +7,7 @@ export type CurrentUser = {
   email: string
 }
 
-const FALLBACK: CurrentUser = {
-  id: 'u1',
-  name: 'María López',
-  email: 'maria.lopez@kora.io',
-}
-
-/** Usuario conectado (sesión o fallback demo). */
+/** Usuario conectado (sesión). Sin sesión: valores vacíos, nunca datos demo. */
 export function getCurrentUser(): CurrentUser {
   const session = loadAuthSession()
   if (session) {
@@ -22,7 +17,7 @@ export function getCurrentUser(): CurrentUser {
       email: session.email,
     }
   }
-  return FALLBACK
+  return { ...ANONYMOUS_CURRENT_USER }
 }
 
 export function getCurrentUserName(): string {

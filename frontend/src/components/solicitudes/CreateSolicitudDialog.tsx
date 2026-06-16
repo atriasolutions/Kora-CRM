@@ -12,8 +12,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useAuth } from '@/hooks/use-auth'
+import { isGuestAccessProfile } from '@/lib/access-profile-admin'
 import { getCurrentUserName } from '@/lib/current-user'
 import { useOrganizationSettings } from '@/hooks/use-organization-settings'
+import { useUsersRegistry } from '@/hooks/use-users-registry'
+import { resolveDefaultSolicitudAssignee } from '@/lib/organization-settings'
 import type { SolicitudFile } from '@/lib/solicitud-files'
 import {
   createDefaultSolicitudFormValues,
@@ -39,8 +42,10 @@ export function CreateSolicitudDialog({
   initialValues,
   onSubmit,
 }: CreateSolicitudDialogProps) {
-  const { session } = useAuth()
+  const { session, profile } = useAuth()
+  const showRequesterField = !isGuestAccessProfile(profile)
   const { settings } = useOrganizationSettings()
+  const { allUsers } = useUsersRegistry()
   const [form, setForm] = useState(() => createDefaultSolicitudFormValues(initialValues))
   const [descriptionFiles, setDescriptionFiles] = useState<SolicitudFile[]>([])
   const [editorKey, setEditorKey] = useState(0)
@@ -48,17 +53,18 @@ export function CreateSolicitudDialog({
   useEffect(() => {
     if (!open) return
     queueMicrotask(() => {
+      const defaultAssignee = resolveDefaultSolicitudAssignee(settings, allUsers)
       setForm(
         createDefaultSolicitudFormValues({
-          assigneeName: settings.defaultSolicitudAssigneeName?.trim() || '',
-          assigneeUserId: settings.defaultSolicitudAssigneeUserId?.trim() || '',
+          assigneeName: defaultAssignee.assigneeName,
+          assigneeUserId: defaultAssignee.assigneeUserId,
           ...initialValues,
         }),
       )
       setDescriptionFiles([])
       setEditorKey((k) => k + 1)
     })
-  }, [open, initialValues, settings.defaultSolicitudAssigneeName, settings.defaultSolicitudAssigneeUserId])
+  }, [open, initialValues, settings, allUsers])
 
   const patch = (partial: Partial<CreateSolicitudFormValues>) => {
     setForm((prev) => ({ ...prev, ...partial }))
@@ -93,6 +99,7 @@ export function CreateSolicitudDialog({
             descriptionAuthorName={session?.name?.trim() || getCurrentUserName()}
             editorKey={`create-${editorKey}`}
             idPrefix="create-sol"
+            showRequesterField={showRequesterField}
           />
           <DialogFooter className="gap-2 border-t border-border pt-4 sm:gap-0">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

@@ -11,7 +11,8 @@ import { useModulePermissions } from '@/hooks/use-module-permissions'
 import { useOrganizationSettings } from '@/hooks/use-organization-settings'
 import {
   defaultOrganizationSettings,
-  validateOrganizationSettings,
+  organizationIssuerSettingsFrom,
+  validateOrganizationIssuerSettings,
 } from '@/lib/organization-settings'
 import {
   KORA_DEFAULT_LOGO_URL,
@@ -37,14 +38,15 @@ export function OrganizationSettingsPanel() {
 
   const handleSave = async () => {
     if (!canEdit) return
-    const validation = validateOrganizationSettings(draft)
+    const issuerDraft = organizationIssuerSettingsFrom(draft)
+    const validation = validateOrganizationIssuerSettings(issuerDraft)
     if (validation) {
       toast.warning(validation)
       return
     }
     setSaving(true)
     try {
-      await saveSettings(draft)
+      await saveSettings(issuerDraft)
       toast.success(
         'Datos de empresa guardados. Se aplican en cotizaciones y órdenes de compra (PDF).',
       )

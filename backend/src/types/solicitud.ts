@@ -61,6 +61,8 @@ export type CreateSolicitudInput = {
   priority?: SolicitudPriority
   assigneeName?: string
   assigneeUserId?: string | null
+  /** Usuario invitado en cuyo nombre se registra la solicitud (solo equipo interno). */
+  requesterUserId?: string | null
   team?: SolicitudTeamMemberInput[]
 }
 

@@ -15,6 +15,7 @@ import { isApiEnabled } from '@/api/config'
 import { adjustInventoryApi, findInventoryPositionIdApi } from '@/api/inventory'
 import type { InventoryDetail } from '@/data/inventory-detail.mock'
 import { useWarehouseLocationOptions } from '@/hooks/use-catalog-options'
+import { getInventoryProductSummaryBySku } from '@/lib/inventory-aggregate'
 import { productForInventorySku } from '@/lib/inventory-relations'
 import { parseSignedInteger } from '@/lib/form-input-format'
 import { getRegistryProducts } from '@/data/products-registry-store'
@@ -102,10 +103,21 @@ export function AdjustInventoryStockDialog({
     warehouseOptions,
   ])
 
-  const stockAtWarehouse = useMemo(
-    () => inventoryStockAtLocation(inventory.sku, warehouse),
-    [inventory.sku, warehouse],
-  )
+  const stockAtWarehouse = useMemo(() => {
+    if (useApi && inventory.isProductView) {
+      const summary = getInventoryProductSummaryBySku(inventory.sku)
+      const locNorm = warehouse.trim().toLowerCase()
+      const row = summary?.locationRows.find(
+        (r) => r.location.trim().toLowerCase() === locNorm,
+      )
+      if (row) {
+        const onHand = row.onHandQtyNum ?? row.quantityNum ?? 0
+        const available = row.availableQtyNum ?? onHand
+        return { onHand, available, row }
+      }
+    }
+    return inventoryStockAtLocation(inventory.sku, warehouse)
+  }, [inventory.isProductView, inventory.sku, warehouse])
 
   useEffect(() => {
     if (!open) return

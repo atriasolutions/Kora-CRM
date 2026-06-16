@@ -17,7 +17,9 @@ import {
   type ArchivedSolicitudEntry,
 } from '@/contexts/solicitudes-registry-context'
 import { STORAGE_PREFIX } from '@/config/brand'
-import { resolveSolicitudListItem } from '@/data/solicitudes.mock'
+import {
+  minimalSolicitudListItem,
+} from '@/lib/production-empty-data'
 import type { SolicitudDetail } from '@/data/solicitudes.mock'
 import type { SolicitudListItem } from '@/data/solicitudes.mock'
 import {
@@ -70,7 +72,7 @@ function snapshotForArchive(
   userSolicitudes: SolicitudListItem[],
 ): SolicitudListItem {
   const fromUser = userSolicitudes.find((o) => o.id === id)
-  const base = fromUser ? { ...fromUser } : resolveSolicitudListItem(id)
+  const base = fromUser ? { ...fromUser } : minimalSolicitudListItem(id)
   return stampRecordAuditOnUpdate(base)
 }
 

@@ -1,6 +1,6 @@
 import { Router } from 'express'
 
-import { getAuditActor } from '../middleware/audit-actor.js'
+import { getAuditActor, getAuthProfile } from '../middleware/audit-actor.js'
 import { requirePermission } from '../middleware/require-permission.js'
 import * as profilesRepo from '../repositories/access-profiles.repository.js'
 import { routeParam } from '../lib/route-params.js'
@@ -43,7 +43,11 @@ accessProfilesRouter.post(
   async (req, res, next) => {
     try {
       const body = createAccessProfileSchema.parse(req.body)
-      const item = await profilesRepo.createAccessProfile(body)
+      const item = await profilesRepo.createAccessProfile(
+        body,
+        getAuditActor(req),
+        getAuthProfile(req),
+      )
       res.status(201).json({ data: item })
     } catch (e) {
       next(e)
@@ -57,7 +61,12 @@ accessProfilesRouter.patch(
   async (req, res, next) => {
     try {
       const body = updateAccessProfileSchema.parse(req.body)
-      const item = await profilesRepo.updateAccessProfile(routeParam(req), body, getAuditActor(req))
+      const item = await profilesRepo.updateAccessProfile(
+        routeParam(req),
+        body,
+        getAuditActor(req),
+        getAuthProfile(req),
+      )
       res.json({ data: item })
     } catch (e) {
       next(e)

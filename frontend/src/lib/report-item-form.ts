@@ -1,11 +1,12 @@
 import { getCurrentUserName } from '@/lib/current-user'
 import { createDefaultReportTableConfig } from '@/types/report-table'
-import type { ReportItem } from '@/types/reports-tree'
+import type { ReportItem, ReportTemplateId } from '@/types/reports-tree'
 import type { ReportItemInput } from '@/contexts/reports-tree-context'
 
 export type ReportFormValues = {
   name: string
   folderId: string
+  templateKind: ReportTemplateId
   reportType: string
   author: string
   description: string
@@ -19,6 +20,7 @@ export function createDefaultReportFormValues(
   return {
     name: '',
     folderId,
+    templateKind: 'tabla-dinamica',
     reportType: 'Tabla dinámica',
     author: getCurrentUserName(),
     description: '',
@@ -31,6 +33,7 @@ export function reportToFormValues(report: ReportItem): ReportFormValues {
   return {
     name: report.name,
     folderId: report.folderId,
+    templateKind: 'tabla-dinamica',
     reportType: report.reportType,
     author: report.author,
     description: report.description,
@@ -38,7 +41,6 @@ export function reportToFormValues(report: ReportItem): ReportFormValues {
   }
 }
 
-/** Convierte el formulario a payload API; siempre tabla dinámica y programación manual. */
 export function reportFormToInput(values: ReportFormValues): ReportItemInput {
   return {
     name: values.name.trim(),
@@ -57,3 +59,7 @@ export function validateReportForm(values: ReportFormValues): string | null {
   if (!values.folderId) return 'Selecciona una carpeta.'
   return null
 }
+
+export const REPORT_TEMPLATE_KIND_OPTIONS: { value: ReportTemplateId; label: string }[] = [
+  { value: 'tabla-dinamica', label: 'Tabla dinámica' },
+]

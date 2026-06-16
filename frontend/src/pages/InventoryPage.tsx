@@ -12,7 +12,6 @@ import { InventorySegmentsView } from '@/components/inventory/InventorySegmentsV
 import { ListPageLayout } from '@/components/list/ListPageLayout'
 import { InventoryProductList } from '@/components/inventory/InventoryProductList'
 import type { InventoryDetail } from '@/data/inventory-detail.mock'
-import { getInventoryDetail } from '@/data/inventory-detail.mock'
 import type { InventoryListItem } from '@/data/inventory.mock'
 import { PURCHASE_LINES_SYNC_EVENT } from '@/data/purchases-registry-store'
 import { STOCK_RECEIPT_LINES_SYNC_EVENT } from '@/data/stock-receipt-lines-registry-store'
@@ -20,11 +19,7 @@ import { isApiEnabled } from '@/api/config'
 import { useInventoryRegistry } from '@/hooks/use-inventory-registry'
 import { useModulePermissions } from '@/hooks/use-module-permissions'
 import { useStockSync } from '@/hooks/use-stock-sync'
-import { inventoryProductIdFromSku } from '@/lib/inventory-aggregate'
-import {
-  findInventoryBySkuAndLocation,
-  getAllInventoryRows,
-} from '@/lib/stock-service'
+import { buildInventoryDetailForAdjustment } from '@/lib/inventory-product-detail'
 import {
   createDefaultInventoryFilters,
   type InventoryFilters,
@@ -35,15 +30,6 @@ import {
   sortInventoryByRecentlyViewed,
   type InventoryListScope,
 } from '@/lib/inventory-list-scope'
-
-function getInventoryDetailForAdjustment(row: InventoryListItem): InventoryDetail {
-  if (getAllInventoryRows().some((r) => r.id === row.id)) {
-    return getInventoryDetail(row.id)
-  }
-  const atLocation = findInventoryBySkuAndLocation(row.sku, row.location)
-  if (atLocation) return getInventoryDetail(atLocation.id)
-  return getInventoryDetail(inventoryProductIdFromSku(row.sku))
-}
 
 const useApi = isApiEnabled()
 
@@ -130,7 +116,7 @@ export function InventoryPage() {
   const [editingInventory, setEditingInventory] = useState<InventoryDetail | null>(null)
 
   const openEditInventory = useCallback((row: InventoryListItem) => {
-    setEditingInventory(getInventoryDetailForAdjustment(row))
+    setEditingInventory(buildInventoryDetailForAdjustment(row))
     setEditOpen(true)
   }, [])
 

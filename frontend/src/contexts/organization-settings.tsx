@@ -44,14 +44,18 @@ export function OrganizationSettingsProvider({ children }: { children: ReactNode
   })
 
   const saveSettings = useCallback(
-    async (next: OrganizationSettings) => {
+    async (patch: Partial<OrganizationSettings>) => {
       if (useApi) {
-        const saved = await updateOrganizationSettingsApi(next)
+        const saved = await updateOrganizationSettingsApi(patch)
         applySettings(saved)
         return
       }
-      applySettings(next)
-      persistSettings(next)
+      setSettings((prev) => {
+        const next = { ...prev, ...patch }
+        persistSettings(next)
+        syncOrganizationSettings(next)
+        return next
+      })
     },
     [applySettings],
   )

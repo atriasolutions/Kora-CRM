@@ -1,19 +1,29 @@
 import { Link } from 'react-router-dom'
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import type { ProjectTaskDatum } from '@/types/dashboard'
 import { cn } from '@/lib/utils'
 
 type TasksByProjectCardProps = {
   items: ProjectTaskDatum[]
+  title?: string
+  description?: string
   className?: string
 }
 
-export function TasksByProjectCard({ items, className }: TasksByProjectCardProps) {
+export function TasksByProjectCard({
+  items,
+  title = 'Tareas por proyecto',
+  description,
+  className,
+}: TasksByProjectCardProps) {
   return (
     <Card className={cn('h-full min-w-0 overflow-hidden border-border shadow-sm', className)}>
       <CardHeader className="p-4 pb-2 sm:p-6 sm:pb-4">
-        <CardTitle className="text-sm font-semibold sm:text-base">Tareas por proyecto</CardTitle>
+        <CardTitle className="text-sm font-semibold sm:text-base">{title}</CardTitle>
+        {description ? (
+          <CardDescription className="text-xs sm:text-sm">{description}</CardDescription>
+        ) : null}
       </CardHeader>
       <CardContent className="space-y-3 px-4 pb-4 sm:space-y-5 sm:px-6 sm:pb-6">
         {items.length === 0 ? (

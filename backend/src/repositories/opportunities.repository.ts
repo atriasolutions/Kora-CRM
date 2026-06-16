@@ -6,7 +6,7 @@ import {
   type ComputedLine,
 } from '../lib/line-items.js'
 import { pool } from '../db/pool.js'
-import { setTenantLocal, tenantQuery } from '../db/tenant-query.js'
+import { setTenantLocal, tenantQuery, withTenantClient } from '../db/tenant-query.js'
 import { pushTenantCondition, tenantWhereParam } from '../lib/tenant-sql.js'
 import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import {
@@ -154,25 +154,27 @@ export async function listOpportunities(
 
   const where = `WHERE ${conditions.join(' AND ')}`
 
-  const countResult = await tenantQuery<{ count: string }>(
-    `SELECT count(*)::text AS count FROM crm_opportunities ${where}`,
-    values,
-  )
-  const total = Number.parseInt(countResult.rows[0]?.count ?? '0', 10)
+  return withTenantClient(async (client) => {
+    const countResult = await client.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM crm_opportunities ${where}`,
+      values,
+    )
+    const total = Number.parseInt(countResult.rows[0]?.count ?? '0', 10)
 
-  const offset = paginationOffset(params.page, params.pageSize)
-  values.push(params.pageSize, offset)
+    const offset = paginationOffset(params.page, params.pageSize)
+    const listValues = [...values, params.pageSize, offset]
 
-  const result = await tenantQuery<OpportunityRow>(
-    `SELECT ${OPP_COLUMNS}
-     FROM crm_opportunities
-     ${where}
-     ORDER BY updated_at DESC
-     LIMIT $${idx++} OFFSET $${idx}`,
-    values,
-  )
+    const result = await client.query<OpportunityRow>(
+      `SELECT ${OPP_COLUMNS}
+       FROM crm_opportunities
+       ${where}
+       ORDER BY updated_at DESC
+       LIMIT $${idx++} OFFSET $${idx}`,
+      listValues,
+    )
 
-  return { items: result.rows.map(mapOpportunityRow), total }
+    return { items: result.rows.map(mapOpportunityRow), total }
+  })
 }
 
 export async function getOpportunityById(id: string): Promise<OpportunityDetail> {

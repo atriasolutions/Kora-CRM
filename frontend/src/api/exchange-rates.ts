@@ -47,7 +47,7 @@ export async function updateStoredExchangeRatesApi(body: {
   return res.data
 }
 
-/** Consulta mindicador.cl y sobrescribe los indicadores almacenados para la fecha. */
+/** Consulta findic.cl (o mindicador.cl) y sobrescribe los indicadores almacenados para la fecha. */
 export async function syncExchangeRatesApi(
   rateDate?: string,
 ): Promise<ExchangeRateSnapshot> {

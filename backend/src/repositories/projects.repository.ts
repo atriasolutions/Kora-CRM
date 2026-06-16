@@ -6,7 +6,7 @@ import {
   resolveOpportunitySnapshot,
 } from '../lib/relation-snapshots.js'
 import { pool } from '../db/pool.js'
-import { setTenantLocal, tenantQuery } from '../db/tenant-query.js'
+import { setTenantLocal, tenantQuery, withTenantClient } from '../db/tenant-query.js'
 import {
   TEAM_MEMBER_USER_NAME_SQL,
   teamMemberUserJoins,
@@ -457,33 +457,36 @@ export async function listProjects(
   }
 
   const where = `WHERE ${conditions.join(' AND ')}`
-  const countResult = await tenantQuery<{ count: string }>(
-    `SELECT count(*)::text AS count FROM crm_projects ${where}`,
-    values,
-  )
-  const total = Number.parseInt(countResult.rows[0]?.count ?? '0', 10)
-  const offset = paginationOffset(params.page, params.pageSize)
-  values.push(params.pageSize, offset)
 
-  const result = await tenantQuery<ProjectRow>(
-    `SELECT ${PROJECT_COLUMNS}
-     FROM crm_projects
-     ${where}
-     ORDER BY updated_at DESC
-     LIMIT $${idx++} OFFSET $${idx}`,
-    values,
-  )
+  return withTenantClient(async (client) => {
+    const countResult = await client.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM crm_projects ${where}`,
+      values,
+    )
+    const total = Number.parseInt(countResult.rows[0]?.count ?? '0', 10)
+    const offset = paginationOffset(params.page, params.pageSize)
+    const listValues = [...values, params.pageSize, offset]
 
-  const projectIds = result.rows.map((row) => row.id)
-  const teamsByProject = await loadTeamsByProjectIds(projectIds)
+    const result = await client.query<ProjectRow>(
+      `SELECT ${PROJECT_COLUMNS}
+       FROM crm_projects
+       ${where}
+       ORDER BY updated_at DESC
+       LIMIT $${idx++} OFFSET $${idx}`,
+      listValues,
+    )
 
-  return {
-    items: result.rows.map((row) => ({
-      ...mapProjectRow(row),
-      teamMembers: mapTeamRowsToListMembers(teamsByProject.get(row.id)),
-    })),
-    total,
-  }
+    const projectIds = result.rows.map((row) => row.id)
+    const teamsByProject = await loadTeamsByProjectIds(projectIds)
+
+    return {
+      items: result.rows.map((row) => ({
+        ...mapProjectRow(row),
+        teamMembers: mapTeamRowsToListMembers(teamsByProject.get(row.id)),
+      })),
+      total,
+    }
+  })
 }
 
 export async function getProjectById(id: string): Promise<ProjectDetail> {

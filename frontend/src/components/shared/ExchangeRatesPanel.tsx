@@ -49,8 +49,6 @@ export function ExchangeRatesPanel({
           <span className="font-medium text-foreground">
             {rates.exchangeRateDate}
           </span>
-          {' · '}
-          Fuente: mindicador.cl
         </p>
         {rows.map((row) => (
           <p key={row.id} className="font-medium tabular-nums text-foreground">

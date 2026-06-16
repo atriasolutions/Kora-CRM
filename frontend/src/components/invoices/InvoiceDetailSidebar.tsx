@@ -21,6 +21,14 @@ import {
   formatSiiInvoiceNumberDisplay,
   invoiceRequiresSiiNumber,
 } from '@/lib/invoice-sii'
+import {
+  dteTypeLabel,
+  documentKindLabel,
+  previewDteBreakdown,
+  referenceCodeLabel,
+  resolvePreviewInvoiceDteType,
+} from '@/lib/invoice-dte'
+import { useOrganizationSettings } from '@/hooks/use-organization-settings'
 
 type InvoiceDetailSidebarProps = {
   invoice: InvoiceDetail
@@ -35,6 +43,22 @@ export function InvoiceDetailSidebar({
   form,
   onFormChange,
 }: InvoiceDetailSidebarProps) {
+  const { settings: orgSettings } = useOrganizationSettings()
+  const invoicingMode = orgSettings.invoicingMode ?? 'manual'
+  const previewDte =
+    invoice.dteType ??
+    (invoice.documentKind === 'credit_note'
+      ? 61
+      : invoice.documentKind === 'debit_note'
+        ? 56
+        : resolvePreviewInvoiceDteType(invoice.lineItems ?? []))
+  const draftBreakdown =
+    invoice.status === 'Borrador' && invoice.lineItems?.length
+      ? previewDteBreakdown(invoice.lineItems, {
+          globalDiscountPercent: invoice.globalDiscount ?? invoice.discountPercent,
+        })
+      : null
+
   const patch = (partial: Partial<InvoiceFormValues>) => {
     onFormChange?.(partial)
   }
@@ -219,12 +243,59 @@ export function InvoiceDetailSidebar({
         </CardContent>
       </Card>
 
-      {invoiceRequiresSiiNumber(invoice.status) ? (
+      {invoice.sourceInvoice ? (
+        <Card className="shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold">Documento origen</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <p>
+              <Link
+                to={`/facturacion/${invoice.sourceInvoice.id}`}
+                className="font-mono font-medium text-primary hover:underline"
+              >
+                {invoice.sourceInvoice.number}
+              </Link>
+            </p>
+            {invoice.sourceInvoice.siiNumber ? (
+              <p>
+                <span className="text-muted-foreground">Folio SII: </span>
+                {formatSiiInvoiceNumberDisplay(invoice.sourceInvoice.siiNumber)}
+              </p>
+            ) : null}
+            {invoice.referenceReason ? (
+              <p>
+                <span className="text-muted-foreground">Motivo: </span>
+                {invoice.referenceReason}
+              </p>
+            ) : null}
+            {invoice.referenceCode ? (
+              <p>
+                <span className="text-muted-foreground">Referencia: </span>
+                {referenceCodeLabel(invoice.referenceCode)}
+              </p>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {invoiceRequiresSiiNumber(invoice.status) ||
+      (invoice.status === 'Borrador' && invoicingMode === 'sii') ? (
         <Card className="shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold">Tributario (SII)</CardTitle>
           </CardHeader>
-          <CardContent className="text-sm">
+          <CardContent className="space-y-2 text-sm">
+            <p>
+              <span className="text-muted-foreground">Documento: </span>
+              {documentKindLabel(invoice.documentKind)}
+            </p>
+            <p>
+              <span className="text-muted-foreground">Tipo DTE: </span>
+              <span className="font-medium">
+                {dteTypeLabel(previewDte, invoice.documentKind)}
+              </span>
+            </p>
             {invoice.siiNumber ? (
               <p>
                 <span className="text-muted-foreground">Folio DTE: </span>
@@ -232,6 +303,30 @@ export function InvoiceDetailSidebar({
                   {formatSiiInvoiceNumberDisplay(invoice.siiNumber)}
                 </span>
               </p>
+            ) : invoice.status === 'Borrador' ? (
+              <>
+                {draftBreakdown ? (
+                  <>
+                    <p>
+                      <span className="text-muted-foreground">Neto afecto: </span>
+                      {draftBreakdown.taxableSubtotal}
+                    </p>
+                    {draftBreakdown.exemptSubtotal !== '$0' ? (
+                      <p>
+                        <span className="text-muted-foreground">Neto exento: </span>
+                        {draftBreakdown.exemptSubtotal}
+                      </p>
+                    ) : null}
+                    <p>
+                      <span className="text-muted-foreground">IVA: </span>
+                      {draftBreakdown.taxAmount}
+                    </p>
+                  </>
+                ) : null}
+                <p className="text-muted-foreground">
+                  Sin folio SII. Se asignará al emitir el documento.
+                </p>
+              </>
             ) : (
               <p className="text-muted-foreground">
                 Sin folio SII. Se solicita al pasar a estado emitida.

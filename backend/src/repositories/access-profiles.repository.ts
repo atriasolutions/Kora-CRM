@@ -1,4 +1,4 @@
-import { tenantQuery } from '../db/tenant-query.js'
+import { tenantQuery, withTenantClient } from '../db/tenant-query.js'
 import { tenantWhereParam } from '../lib/tenant-sql.js'
 import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import {
@@ -7,6 +7,11 @@ import {
   canRenameProfile,
   isLockedAccessProfile,
 } from '../lib/access-profile-admin.js'
+import {
+  assertPermissionsGrantableByActor,
+  filterPermissionsByActorGrant,
+  mergePermissionsPreservingHiddenModules,
+} from '../lib/profile-permission-grants.js'
 import {
   mapAccessProfile,
   mapAccessProfileListRow,
@@ -61,40 +66,39 @@ function profileInUseMessage(count: number): string {
   return `No se puede eliminar el perfil: ${count} usuarios lo tienen asignado. Reasígnalos antes de eliminar.`
 }
 
-async function loadPermissions(profileId: string): Promise<PermissionRow[]> {
-  const result = await tenantQuery<PermissionRow>(
-    `SELECT module_id, can_menu, can_view, can_create, can_edit, can_delete
-     FROM crm_access_profile_permissions
-     WHERE profile_id = $1
-     ORDER BY module_id`,
-    [profileId],
-  )
-  return result.rows
-}
-
 async function upsertPermissions(
   profileId: string,
   permissions: MenuModulePermission[],
 ): Promise<void> {
-  await tenantQuery(`DELETE FROM crm_access_profile_permissions WHERE profile_id = $1`, [
-    profileId,
-  ])
-  for (const perm of permissions) {
-    await tenantQuery(
-      `INSERT INTO crm_access_profile_permissions (
-        profile_id, module_id, can_menu, can_view, can_create, can_edit, can_delete
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [
-        profileId,
+  await withTenantClient(async (client) => {
+    await client.query(`DELETE FROM crm_access_profile_permissions WHERE profile_id = $1`, [
+      profileId,
+    ])
+    if (permissions.length === 0) return
+
+    const values: unknown[] = [profileId]
+    const placeholders: string[] = []
+    permissions.forEach((perm, i) => {
+      const base = i * 6 + 2
+      placeholders.push(
+        `($1, $${base}, $${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5})`,
+      )
+      values.push(
         perm.moduleId,
         perm.flags.menu,
         perm.flags.view,
         perm.flags.create,
         perm.flags.edit,
         perm.flags.delete,
-      ],
+      )
+    })
+    await client.query(
+      `INSERT INTO crm_access_profile_permissions (
+        profile_id, module_id, can_menu, can_view, can_create, can_edit, can_delete
+      ) VALUES ${placeholders.join(', ')}`,
+      values,
     )
-  }
+  })
 }
 
 function assertCanModifyProfile(existing: AccessProfile, actor: AuditActor): void {
@@ -115,21 +119,48 @@ export async function listAccessProfiles(): Promise<AccessProfileListItem[]> {
 }
 
 export async function getAccessProfileById(id: string): Promise<AccessProfile> {
-  const result = await tenantQuery<AccessProfileRow>(
-    `SELECT ${PROFILE_SELECT} FROM crm_access_profiles p WHERE p.id = $1 AND ${tenantWhereParam(2, 'p')}`,
-    [id, getTenantIdOrDefault()],
+  return withTenantClient(async (client) => {
+    const result = await client.query<AccessProfileRow>(
+      `SELECT ${PROFILE_SELECT} FROM crm_access_profiles p WHERE p.id = $1 AND ${tenantWhereParam(2, 'p')}`,
+      [id, getTenantIdOrDefault()],
+    )
+    const row = result.rows[0]
+    if (!row) throw notFound('Perfil no encontrado')
+    const permResult = await client.query<PermissionRow>(
+      `SELECT module_id, can_menu, can_view, can_create, can_edit, can_delete
+       FROM crm_access_profile_permissions
+       WHERE profile_id = $1
+       ORDER BY module_id`,
+      [id],
+    )
+    return mapAccessProfile(row, permResult.rows)
+  })
+}
+
+function permissionsWithActiveGrants(
+  permissions: MenuModulePermission[],
+): MenuModulePermission[] {
+  return permissions.filter((perm) =>
+    Object.values(perm.flags).some((flag) => flag),
   )
-  const row = result.rows[0]
-  if (!row) throw notFound('Perfil no encontrado')
-  const permissions = await loadPermissions(id)
-  return mapAccessProfile(row, permissions)
 }
 
 export async function createAccessProfile(
   input: CreateAccessProfileInput,
+  actor: AuditActor,
+  actorProfile: AccessProfile | undefined,
 ): Promise<AccessProfile> {
   if (!input.name?.trim()) throw badRequest('El nombre es obligatorio')
   if (!input.permissions?.length) throw badRequest('Los permisos son obligatorios')
+
+  const isPlatformOperator = Boolean(actor.isPlatformOperator)
+  assertPermissionsGrantableByActor(input.permissions, actorProfile, isPlatformOperator)
+  const permissions = permissionsWithActiveGrants(
+    filterPermissionsByActorGrant(input.permissions, actorProfile, isPlatformOperator),
+  )
+  if (permissions.length === 0) {
+    throw badRequest('Indica al menos un permiso que tu perfil pueda otorgar.')
+  }
 
   const result = await tenantQuery<{ id: string }>(
     `INSERT INTO crm_access_profiles (name, description, is_system, updated_at, tenant_id)
@@ -137,7 +168,7 @@ export async function createAccessProfile(
     [input.name.trim(), input.description?.trim() ?? '', getTenantIdOrDefault()],
   )
   const id = result.rows[0]!.id
-  await upsertPermissions(id, input.permissions)
+  await upsertPermissions(id, permissions)
   return getAccessProfileById(id)
 }
 
@@ -145,6 +176,7 @@ export async function updateAccessProfile(
   id: string,
   input: UpdateAccessProfileInput,
   actor: AuditActor,
+  actorProfile: AccessProfile | undefined,
 ): Promise<AccessProfile> {
   const existing = await getAccessProfileById(id)
   assertCanModifyProfile(existing, actor)
@@ -165,10 +197,18 @@ export async function updateAccessProfile(
     )
   }
   if (input.permissions) {
-    if (!canEditProfilePermissions(existing, Boolean(actor.isPlatformOperator))) {
+    const isPlatformOperator = Boolean(actor.isPlatformOperator)
+    if (!canEditProfilePermissions(existing, isPlatformOperator)) {
       throw badRequest('Los permisos de este perfil no son configurables')
     }
-    await upsertPermissions(id, input.permissions)
+    assertPermissionsGrantableByActor(input.permissions, actorProfile, isPlatformOperator)
+    const merged = mergePermissionsPreservingHiddenModules(
+      existing.permissions,
+      input.permissions,
+      actorProfile,
+      isPlatformOperator,
+    )
+    await upsertPermissions(id, permissionsWithActiveGrants(merged))
   }
 
   return getAccessProfileById(id)

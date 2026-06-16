@@ -17,7 +17,7 @@ import {
   type ArchivedProjectEntry,
 } from '@/contexts/projects-registry-context'
 import { STORAGE_PREFIX } from '@/config/brand'
-import { resolveProjectListItem } from '@/data/project-detail.mock'
+import { minimalProjectListItem } from '@/lib/production-empty-data'
 import type { ProjectDetail } from '@/data/project-detail.mock'
 import type { ProjectListItem } from '@/data/projects.mock'
 import { syncRegistryProjects } from '@/data/projects-registry-store'
@@ -70,7 +70,7 @@ function snapshotForArchive(
   userProjects: ProjectListItem[],
 ): ProjectListItem {
   const fromUser = userProjects.find((o) => o.id === id)
-  const base = fromUser ? { ...fromUser } : resolveProjectListItem(id)
+  const base = fromUser ? { ...fromUser } : minimalProjectListItem(id)
   return stampRecordAuditOnUpdate(base)
 }
 

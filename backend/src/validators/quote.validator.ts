@@ -17,7 +17,7 @@ const lineItemSchema = z
   })
   .refine(
     (line) => !line.deferredPayment || Boolean(line.deferredPaymentText?.trim()),
-    { message: 'Indica el texto de plazo diferido en la línea.' },
+    { message: 'Indica el texto de plazo entrega en la línea.' },
   )
 
 export const createQuoteSchema = z.object({

@@ -2,7 +2,7 @@ import type { PoolClient } from 'pg'
 import { enforceRecordQuota } from '../lib/tenant-quota-enforce.js'
 
 import { pool } from '../db/pool.js'
-import { setTenantLocal, tenantQuery } from '../db/tenant-query.js'
+import { setTenantLocal, tenantQuery, withTenantClient } from '../db/tenant-query.js'
 import { pushTenantCondition, tenantWhereParam } from '../lib/tenant-sql.js'
 import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import { deriveInventoryStatus } from '../mappers/inventory.mapper.js'
@@ -18,6 +18,7 @@ import type {
 import { normalizeProductCurrency } from '../types/currency.js'
 import { paginationOffset } from '../utils/pagination.js'
 import { purgeEntityNotesAndFiles } from '../services/entity-purge.service.js'
+import { resolveProductCategoryIdByName } from './product-categories.repository.js'
 
 const SELECT_COLUMNS = `
   p.id, p.name, p.sku, c.name AS category_name, p.product_type, p.unit_of_measure,
@@ -27,7 +28,7 @@ const SELECT_COLUMNS = `
     WHEN p.track_inventory THEN COALESCE(FLOOR(inv.total_on_hand), 0)::int
     ELSE p.stock_qty
   END AS stock_qty,
-  p.status, p.track_inventory,
+  p.status, p.track_inventory, p.min_stock, p.max_stock,
   p.barcode, p.image_url,
   p.created_at, p.created_by_id, p.created_by_name, p.owner_name,
   p.updated_at, p.updated_by_id, p.updated_by_name
@@ -35,13 +36,21 @@ const SELECT_COLUMNS = `
 
 const FROM_JOIN = `
   FROM crm_products p
-  LEFT JOIN crm_product_categories c ON c.id = p.category_id
+  LEFT JOIN crm_product_categories c
+    ON c.id = p.category_id AND c.tenant_id = p.tenant_id AND c.deleted_at IS NULL
   LEFT JOIN LATERAL (
     SELECT COALESCE(SUM(ip.quantity_on_hand), 0) AS total_on_hand
     FROM crm_inventory_positions ip
-    WHERE ip.product_id = p.id
-       OR lower(trim(ip.sku)) = lower(trim(p.sku))
+    WHERE ip.tenant_id = p.tenant_id
+      AND (ip.product_id = p.id
+        OR lower(trim(ip.sku)) = lower(trim(p.sku)))
   ) inv ON true
+`
+
+const FROM_COUNT = `
+  FROM crm_products p
+  LEFT JOIN crm_product_categories c
+    ON c.id = p.category_id AND c.tenant_id = p.tenant_id AND c.deleted_at IS NULL
 `
 
 export type ListProductsParams = {
@@ -49,22 +58,8 @@ export type ListProductsParams = {
   pageSize: number
   q?: string
   status?: string
+  categoryId?: string
   archivedOnly?: boolean
-}
-
-async function resolveCategoryId(categoryName?: string): Promise<string | null> {
-  const name = categoryName?.trim()
-  if (!name) return null
-  const existing = await tenantQuery<{ id: string }>(
-    `SELECT id FROM crm_product_categories WHERE lower(trim(name)) = lower($1) AND active = true LIMIT 1`,
-    [name],
-  )
-  if (existing.rows[0]) return existing.rows[0].id
-  const inserted = await tenantQuery<{ id: string }>(
-    `INSERT INTO crm_product_categories (name, active, tenant_id) VALUES ($1, true, $2) RETURNING id`,
-    [name, getTenantIdOrDefault()],
-  )
-  return inserted.rows[0]?.id ?? null
 }
 
 function toCents(amount?: number): number {
@@ -88,12 +83,28 @@ async function resolveDefaultWarehouse(
   const result = await client.query<{ id: string; name: string }>(
     `SELECT id, name
      FROM crm_warehouses
-     WHERE deleted_at IS NULL AND active = true
+     WHERE deleted_at IS NULL AND active = true AND tenant_id = $1
      ORDER BY is_default DESC, name ASC
      LIMIT 1`,
+    [getTenantIdOrDefault()],
   )
   const row = result.rows[0]
   return { id: row?.id ?? null, name: row?.name ?? 'Bodega central' }
+}
+
+async function findInventoryPositionIds(
+  client: PoolClient,
+  params: { productId: string; sku: string },
+): Promise<string[]> {
+  const sku = params.sku.trim()
+  const result = await client.query<{ id: string }>(
+    `SELECT id
+     FROM crm_inventory_positions
+     WHERE tenant_id = $1
+       AND (product_id = $2 OR lower(trim(sku)) = lower($3))`,
+    [getTenantIdOrDefault(), params.productId, sku],
+  )
+  return result.rows.map((row) => row.id)
 }
 
 /** Crea la posición de inventario inicial al dar de alta un producto con control de stock. */
@@ -114,15 +125,39 @@ async function ensureInventoryPositionForNewProduct(
   const minStock = Math.max(0, params.minStock)
   const available = onHand
   const status = deriveInventoryStatus(onHand, 0, minStock, null)
+  const tenantId = getTenantIdOrDefault()
 
   const existing = await client.query<{ id: string }>(
     `SELECT id FROM crm_inventory_positions
      WHERE lower(trim(sku)) = lower($1)
        AND warehouse_id IS NOT DISTINCT FROM $2
+       AND tenant_id = $3
      LIMIT 1`,
-    [sku, warehouse.id],
+    [sku, warehouse.id, tenantId],
   )
-  if (existing.rows[0]) return
+  const existingId = existing.rows[0]?.id
+  if (existingId) {
+    await client.query(
+      `UPDATE crm_inventory_positions
+       SET product_id = $1,
+           product_name = $2,
+           sku = $3,
+           min_stock = $4,
+           status = $5,
+           updated_at = now()
+       WHERE id = $6 AND tenant_id = $7`,
+      [
+        params.productId,
+        params.productName.trim(),
+        sku,
+        minStock,
+        status,
+        existingId,
+        tenantId,
+      ],
+    )
+    return
+  }
 
   const inserted = await client.query<{ id: string }>(
     `INSERT INTO crm_inventory_positions (
@@ -168,9 +203,156 @@ async function ensureInventoryPositionForNewProduct(
   }
 }
 
+/** Borra posiciones, movimientos y reservas al desactivar control de stock. */
+async function removeInventoryForProduct(
+  client: PoolClient,
+  params: { productId: string; sku: string },
+): Promise<void> {
+  const sku = params.sku.trim()
+  const productId = params.productId
+  const tenantId = getTenantIdOrDefault()
+  const positionIds = await findInventoryPositionIds(client, { productId, sku })
+
+  if (positionIds.length > 0) {
+    await client.query(
+      `DELETE FROM crm_stock_reservations
+       WHERE inventory_position_id = ANY($1::uuid[])
+          OR product_id = $2
+          OR lower(trim(sku)) = lower($3)`,
+      [positionIds, productId, sku],
+    )
+    await client.query(
+      `DELETE FROM crm_stock_movements
+       WHERE inventory_position_id = ANY($1::uuid[])
+          OR product_id = $2
+          OR lower(trim(sku)) = lower($3)`,
+      [positionIds, productId, sku],
+    )
+    await client.query(
+      `DELETE FROM crm_inventory_positions
+       WHERE tenant_id = $1 AND id = ANY($2::uuid[])`,
+      [tenantId, positionIds],
+    )
+    return
+  }
+
+  await client.query(
+    `DELETE FROM crm_stock_reservations
+     WHERE product_id = $1 OR lower(trim(sku)) = lower($2)`,
+    [productId, sku],
+  )
+  await client.query(
+    `DELETE FROM crm_stock_movements
+     WHERE product_id = $1 OR lower(trim(sku)) = lower($2)`,
+    [productId, sku],
+  )
+  await client.query(
+    `DELETE FROM crm_inventory_positions
+     WHERE tenant_id = $1
+       AND (product_id = $2 OR lower(trim(sku)) = lower($3))`,
+    [tenantId, productId, sku],
+  )
+}
+
+async function syncInventoryAfterProductUpdate(
+  client: PoolClient,
+  params: {
+    productId: string
+    productName: string
+    sku: string
+    trackInventory: boolean
+    previousTrackInventory: boolean
+    onHand: number
+    minStock: number
+    actor: AuditActor
+  },
+): Promise<void> {
+  if (!params.trackInventory) {
+    await removeInventoryForProduct(client, {
+      productId: params.productId,
+      sku: params.sku,
+    })
+    return
+  }
+
+  if (!params.previousTrackInventory) {
+    await ensureInventoryPositionForNewProduct(client, {
+      productId: params.productId,
+      productName: params.productName,
+      sku: params.sku,
+      onHand: params.onHand,
+      minStock: params.minStock,
+      actor: params.actor,
+    })
+    return
+  }
+
+  const positions = await client.query<{
+    id: string
+    quantity_on_hand: string | number
+    quantity_reserved: string | number
+    min_stock: string | number | null
+    status: string | null
+  }>(
+    `SELECT id, quantity_on_hand, quantity_reserved, min_stock, status
+     FROM crm_inventory_positions
+     WHERE tenant_id = $1
+       AND (product_id = $2 OR lower(trim(sku)) = lower($3))`,
+    [getTenantIdOrDefault(), params.productId, params.sku.trim()],
+  )
+
+  if (positions.rows.length === 0) {
+    await ensureInventoryPositionForNewProduct(client, {
+      productId: params.productId,
+      productName: params.productName,
+      sku: params.sku,
+      onHand: params.onHand,
+      minStock: params.minStock,
+      actor: params.actor,
+    })
+    return
+  }
+
+  for (const pos of positions.rows) {
+    const onHand = Number(pos.quantity_on_hand ?? 0)
+    const reserved = Number(pos.quantity_reserved ?? 0)
+    const minStock = Math.max(0, params.minStock)
+    const status = deriveInventoryStatus(
+      onHand,
+      reserved,
+      minStock,
+      pos.status as import('../types/inventory.js').InventoryStatus | null,
+    )
+    await client.query(
+      `UPDATE crm_inventory_positions
+       SET product_name = $1,
+           sku = $2,
+           min_stock = $3,
+           status = $4,
+           updated_at = now()
+       WHERE id = $5 AND tenant_id = $6`,
+      [
+        params.productName.trim(),
+        params.sku.trim(),
+        minStock,
+        status,
+        pos.id,
+        getTenantIdOrDefault(),
+      ],
+    )
+  }
+}
+
 export async function listProducts(
   params: ListProductsParams,
 ): Promise<{ items: ProductListItem[]; total: number }> {
+  const result = await listProductRows(params)
+  return { items: result.items.map(mapProductRow), total: result.total }
+}
+
+export async function listProductRows(
+  params: ListProductsParams,
+): Promise<{ items: ProductRow[]; total: number }> {
   const conditions: string[] = ['p.deleted_at IS NULL']
   const values: unknown[] = []
   let idx = 1
@@ -185,6 +367,10 @@ export async function listProducts(
     conditions.push(`p.status = $${idx++}`)
     values.push(params.status)
   }
+  if (params.categoryId) {
+    conditions.push(`p.category_id = $${idx++}`)
+    values.push(params.categoryId)
+  }
   if (params.q) {
     conditions.push(
       `(p.name ILIKE $${idx} OR p.sku ILIKE $${idx} OR c.name ILIKE $${idx})`,
@@ -195,25 +381,37 @@ export async function listProducts(
 
   const where = `WHERE ${conditions.join(' AND ')}`
 
-  const countResult = await tenantQuery<{ count: string }>(
-    `SELECT count(*)::text AS count ${FROM_JOIN} ${where}`,
-    values,
+  return withTenantClient(async (client) => {
+    const countResult = await client.query<{ count: string }>(
+      `SELECT count(*)::text AS count ${FROM_COUNT} ${where}`,
+      values,
+    )
+    const total = Number.parseInt(countResult.rows[0]?.count ?? '0', 10)
+
+    const offset = paginationOffset(params.page, params.pageSize)
+    const listValues = [...values, params.pageSize, offset]
+
+    const result = await client.query<ProductRow>(
+      `SELECT ${SELECT_COLUMNS}
+       ${FROM_JOIN}
+       ${where}
+       ORDER BY p.updated_at DESC
+       LIMIT $${idx++} OFFSET $${idx}`,
+      listValues,
+    )
+
+    return { items: result.rows, total }
+  })
+}
+
+export async function getProductStoredImageUrl(id: string): Promise<string | null> {
+  const result = await tenantQuery<{ image_url: string | null }>(
+    `SELECT p.image_url
+     FROM crm_products p
+     WHERE p.id = $1 AND p.deleted_at IS NULL AND ${tenantWhereParam(2, 'p')}`,
+    [id, getTenantIdOrDefault()],
   )
-  const total = Number.parseInt(countResult.rows[0]?.count ?? '0', 10)
-
-  const offset = paginationOffset(params.page, params.pageSize)
-  values.push(params.pageSize, offset)
-
-  const result = await tenantQuery<ProductRow>(
-    `SELECT ${SELECT_COLUMNS}
-     ${FROM_JOIN}
-     ${where}
-     ORDER BY p.updated_at DESC
-     LIMIT $${idx++} OFFSET $${idx}`,
-    values,
-  )
-
-  return { items: result.rows.map(mapProductRow), total }
+  return result.rows[0]?.image_url?.trim() || null
 }
 
 export async function getProductById(id: string): Promise<ProductListItem> {
@@ -262,7 +460,7 @@ export async function createProduct(
   if (!input.name?.trim()) throw badRequest('El nombre es obligatorio')
   if (!input.sku?.trim()) throw badRequest('El SKU es obligatorio')
 
-  const categoryId = await resolveCategoryId(input.category)
+  const categoryId = await resolveProductCategoryIdByName(input.category)
   const trackInventory = input.trackInventory ?? true
   const stockQty =
     trackInventory && input.stockNum != null ? input.stockNum : null
@@ -358,6 +556,7 @@ export async function updateProduct(
 ): Promise<ProductListItem> {
   const existing = await getProductById(id)
   const previousOwner = existing.owner ?? ''
+  const previousTrackInventory = existing.trackInventory
 
   const sets: string[] = []
   const values: unknown[] = []
@@ -377,7 +576,7 @@ export async function updateProduct(
   }
   if (input.category !== undefined) {
     sets.push(`category_id = $${idx++}`)
-    values.push(await resolveCategoryId(input.category))
+    values.push(await resolveProductCategoryIdByName(input.category))
   }
   if (input.ownerName !== undefined) {
     sets.push(`owner_name = $${idx++}`)
@@ -422,12 +621,18 @@ export async function updateProduct(
   if (input.trackInventory !== undefined) {
     sets.push(`track_inventory = $${idx++}`)
     values.push(input.trackInventory)
+    if (!input.trackInventory) {
+      sets.push(`min_stock = $${idx++}`)
+      values.push(null)
+      sets.push(`max_stock = $${idx++}`)
+      values.push(null)
+    }
   }
-  if (input.minStock !== undefined) {
+  if (input.minStock !== undefined && (input.trackInventory ?? previousTrackInventory)) {
     sets.push(`min_stock = $${idx++}`)
     values.push(input.minStock)
   }
-  if (input.maxStock !== undefined) {
+  if (input.maxStock !== undefined && (input.trackInventory ?? previousTrackInventory)) {
     sets.push(`max_stock = $${idx++}`)
     values.push(input.maxStock)
   }
@@ -440,25 +645,70 @@ export async function updateProduct(
     values.push(input.imageUrl.trim() || null)
   }
 
-  if (sets.length === 0) return getProductById(id)
+  const nextTrackInventory = input.trackInventory ?? previousTrackInventory
+  const nextName = input.name?.trim() ?? existing.name
+  const nextSku = input.sku?.trim() ?? existing.sku
+  const nextOnHand =
+    input.stockNum !== undefined
+      ? Math.max(0, input.stockNum)
+      : existing.stockNum >= 0
+        ? existing.stockNum
+        : 0
+  const nextMinStock =
+    nextTrackInventory
+      ? input.minStock !== undefined
+        ? Math.max(0, input.minStock)
+        : existing.minStockNum
+      : 0
 
-  sets.push(`updated_by_id = $${idx++}`)
-  values.push(actor.userId)
-  sets.push(`updated_by_name = $${idx++}`)
-  values.push(actor.userName)
-  values.push(id)
-
+  const client = await pool.connect()
   try {
-    await tenantQuery(
-      `UPDATE crm_products SET ${sets.join(', ')}, updated_at = now()
-       WHERE id = $${idx} AND deleted_at IS NULL`,
-      values,
-    )
-  } catch (err) {
-    if (err && typeof err === 'object' && 'code' in err && (err as { code: string }).code === '23505') {
-      throw badRequest('Ya existe un producto con ese SKU')
+    await client.query('BEGIN')
+    await setTenantLocal(client)
+
+    if (sets.length > 0) {
+      sets.push(`updated_by_id = $${idx++}`)
+      values.push(actor.userId)
+      sets.push(`updated_by_name = $${idx++}`)
+      values.push(actor.userName)
+      values.push(id)
+
+      try {
+        await client.query(
+          `UPDATE crm_products SET ${sets.join(', ')}, updated_at = now()
+           WHERE id = $${idx} AND deleted_at IS NULL AND tenant_id = $${idx + 1}`,
+          [...values, getTenantIdOrDefault()],
+        )
+      } catch (err) {
+        if (
+          err &&
+          typeof err === 'object' &&
+          'code' in err &&
+          (err as { code: string }).code === '23505'
+        ) {
+          throw badRequest('Ya existe un producto con ese SKU')
+        }
+        throw err
+      }
     }
+
+    await syncInventoryAfterProductUpdate(client, {
+      productId: id,
+      productName: nextName,
+      sku: nextSku,
+      trackInventory: nextTrackInventory,
+      previousTrackInventory,
+      onHand: nextOnHand,
+      minStock: nextMinStock,
+      actor,
+    })
+
+    await client.query('COMMIT')
+  } catch (err) {
+    await client.query('ROLLBACK')
     throw err
+  } finally {
+    client.release()
   }
 
   const detail = await getProductById(id)
@@ -521,6 +771,74 @@ export async function softDeleteProduct(id: string, actor: AuditActor): Promise<
  * Elimina el producto del todo para liberar la restricción única de `sku`.
  * Se permite tanto si estaba en papelera (`archived_at`) como si ya tenía soft-delete (`deleted_at`).
  */
+export type ProductInvoiceSalesTotalRow = {
+  productId: string | null
+  sku: string
+  productName: string
+  totalQuantity: number
+}
+
+/** Unidades facturadas por producto en facturas emitidas (no borrador ni anulada). */
+export async function listProductInvoiceSalesTotals(): Promise<ProductInvoiceSalesTotalRow[]> {
+  const result = await tenantQuery<{
+    product_id: string | null
+    sku: string | null
+    product_name: string | null
+    total_quantity: string
+  }>(
+    `WITH issued_lines AS (
+       SELECT
+         li.product_id,
+         trim(lower(li.sku)) AS sku_key,
+         trim(li.sku) AS sku,
+         trim(li.product_name) AS product_name,
+         li.quantity
+       FROM crm_invoice_line_items li
+       INNER JOIN crm_invoices inv ON inv.id = li.invoice_id
+       WHERE inv.deleted_at IS NULL
+         AND inv.archived_at IS NULL
+         AND inv.status NOT IN ('Borrador', 'Anulada')
+         AND ${tenantWhereParam(1, 'inv')}
+     ),
+     by_product AS (
+       SELECT
+         product_id,
+         NULL::text AS sku,
+         max(product_name) AS product_name,
+         COALESCE(SUM(quantity), 0) AS total_quantity
+       FROM issued_lines
+       WHERE product_id IS NOT NULL
+       GROUP BY product_id
+     ),
+     by_sku AS (
+       SELECT
+         NULL::uuid AS product_id,
+         max(sku) AS sku,
+         max(product_name) AS product_name,
+         COALESCE(SUM(quantity), 0) AS total_quantity
+       FROM issued_lines
+       WHERE product_id IS NULL AND sku_key <> ''
+       GROUP BY sku_key
+     )
+     SELECT product_id, sku, product_name, total_quantity::text
+     FROM (
+       SELECT * FROM by_product
+       UNION ALL
+       SELECT * FROM by_sku
+     ) combined
+     WHERE total_quantity > 0
+     ORDER BY total_quantity DESC`,
+    [getTenantIdOrDefault()],
+  )
+
+  return result.rows.map((row) => ({
+    productId: row.product_id,
+    sku: row.sku?.trim() ?? '',
+    productName: row.product_name?.trim() ?? '',
+    totalQuantity: Number.parseFloat(row.total_quantity) || 0,
+  }))
+}
+
 export async function permanentlyDeleteProduct(id: string): Promise<void> {
   const client = await pool.connect()
   try {

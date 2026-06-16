@@ -11,7 +11,7 @@ import {
   isUniqueViolation,
 } from '../lib/stock-receipt-number.js'
 import { pool } from '../db/pool.js'
-import { setTenantLocal, tenantQuery } from '../db/tenant-query.js'
+import { setTenantLocal, tenantQuery, withTenantClient } from '../db/tenant-query.js'
 import { pushTenantCondition, tenantWhereParam } from '../lib/tenant-sql.js'
 import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import { deriveInventoryStatus } from '../mappers/inventory.mapper.js'
@@ -179,24 +179,27 @@ export async function listStockReceipts(
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
-  const countResult = await tenantQuery<{ count: string }>(
-    `SELECT count(*)::text AS count FROM crm_stock_receipts ${where}`,
-    values,
-  )
-  const total = Number.parseInt(countResult.rows[0]?.count ?? '0', 10)
-  const offset = paginationOffset(params.page, params.pageSize)
-  values.push(params.pageSize, offset)
 
-  const result = await tenantQuery<StockReceiptRow>(
-    `SELECT ${RECEIPT_COLUMNS}
-     FROM crm_stock_receipts
-     ${where}
-     ORDER BY updated_at DESC
-     LIMIT $${idx++} OFFSET $${idx}`,
-    values,
-  )
+  return withTenantClient(async (client) => {
+    const countResult = await client.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM crm_stock_receipts ${where}`,
+      values,
+    )
+    const total = Number.parseInt(countResult.rows[0]?.count ?? '0', 10)
+    const offset = paginationOffset(params.page, params.pageSize)
+    const listValues = [...values, params.pageSize, offset]
 
-  return { items: result.rows.map(mapStockReceiptRow), total }
+    const result = await client.query<StockReceiptRow>(
+      `SELECT ${RECEIPT_COLUMNS}
+       FROM crm_stock_receipts
+       ${where}
+       ORDER BY updated_at DESC
+       LIMIT $${idx++} OFFSET $${idx}`,
+      listValues,
+    )
+
+    return { items: result.rows.map(mapStockReceiptRow), total }
+  })
 }
 
 export async function getStockReceiptById(id: string): Promise<StockReceiptDetail> {

@@ -10,7 +10,7 @@ import {
 } from '../lib/document-line-items.js'
 import { getExchangeRatesForDocumentDate } from '../services/exchange-rates.service.js'
 import { pool } from '../db/pool.js'
-import { setTenantLocal, tenantQuery } from '../db/tenant-query.js'
+import { setTenantLocal, tenantQuery, withTenantClient } from '../db/tenant-query.js'
 import { pushTenantCondition, tenantWhereParam } from '../lib/tenant-sql.js'
 import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import {
@@ -243,24 +243,27 @@ export async function listPurchases(
   }
 
   const where = `WHERE ${conditions.join(' AND ')}`
-  const countResult = await tenantQuery<{ count: string }>(
-    `SELECT count(*)::text AS count FROM crm_purchases ${where}`,
-    values,
-  )
-  const total = Number.parseInt(countResult.rows[0]?.count ?? '0', 10)
-  const offset = paginationOffset(params.page, params.pageSize)
-  values.push(params.pageSize, offset)
 
-  const result = await tenantQuery<PurchaseRow>(
-    `SELECT ${PURCHASE_COLUMNS}
-     FROM crm_purchases
-     ${where}
-     ORDER BY updated_at DESC
-     LIMIT $${idx++} OFFSET $${idx}`,
-    values,
-  )
+  return withTenantClient(async (client) => {
+    const countResult = await client.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM crm_purchases ${where}`,
+      values,
+    )
+    const total = Number.parseInt(countResult.rows[0]?.count ?? '0', 10)
+    const offset = paginationOffset(params.page, params.pageSize)
+    const listValues = [...values, params.pageSize, offset]
 
-  return { items: result.rows.map(mapPurchaseRow), total }
+    const result = await client.query<PurchaseRow>(
+      `SELECT ${PURCHASE_COLUMNS}
+       FROM crm_purchases
+       ${where}
+       ORDER BY updated_at DESC
+       LIMIT $${idx++} OFFSET $${idx}`,
+      listValues,
+    )
+
+    return { items: result.rows.map(mapPurchaseRow), total }
+  })
 }
 
 export async function getPurchaseById(id: string): Promise<PurchaseDetail> {

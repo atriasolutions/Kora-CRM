@@ -56,7 +56,7 @@ function listItemToReportRow(item: object): ReportTableRow {
   return out
 }
 
-async function loadRows(sourceId: ReportDataSourceId): Promise<ReportTableRow[]> {
+export async function loadReportRows(sourceId: ReportDataSourceId): Promise<ReportTableRow[]> {
   const pageSize = MAX_ROWS
   switch (sourceId) {
     case 'contactos': {
@@ -147,7 +147,7 @@ async function loadRows(sourceId: ReportDataSourceId): Promise<ReportTableRow[]>
 export async function executeReportTable(
   config: ReportTableConfig,
 ): Promise<ReportTableRunResult & { filterError?: string }> {
-  const allRows = await loadRows(config.dataSource)
+  const allRows = await loadReportRows(config.dataSource)
   const { rows: filtered, error } = filterReportRows(
     allRows,
     config.conditions ?? [],

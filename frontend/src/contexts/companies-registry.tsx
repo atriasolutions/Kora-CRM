@@ -163,6 +163,10 @@ export function CompaniesRegistryProvider({ children }: { children: ReactNode })
           ...detail,
           logoUrl: saved.logoUrl?.trim() || detail.logoUrl,
           name: saved.name,
+          website: saved.website?.trim() ?? detail.website,
+          phone: saved.phone?.trim() ?? detail.phone,
+          email: saved.email?.trim() ?? detail.email,
+          description: saved.description?.trim() ?? detail.description,
         }
         cacheEntityListImage('company', detail.id, merged.logoUrl)
         const list = listItemFromCompanyDetail(merged)

@@ -76,7 +76,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     label: 'Facturación electrónica',
     description: 'Modo manual o integración con el SII (certificado, folios y RCV).',
     Icon: FileDigit,
-    comingSoon: true,
+    platformOperatorOnly: true,
   },
   {
     id: 'informacion-instancia',

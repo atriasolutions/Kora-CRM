@@ -21,7 +21,7 @@ export type ProductsRegistryContextValue = {
   updateProductFromDetail: (
     detail: ProductDetail,
     options?: { previousSku?: string },
-  ) => Promise<void>
+  ) => Promise<ProductListItem | void>
   archiveProduct: (id: string) => Promise<void>
   archiveProducts: (ids: string[]) => Promise<void>
   restoreProduct: (id: string) => Promise<void>

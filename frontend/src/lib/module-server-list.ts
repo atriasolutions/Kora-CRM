@@ -74,9 +74,11 @@ export function fetchQuotesServerPage(
 export function fetchInvoicesServerPage(
   params: ServerListFetchParams,
   archived = false,
+  documentKind?: string,
 ): Promise<ServerListFetchResult<InvoiceListItem>> {
   return fetchModulePage(`${API_V1}/invoices`, params, {
     archived: archived ? 'true' : 'false',
+    documentKind: documentKind && documentKind !== 'all' ? documentKind : undefined,
   })
 }
 
@@ -134,8 +136,10 @@ export function fetchSolicitudesServerPage(
 export function fetchBitacoraServerPage(
   params: ServerListFetchParams,
   serverQuery: BitacoraServerListQuery = {},
+  archived = false,
 ): Promise<ServerListFetchResult<BitacoraListItem>> {
   return fetchModulePage(`${API_V1}/bitacora`, params, {
+    archived: archived ? 'true' : 'false',
     mine: serverQuery.mine,
     billable: serverQuery.billable,
     workDateFrom: serverQuery.workDateFrom,

@@ -1,6 +1,6 @@
 import { acquireSkuStockLock } from '../lib/inventory-stock-lock.js'
 import { pool } from '../db/pool.js'
-import { setTenantLocal, tenantQuery } from '../db/tenant-query.js'
+import { setTenantLocal, tenantQuery, withTenantClient } from '../db/tenant-query.js'
 import { pushTenantCondition, tenantWhereParam } from '../lib/tenant-sql.js'
 import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import {
@@ -41,13 +41,19 @@ const POSITION_COLUMNS = `
 const POSITION_FROM = `
   FROM crm_inventory_positions ip
   LEFT JOIN crm_products pr ON pr.id = ip.product_id
-  LEFT JOIN crm_product_categories c ON c.id = pr.category_id
+  LEFT JOIN crm_product_categories c
+    ON c.id = pr.category_id AND c.tenant_id = pr.tenant_id AND c.deleted_at IS NULL
 `
 
 const MOVEMENT_COLUMNS = `
   id, inventory_position_id, movement_type, reference,
-  quantity_delta, occurred_at, author_name, source_kind, source_id
+  quantity_delta, occurred_at, author_name, source_kind, source_id,
+  adjustment_detail
 `
+
+const MOVEMENT_SELECT = MOVEMENT_COLUMNS.split(',')
+  .map((column) => `sm.${column.trim()}`)
+  .join(', ')
 
 export type ListInventoryParams = {
   page: number
@@ -59,12 +65,13 @@ export type ListInventoryParams = {
 
 async function loadMovements(positionId: string): Promise<StockMovementRow[]> {
   const result = await tenantQuery<StockMovementRow>(
-    `SELECT ${MOVEMENT_COLUMNS}
-     FROM crm_stock_movements
-     WHERE inventory_position_id = $1
-     ORDER BY occurred_at DESC
+    `SELECT ${MOVEMENT_SELECT}
+     FROM crm_stock_movements sm
+     INNER JOIN crm_inventory_positions ip ON ip.id = sm.inventory_position_id
+     WHERE sm.inventory_position_id = $1 AND ${tenantWhereParam(2, 'ip')}
+     ORDER BY sm.occurred_at DESC
      LIMIT 50`,
-    [positionId],
+    [positionId, getTenantIdOrDefault()],
   )
   return result.rows
 }
@@ -77,6 +84,9 @@ export async function listInventory(
   let idx = 1
 
   idx = pushTenantCondition(conditions, values, idx, 'ip')
+  conditions.push(
+    `(ip.product_id IS NULL OR (pr.deleted_at IS NULL AND pr.track_inventory = true))`,
+  )
   if (params.status) {
     conditions.push(`ip.status = $${idx++}`)
     values.push(params.status)
@@ -94,24 +104,30 @@ export async function listInventory(
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
-  const countResult = await tenantQuery<{ count: string }>(
-    `SELECT count(*)::text AS count FROM crm_inventory_positions ip ${where}`,
-    values,
-  )
-  const total = Number.parseInt(countResult.rows[0]?.count ?? '0', 10)
-  const offset = paginationOffset(params.page, params.pageSize)
-  values.push(params.pageSize, offset)
 
-  const result = await tenantQuery<InventoryRow>(
-    `SELECT ${POSITION_COLUMNS}
-     ${POSITION_FROM}
-     ${where}
-     ORDER BY ip.updated_at DESC
-     LIMIT $${idx++} OFFSET $${idx}`,
-    values,
-  )
+  return withTenantClient(async (client) => {
+    const countResult = await client.query<{ count: string }>(
+      `SELECT count(*)::text AS count
+       FROM crm_inventory_positions ip
+       LEFT JOIN crm_products pr ON pr.id = ip.product_id
+       ${where}`,
+      values,
+    )
+    const total = Number.parseInt(countResult.rows[0]?.count ?? '0', 10)
+    const offset = paginationOffset(params.page, params.pageSize)
+    const listValues = [...values, params.pageSize, offset]
 
-  return { items: result.rows.map(mapInventoryRow), total }
+    const result = await client.query<InventoryRow>(
+      `SELECT ${POSITION_COLUMNS}
+       ${POSITION_FROM}
+       ${where}
+       ORDER BY ip.updated_at DESC
+       LIMIT $${idx++} OFFSET $${idx}`,
+      listValues,
+    )
+
+    return { items: result.rows.map(mapInventoryRow), total }
+  })
 }
 
 export async function getInventoryById(id: string): Promise<InventoryDetail> {
@@ -185,12 +201,13 @@ export async function adjustInventory(
   try {
     await client.query('BEGIN')
     await setTenantLocal(client)
+    const tenantId = getTenantIdOrDefault()
     const posResult = await client.query<InventoryRow>(
       `SELECT ${POSITION_BASE_COLUMNS}
        FROM crm_inventory_positions
-       WHERE id = $1
+       WHERE id = $1 AND tenant_id = $2
        FOR UPDATE`,
-      [id],
+      [id, tenantId],
     )
     const row = posResult.rows[0]
     if (!row) throw notFound('Posición de inventario no encontrada')
@@ -210,8 +227,8 @@ export async function adjustInventory(
         status = $4,
         last_movement_at = now(),
         updated_at = now()
-      WHERE id = $1`,
-      [id, onHand, available, status],
+      WHERE id = $1 AND tenant_id = $5`,
+      [id, onHand, available, status, tenantId],
     )
 
     await client.query(

@@ -22,6 +22,21 @@ function hasPermission(
   return canModulePermission(profile, moduleId, action)
 }
 
+/** Solo operador de plataforma (superadmin). */
+export function requirePlatformOperator() {
+  return (req: Request, _res: Response, next: NextFunction): void => {
+    if (!getAuditActor(req).isPlatformOperator) {
+      next(
+        forbidden(
+          'Solo el operador de plataforma puede acceder a la configuración SII.',
+        ),
+      )
+      return
+    }
+    next()
+  }
+}
+
 export function requirePermission(moduleId: MenuModuleId, action: PermissionAction) {
   return (req: Request, _res: Response, next: NextFunction): void => {
     if (!hasPermission(req, moduleId, action)) {

@@ -3,28 +3,28 @@ import { useEffect, useState } from 'react'
 import { getDashboardApi } from '@/api/dashboard'
 import { isApiEnabled } from '@/api/config'
 import { getDashboardMock } from '@/data/dashboard.mock'
+import { getEmptyDashboard } from '@/lib/dashboard-empty'
 import {
   defaultDashboardPeriod,
   periodOptionId,
   type DashboardPeriod,
 } from '@/lib/dashboard-period'
-import type { DashboardData } from '@/types/dashboard'
+import type { DashboardData, DashboardViewId } from '@/types/dashboard'
 
-export function useDashboardData(period: DashboardPeriod) {
+export function useDashboardData(period: DashboardPeriod, view: DashboardViewId = 'ventas') {
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [fromApi, setFromApi] = useState(false)
 
   const periodKey = periodOptionId(period)
+  const viewKey = view
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    setError(null)
 
     if (isApiEnabled()) {
-      void getDashboardApi(period)
+      void getDashboardApi(period, view)
         .then((snapshot) => {
           if (!cancelled) {
             setData(snapshot)
@@ -33,16 +33,15 @@ export function useDashboardData(period: DashboardPeriod) {
         })
         .catch(() => {
           if (!cancelled) {
-            setError('No se pudo cargar el dashboard.')
-            setData(getDashboardMock(period))
-            setFromApi(false)
+            setData(getEmptyDashboard(period, view))
+            setFromApi(true)
           }
         })
         .finally(() => {
           if (!cancelled) setLoading(false)
         })
     } else {
-      setData(getDashboardMock(period))
+      setData(getDashboardMock(period, view))
       setFromApi(false)
       setLoading(false)
     }
@@ -50,12 +49,11 @@ export function useDashboardData(period: DashboardPeriod) {
     return () => {
       cancelled = true
     }
-  }, [periodKey])
+  }, [periodKey, viewKey, period, view])
 
   return {
     data,
     loading,
-    error,
     fromApi,
   }
 }

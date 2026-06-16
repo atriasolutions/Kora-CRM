@@ -1,14 +1,19 @@
 import { isApiEnabled } from '@/api/config'
 import { executeReportTableApi } from '@/api/reports'
 import { buildNpsReportResult, type NpsReportResult } from '@/data/nps-report.mock'
+import { emptyNpsReportResult } from '@/lib/production-empty-data'
 import { runReportTable, resolveReportTableConfig } from '@/lib/report-table-run'
 import type { ReportTableConfig, ReportTableRunResult } from '@/types/report-table'
 import type { ReportItem, ReportTemplateId } from '@/types/reports-tree'
 
 const RUN_DELAY_MS = 900
 
-export function resolveReportTemplate(_report: ReportItem): ReportTemplateId {
-  return 'tabla-dinamica'
+export function resolveReportTemplate(report: ReportItem): ReportTemplateId {
+  if (report.templateId === 'nps-clientes') return 'nps-clientes'
+  if (report.templateId === 'tabla-dinamica' || report.tableConfig) {
+    return 'tabla-dinamica'
+  }
+  return report.templateId ?? 'generic'
 }
 
 export function formatReportLastRun(date: Date): string {
@@ -32,7 +37,10 @@ export async function executeReportTemplate(
   await new Promise((resolve) => window.setTimeout(resolve, RUN_DELAY_MS))
 
   if (templateId === 'nps-clientes') {
-    return { templateId: 'nps-clientes', data: buildNpsReportResult() }
+    return {
+      templateId: 'nps-clientes',
+      data: isApiEnabled() ? emptyNpsReportResult() : buildNpsReportResult(),
+    }
   }
 
   if (templateId === 'tabla-dinamica') {
@@ -55,7 +63,9 @@ export async function executeReportTemplate(
 
   return {
     templateId: 'generic',
-    message: `Ejecución demo de «${report.name}» completada.`,
+    message: isApiEnabled()
+      ? `No hay plantilla de ejecución configurada para «${report.name}».`
+      : `Ejecución demo de «${report.name}» completada.`,
   }
 }
 

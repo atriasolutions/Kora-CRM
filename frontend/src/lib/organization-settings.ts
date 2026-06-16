@@ -57,6 +57,90 @@ export function organizationSettingsToFormValues(
   return { ...settings }
 }
 
+/** Campos editables en la sección «Empresa emisora». */
+export type OrganizationIssuerSettings = Pick<
+  OrganizationSettings,
+  | 'legalName'
+  | 'tradeName'
+  | 'tagline'
+  | 'rut'
+  | 'giro'
+  | 'address'
+  | 'city'
+  | 'region'
+  | 'commune'
+  | 'phone'
+  | 'email'
+  | 'logoUrl'
+>
+
+export function organizationIssuerSettingsFrom(
+  settings: OrganizationSettings,
+): OrganizationIssuerSettings {
+  return {
+    legalName: settings.legalName,
+    tradeName: settings.tradeName,
+    tagline: settings.tagline,
+    rut: settings.rut,
+    giro: settings.giro,
+    address: settings.address,
+    city: settings.city,
+    region: settings.region,
+    commune: settings.commune,
+    phone: settings.phone,
+    email: settings.email,
+    logoUrl: settings.logoUrl,
+  }
+}
+
+export function validateOrganizationIssuerSettings(
+  values: OrganizationIssuerSettings,
+): string | null {
+  if (!values.legalName.trim()) return 'El nombre legal de la empresa es obligatorio.'
+  if (!values.rut.trim()) return 'El RUT de la empresa es obligatorio.'
+  if (!values.email.trim()) return 'El email de contacto es obligatorio.'
+  const region = values.region.trim()
+  const commune = values.commune.trim()
+  if (region && !commune) return 'Selecciona una comuna para la región indicada.'
+  if (commune && !region) return 'Selecciona una región para la comuna indicada.'
+  return null
+}
+
+/** Campos editables en Configuración → Solicitudes. */
+export type OrganizationSolicitudesSettings = Pick<
+  OrganizationSettings,
+  'defaultSolicitudAssigneeUserId' | 'defaultSolicitudAssigneeName'
+>
+
+export function organizationSolicitudesSettingsFrom(
+  settings: OrganizationSettings,
+): OrganizationSolicitudesSettings {
+  return {
+    defaultSolicitudAssigneeUserId: settings.defaultSolicitudAssigneeUserId,
+    defaultSolicitudAssigneeName: settings.defaultSolicitudAssigneeName,
+  }
+}
+
+/** Resuelve nombre del responsable desde el directorio de usuarios si hay id. */
+export function resolveDefaultSolicitudAssignee(
+  settings: Pick<
+    OrganizationSettings,
+    'defaultSolicitudAssigneeUserId' | 'defaultSolicitudAssigneeName'
+  >,
+  users: { id: string; name: string }[],
+): { assigneeUserId: string; assigneeName: string } {
+  const assigneeUserId = settings.defaultSolicitudAssigneeUserId?.trim() ?? ''
+  const storedName = settings.defaultSolicitudAssigneeName?.trim() ?? ''
+  if (!assigneeUserId) {
+    return { assigneeUserId: '', assigneeName: storedName }
+  }
+  const user = users.find((u) => u.id === assigneeUserId)
+  return {
+    assigneeUserId,
+    assigneeName: user?.name?.trim() || storedName,
+  }
+}
+
 export function validateOrganizationSettings(
   values: OrganizationSettings,
 ): string | null {

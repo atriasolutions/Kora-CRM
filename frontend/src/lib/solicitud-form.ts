@@ -17,6 +17,9 @@ export type SolicitudFormValues = {
   priority: SolicitudPriority
   assigneeName: string
   assigneeUserId: string
+  /** Usuario invitado solicitante (creación interna a petición de). */
+  requesterName: string
+  requesterUserId: string
 }
 
 export { SOLICITUD_STATUS_OPTIONS, SOLICITUD_PRIORITY_OPTIONS }
@@ -31,6 +34,8 @@ export function defaultSolicitudFormValues(
     priority: 'Media',
     assigneeName: '',
     assigneeUserId: '',
+    requesterName: '',
+    requesterUserId: '',
     ...partial,
   }
 }
@@ -48,6 +53,8 @@ export function solicitudDetailToFormValues(solicitud: SolicitudDetail): Solicit
     priority: solicitud.priority,
     assigneeName: solicitud.assignee,
     assigneeUserId: solicitud.assigneeUserId ?? '',
+    requesterName: '',
+    requesterUserId: '',
   }
 }
 

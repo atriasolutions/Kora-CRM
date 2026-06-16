@@ -114,7 +114,7 @@ function SourceBadge({ source }: { source?: string }) {
           : 'bg-primary/10 text-primary',
       )}
     >
-      {isManual ? 'Manual' : source ?? 'mindicador.cl'}
+      {isManual ? 'Manual' : source ?? 'findic.cl'}
     </span>
   )
 }
@@ -308,7 +308,7 @@ export function TaxCurrencySettingsPanel() {
     }
     setVatSaving(true)
     try {
-      await saveSettings({ ...settings, defaultVatPercent: value })
+      await saveSettings({ defaultVatPercent: value })
       setConfirmVatOpen(false)
       toast.success('IVA por defecto actualizado.')
     } catch {
@@ -368,12 +368,12 @@ export function TaxCurrencySettingsPanel() {
       setTodayRates(synced)
       setRateDraft(ratesToDraft(synced))
       setConfirmSyncOpen(false)
-      toast.success('Indicadores sincronizados desde mindicador.cl.')
+      toast.success('Indicadores sincronizados correctamente.')
     } catch (error) {
       toast.error(
         error instanceof Error
           ? error.message
-          : 'No se pudo sincronizar con mindicador.cl.',
+          : 'No se pudo sincronizar los indicadores (findic.cl / mindicador.cl).',
       )
     } finally {
       setSyncLoading(false)
@@ -484,7 +484,8 @@ export function TaxCurrencySettingsPanel() {
             {todayRates ? <RatesMeta rates={todayRates} /> : null}
           </div>
           <p className="text-xs leading-relaxed text-muted-foreground">
-            Sincronización automática diaria a las 00:05 (Chile) desde mindicador.cl. Puedes
+            Sincronización automática diaria a las 00:05 (Chile) desde findic.cl (con respaldo
+            mindicador.cl). Puedes
             corregir valores manualmente cuando sea necesario.
           </p>
         </CardHeader>
@@ -663,7 +664,8 @@ export function TaxCurrencySettingsPanel() {
             <DialogDescription asChild>
               <div className="space-y-3 pt-1 text-sm text-muted-foreground">
                 <p>
-                  Se consultará mindicador.cl y se actualizarán los valores UF, USD y EUR
+                  Se consultará findic.cl (y mindicador.cl si falla) y se actualizarán los valores UF,
+                  USD y EUR
                   almacenados para{' '}
                   <span className="font-medium capitalize text-foreground">
                     {formatDisplayDate(today)}
@@ -673,7 +675,8 @@ export function TaxCurrencySettingsPanel() {
                 <p>
                   Si habías modificado los indicadores manualmente, esos valores serán
                   reemplazados por los del servicio y la fuente volverá a{' '}
-                  <span className="font-medium text-foreground">mindicador.cl</span>.
+                  <span className="font-medium text-foreground">findic.cl</span> y, de ser
+                  necesario, <span className="font-medium text-foreground">mindicador.cl</span>.
                 </p>
               </div>
             </DialogDescription>

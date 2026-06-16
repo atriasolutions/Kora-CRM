@@ -54,8 +54,10 @@ export function bitacoraDetailToApiBody(detail: BitacoraDetail): BitacoraApiBody
   return body
 }
 
-export async function listBitacoraApi(): Promise<BitacoraListItem[]> {
-  return fetchAllPages<BitacoraListItem>(BASE)
+export async function listBitacoraApi(archived = false): Promise<BitacoraListItem[]> {
+  return fetchAllPages<BitacoraListItem>(BASE, {
+    archived: archived ? 'true' : 'false',
+  })
 }
 
 export async function listBitacoraForSolicitudApi(
@@ -95,8 +97,29 @@ export async function updateBitacoraApi(
   return res.data
 }
 
-export async function deleteBitacoraApi(id: string): Promise<void> {
+export async function archiveBitacoraApi(id: string): Promise<BitacoraListItem> {
+  const res = await fetchJSON<ApiItemResponse<BitacoraListItem>>(
+    `${BASE}/${id}/archive`,
+    { method: 'POST' },
+  )
+  return res.data
+}
+
+export async function restoreBitacoraApi(id: string): Promise<BitacoraListItem> {
+  const res = await fetchJSON<ApiItemResponse<BitacoraListItem>>(
+    `${BASE}/${id}/restore`,
+    { method: 'POST' },
+  )
+  return res.data
+}
+
+export async function permanentlyDeleteBitacoraApi(id: string): Promise<void> {
   await fetchJSON(`${BASE}/${id}`, { method: 'DELETE' })
+}
+
+/** @deprecated Usar archiveBitacoraApi */
+export async function deleteBitacoraApi(id: string): Promise<void> {
+  await archiveBitacoraApi(id)
 }
 
 export async function fetchBitacoraDashboardApi(

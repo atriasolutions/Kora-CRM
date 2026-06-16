@@ -147,6 +147,18 @@ export async function listQuotesForOpportunityApi(
   })
 }
 
+/** Cotizaciones vinculadas a una empresa (ficha empresa, resumen comercial). */
+export async function listQuotesForCompanyApi(
+  companyId: string,
+): Promise<QuoteListItem[]> {
+  const id = companyId.trim()
+  if (!id) return []
+  return fetchAllPages<QuoteListItem>(BASE, {
+    companyId: id,
+    archived: 'false',
+  })
+}
+
 export async function getQuoteApi(id: string): Promise<QuoteDetail> {
   const res = await fetchJSON<
     ApiItemResponse<QuoteListItem & { lineItems: QuoteLineItem[] }>

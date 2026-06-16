@@ -20,6 +20,7 @@ export function QuoteLineItemsPanel({
   showAvailability = false,
 }: QuoteLineItemsPanelProps) {
   useStockSync()
+  const showDeferredCol = lineItems.some((li) => li.deferredPayment === true)
   return (
     <Card className={cn('shadow-sm', className)}>
       <CardHeader>
@@ -41,6 +42,9 @@ export function QuoteLineItemsPanel({
                   <th className="px-4 py-2 font-medium">Precio orig.</th>
                   <th className="px-4 py-2 font-medium">Precio CLP</th>
                   <th className="px-4 py-2 font-medium">Desc.</th>
+                  {showDeferredCol ? (
+                    <th className="px-4 py-2 font-medium">Plazo entrega</th>
+                  ) : null}
                   <th className="px-4 py-2 font-medium">Total</th>
                   {showAvailability ? (
                     <th className="px-4 py-2 font-medium">Disponible</th>
@@ -71,6 +75,13 @@ export function QuoteLineItemsPanel({
                       </td>
                       <td className="px-4 py-3 tabular-nums">{li.unitPrice}</td>
                       <td className="px-4 py-3">{li.discount}</td>
+                      {showDeferredCol ? (
+                        <td className="px-4 py-3 text-xs text-muted-foreground">
+                          {li.deferredPayment
+                            ? li.deferredPaymentText?.trim() || '—'
+                            : '—'}
+                        </td>
+                      ) : null}
                       <td className="px-4 py-3 font-semibold tabular-nums">{li.total}</td>
                       {showAvailability ? (
                         <td

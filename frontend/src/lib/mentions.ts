@@ -282,6 +282,8 @@ function lookupMentionByRecord(
   const cached = MENTION_BY_ID.get(id) ?? MENTION_BY_HREF.get(mentionRecordHref(kind, recordId))
   if (cached) return { ...cached, recordId, href: mentionRecordHref(kind, recordId) }
 
+  if (useApi) return null
+
   if (kind === 'user') return null
 
   try {
