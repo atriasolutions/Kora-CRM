@@ -79,6 +79,10 @@ export function probabilityLabelForStage(stage: OpportunityStage): string {
   return `${pct}%`
 }
 
+export function probabilityPercentForStage(stage: OpportunityStage): number {
+  return STAGE_PROBABILITY[stage] ?? 10
+}
+
 export function defaultEstimatedCloseDate(daysAhead = 30): string {
   const date = new Date()
   date.setDate(date.getDate() + daysAhead)

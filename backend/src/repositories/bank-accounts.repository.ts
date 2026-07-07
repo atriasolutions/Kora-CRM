@@ -10,6 +10,7 @@ import {
   normalizeChileBankCode,
   resolveChileBankName,
 } from '../lib/chile-banks.js'
+import { formatRutDisplay, getRutValidationMessage } from '../lib/chile-rut.js'
 import { mapBankAccount, type BankAccountRow } from '../mappers/bank-account.mapper.js'
 import { badRequest, notFound } from '../middleware/errors.js'
 import type {
@@ -19,13 +20,21 @@ import type {
 } from '../types/bank-account.js'
 
 const SELECT_COLUMNS = `id, tenant_id, account_name, bank_code, bank_name, account_type,
-  account_number, email, is_default, sort_order, created_at, updated_at`
+  account_number, rut, email, is_default, sort_order, created_at, updated_at`
+
+function normalizeBankRut(rut: string): string {
+  const trimmed = rut.trim()
+  const message = getRutValidationMessage(trimmed, true)
+  if (message) throw badRequest(message)
+  return formatRutDisplay(trimmed)
+}
 
 function validateBankInput(input: {
   bankCode?: string
   accountType?: string
   accountNumber?: string
   accountName?: string
+  rut?: string
 }): void {
   if (input.bankCode !== undefined && !isValidChileBankCode(input.bankCode)) {
     throw badRequest('Banco no válido.')
@@ -38,6 +47,9 @@ function validateBankInput(input: {
   }
   if (input.accountName !== undefined && !input.accountName.trim()) {
     throw badRequest('El nombre de la cuenta es obligatorio.')
+  }
+  if (input.rut !== undefined) {
+    normalizeBankRut(input.rut)
   }
 }
 
@@ -95,11 +107,13 @@ export async function createBankAccount(input: CreateBankAccountInput): Promise<
       await clearDefaultBankAccounts(client)
     }
 
+    const rut = normalizeBankRut(input.rut)
+
     const result = await client.query<BankAccountRow>(
       `INSERT INTO crm_organization_bank_accounts (
          tenant_id, account_name, bank_code, bank_name, account_type,
-         account_number, email, is_default, sort_order
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         account_number, rut, email, is_default, sort_order
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING ${SELECT_COLUMNS}`,
       [
         getTenantIdOrDefault(),
@@ -108,6 +122,7 @@ export async function createBankAccount(input: CreateBankAccountInput): Promise<
         bankName,
         input.accountType,
         input.accountNumber.trim(),
+        rut,
         input.email?.trim() || '',
         isDefault,
         input.sortOrder ?? 0,
@@ -144,6 +159,9 @@ export async function updateBankAccount(
       await clearDefaultBankAccounts(client)
     }
 
+    const rut =
+      input.rut !== undefined ? normalizeBankRut(input.rut) : null
+
     const result = await client.query<BankAccountRow>(
       `UPDATE crm_organization_bank_accounts SET
          account_name = COALESCE($2, account_name),
@@ -151,11 +169,12 @@ export async function updateBankAccount(
          bank_name = $4,
          account_type = COALESCE($5, account_type),
          account_number = COALESCE($6, account_number),
-         email = COALESCE($7, email),
-         is_default = COALESCE($8, is_default),
-         sort_order = COALESCE($9, sort_order),
+         rut = COALESCE($7, rut),
+         email = COALESCE($8, email),
+         is_default = COALESCE($9, is_default),
+         sort_order = COALESCE($10, sort_order),
          updated_at = now()
-       WHERE id = $1 AND ${tenantWhereParam(10)}
+       WHERE id = $1 AND ${tenantWhereParam(11)}
        RETURNING ${SELECT_COLUMNS}`,
       [
         id,
@@ -164,6 +183,7 @@ export async function updateBankAccount(
         bankName,
         input.accountType ?? null,
         input.accountNumber?.trim() || null,
+        rut,
         input.email !== undefined ? input.email.trim() : null,
         input.isDefault ?? null,
         input.sortOrder ?? null,

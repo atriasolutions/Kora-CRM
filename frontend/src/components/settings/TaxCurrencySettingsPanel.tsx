@@ -13,7 +13,6 @@ import { toast } from '@/lib/toast'
 import {
   getStoredExchangeRatesApi,
   syncExchangeRatesApi,
-  updateStoredExchangeRatesApi,
 } from '@/api/exchange-rates'
 import { isApiEnabled } from '@/api/config'
 import { Button } from '@/components/ui/button'
@@ -245,11 +244,8 @@ export function TaxCurrencySettingsPanel() {
   const vatDirty = vatDraft.trim() !== String(settings.defaultVatPercent)
 
   const [todayRates, setTodayRates] = useState<ExchangeRateSnapshot | null>(null)
-  const [rateDraft, setRateDraft] = useState<RateDraft>(() => ratesToDraft(null))
   const [todayLoading, setTodayLoading] = useState(isApiEnabled())
   const [todayError, setTodayError] = useState<string | null>(null)
-  const [ratesSaving, setRatesSaving] = useState(false)
-  const [confirmRatesOpen, setConfirmRatesOpen] = useState(false)
   const [syncLoading, setSyncLoading] = useState(false)
   const [confirmSyncOpen, setConfirmSyncOpen] = useState(false)
 
@@ -273,7 +269,6 @@ export function TaxCurrencySettingsPanel() {
     try {
       const data = await getStoredExchangeRatesApi()
       setTodayRates(data)
-      setRateDraft(ratesToDraft(data))
     } catch (error) {
       setTodayError(
         error instanceof Error
@@ -318,55 +313,12 @@ export function TaxCurrencySettingsPanel() {
     }
   }
 
-  const parsedRateDraft = {
-    ufClp: parseRateInput(rateDraft.ufClp),
-    usdClp: parseRateInput(rateDraft.usdClp),
-    eurClp: parseRateInput(rateDraft.eurClp),
-  }
-
-  const ratesDraftValid =
-    parsedRateDraft.ufClp != null &&
-    parsedRateDraft.usdClp != null &&
-    parsedRateDraft.eurClp != null
-
-  const ratesDraftDirty =
-    !todayRates ||
-    parsedRateDraft.ufClp !== todayRates.ufClp ||
-    parsedRateDraft.usdClp !== todayRates.usdClp ||
-    parsedRateDraft.eurClp !== todayRates.eurClp
-
-  const handleConfirmSaveRates = async () => {
-    if (!ratesDraftValid || !canEdit) return
-    setRatesSaving(true)
-    try {
-      const saved = await updateStoredExchangeRatesApi({
-        rateDate: today,
-        ufClp: parsedRateDraft.ufClp!,
-        usdClp: parsedRateDraft.usdClp!,
-        eurClp: parsedRateDraft.eurClp!,
-      })
-      setTodayRates(saved)
-      setRateDraft(ratesToDraft(saved))
-      setConfirmRatesOpen(false)
-      toast.success('Indicadores del día actualizados.')
-    } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : 'No se pudieron guardar los indicadores.',
-      )
-    } finally {
-      setRatesSaving(false)
-    }
-  }
-
   const handleConfirmSync = async () => {
     if (!canEdit || !isApiEnabled()) return
     setSyncLoading(true)
     try {
       const synced = await syncExchangeRatesApi(today)
       setTodayRates(synced)
-      setRateDraft(ratesToDraft(synced))
       setConfirmSyncOpen(false)
       toast.success('Indicadores sincronizados correctamente.')
     } catch (error) {
@@ -485,8 +437,8 @@ export function TaxCurrencySettingsPanel() {
           </div>
           <p className="text-xs leading-relaxed text-muted-foreground">
             Sincronización automática diaria a las 00:05 (Chile) desde findic.cl (con respaldo
-            mindicador.cl). Puedes
-            corregir valores manualmente cuando sea necesario.
+            mindicador.cl). Los valores no se editan manualmente; si necesitas actualizarlos al
+            instante, usa «Sincronizar».
           </p>
         </CardHeader>
 
@@ -500,46 +452,33 @@ export function TaxCurrencySettingsPanel() {
             <p className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
               {todayError}
             </p>
-          ) : canEdit ? (
+          ) : (
             <>
-              <RatesGrid
-                draft={rateDraft}
-                editable
-                disabled={readOnly}
-                onChange={(patch) => setRateDraft((prev) => ({ ...prev, ...patch }))}
-              />
+              <RatesGrid draft={ratesToDraft(todayRates)} />
               {!todayRates ? (
                 <p className="text-center text-sm text-muted-foreground">
-                  Aún no hay valores para hoy. Ingresa UF, USD y EUR para registrarlos.
+                  Aún no hay valores para hoy. Usa «Sincronizar» para obtenerlos desde findic.cl.
                 </p>
               ) : null}
-              <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border/60 pt-4">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="gap-2"
-                  disabled={syncLoading || ratesSaving || readOnly || !isApiEnabled()}
-                  onClick={() => setConfirmSyncOpen(true)}
-                >
-                  {syncLoading ? (
-                    <Loader2 aria-hidden className="size-4 animate-spin" />
-                  ) : (
-                    <RefreshCw aria-hidden className="size-4" />
-                  )}
-                  Sincronizar
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={!ratesDraftValid || !ratesDraftDirty || ratesSaving || syncLoading}
-                  onClick={() => setConfirmRatesOpen(true)}
-                >
-                  Guardar indicadores
-                </Button>
-              </div>
+              {canEdit ? (
+                <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border/60 pt-4">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="gap-2"
+                    disabled={syncLoading || readOnly || !isApiEnabled()}
+                    onClick={() => setConfirmSyncOpen(true)}
+                  >
+                    {syncLoading ? (
+                      <Loader2 aria-hidden className="size-4 animate-spin" />
+                    ) : (
+                      <RefreshCw aria-hidden className="size-4" />
+                    )}
+                    Sincronizar
+                  </Button>
+                </div>
+              ) : null}
             </>
-          ) : (
-            <RatesGrid draft={ratesToDraft(todayRates)} />
           )}
 
           <div className="rounded-xl border border-dashed border-border/80 bg-muted/10 p-4">
@@ -701,48 +640,6 @@ export function TaxCurrencySettingsPanel() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={confirmRatesOpen} onOpenChange={setConfirmRatesOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle aria-hidden className="size-5 text-amber-500" />
-              Confirmar indicadores manuales
-            </DialogTitle>
-            <DialogDescription asChild>
-              <div className="space-y-3 pt-1 text-sm text-muted-foreground">
-                <p>
-                  Sobrescribirás los valores UF, USD y EUR del{' '}
-                  <span className="font-medium capitalize text-foreground">
-                    {formatDisplayDate(today)}
-                  </span>
-                  .
-                </p>
-                <p>
-                  Quedarán marcados como manuales y se usarán al convertir moneda en cotizaciones,
-                  facturas y compras con esta fecha de referencia.
-                </p>
-              </div>
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setConfirmRatesOpen(false)}
-              disabled={ratesSaving}
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="button"
-              onClick={() => void handleConfirmSaveRates()}
-              disabled={ratesSaving}
-            >
-              {ratesSaving ? 'Guardando…' : 'Confirmar cambios'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

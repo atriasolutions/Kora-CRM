@@ -736,7 +736,7 @@ export async function getAbastecimientoDashboardSnapshot(
       [rangeStartIso, rangeEndIso],
     ),
     tenantQuery<{ label: string; count: string }>(
-      `SELECT coalesce(nullif(trim(status), ''), 'Sin clasificar') AS label,
+      `SELECT coalesce(nullif(trim(status::text), ''), 'Sin clasificar') AS label,
               count(*)::text AS count
        FROM crm_inventory_positions
        WHERE ${dashTenantFilter()}

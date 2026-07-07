@@ -29,6 +29,11 @@ export type ContactListItem = {
   /** Nota capturada al crear el registro */
   initialNote?: string
   ownerName?: string
+  treatmentOpposition?: boolean
+  treatmentBlockedAt?: string
+  marketingConsent?: boolean | null
+  marketingConsentAt?: string
+  legalBasis?: import('@/types/privacy').ContactLegalBasis
   /** ISO / datetime-local del último intento de contacto registrado. */
   lastOutreachAt?: string
   lastOutreachChannel?: import('@/data/contact-detail.mock').ContactActivityType

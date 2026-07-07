@@ -77,6 +77,8 @@ function createToFormValues(
     licenseTerms: extra?.licenseTerms ?? '',
     supplierName: extra?.supplierName ?? '',
     supplierSku: extra?.supplierSku ?? '',
+    publishInIntegration: extra?.publishInIntegration ?? true,
+    publishPriceInIntegration: extra?.publishPriceInIntegration ?? true,
   }
 }
 

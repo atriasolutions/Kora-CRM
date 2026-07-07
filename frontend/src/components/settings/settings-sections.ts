@@ -6,6 +6,7 @@ import {
   Layers,
   Receipt,
   Server,
+  Shield,
   SlidersHorizontal,
   Warehouse,
   ClipboardList,
@@ -20,6 +21,7 @@ export type SettingsSectionId =
   | 'categorias'
   | 'impuestos'
   | 'solicitudes'
+  | 'privacidad'
   | 'informacion-instancia'
   | 'instancia'
 
@@ -70,6 +72,13 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     label: 'Solicitudes',
     description: 'Responsable predeterminado al crear nuevas solicitudes.',
     Icon: ClipboardList,
+  },
+  {
+    id: 'privacidad',
+    label: 'Privacidad y datos',
+    description:
+      'Política de tratamiento, solicitudes ARSOPB e incidentes de seguridad (Ley 21.719).',
+    Icon: Shield,
   },
   {
     id: 'facturacion-sii',

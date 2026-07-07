@@ -15,6 +15,7 @@ import {
   SettingsOverviewIcon,
   type SettingsSectionId,
 } from '@/components/settings/settings-sections'
+import { PrivacyComplianceSettingsPanel } from '@/components/settings/PrivacyComplianceSettingsPanel'
 import { SolicitudesSettingsPanel } from '@/components/settings/SolicitudesSettingsPanel'
 import { BankAccountsSettingsPanel } from '@/components/settings/BankAccountsSettingsPanel'
 import { WarehousesSettingsPanel } from '@/components/settings/WarehousesSettingsPanel'
@@ -37,6 +38,8 @@ function SettingsSectionPanel({ sectionId }: { sectionId: SettingsSectionId }) {
       return <TaxCurrencySettingsPanel />
     case 'solicitudes':
       return <SolicitudesSettingsPanel />
+    case 'privacidad':
+      return <PrivacyComplianceSettingsPanel />
     case 'informacion-instancia':
       return <TenantUsageSettingsPanel />
     case 'instancia':

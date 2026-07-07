@@ -48,6 +48,7 @@ import { useContactsRegistry } from '@/hooks/use-contacts-registry'
 import { useOpportunitiesRegistry } from '@/hooks/use-opportunities-registry'
 import { useQuotesRegistry } from '@/hooks/use-quotes-registry'
 import type { CreateQuoteFormValues } from '@/lib/quote-create'
+import { syncOpportunityStageMetrics } from '@/lib/opportunity-form'
 import { quoteSummariesFromListItems } from '@/lib/quote-relations'
 import { lastContactLabelFromActivity } from '@/lib/contact-activity'
 import { recordEntityView } from '@/lib/entity-recently-viewed'
@@ -346,16 +347,18 @@ export function OpportunityDetailPage() {
                   return
                 }
                 const outcome = journeyStageToOutcome(stage, opportunity.lossReason)
-                const nextOpportunity = normalizeOpportunityDetail({
-                  ...opportunity,
-                  stage,
-                  outcome,
-                  stageHistory: buildOpportunityStageHistoryOnTransition(
-                    opportunity.stage,
+                const nextOpportunity = normalizeOpportunityDetail(
+                  syncOpportunityStageMetrics({
+                    ...opportunity,
                     stage,
-                    opportunity.stageHistory ?? [],
-                  ),
-                })
+                    outcome,
+                    stageHistory: buildOpportunityStageHistoryOnTransition(
+                      opportunity.stage,
+                      stage,
+                      opportunity.stageHistory ?? [],
+                    ),
+                  }),
+                )
                 void updateOpportunityFromDetail(nextOpportunity)
                 setOpportunity(nextOpportunity)
               }

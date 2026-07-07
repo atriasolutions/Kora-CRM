@@ -21,6 +21,8 @@ import {
 } from '@/lib/form-input-format'
 import { getDefaultOwnerName } from '@/lib/user-lookup'
 
+import type { ContactLegalBasis } from '@/types/privacy'
+
 export type ContactKind = 'B2B' | 'B2C'
 
 export type ContactFormValues = {
@@ -48,6 +50,10 @@ export type ContactFormValues = {
   industry: string
   website: string
   employees: string
+  treatmentOpposition: boolean
+  treatmentBlocked: boolean
+  marketingConsent: '' | 'true' | 'false'
+  legalBasis: ContactLegalBasis | ''
 }
 
 export const CONTACT_STATUS_OPTIONS: ContactLifecycleStatus[] = [
@@ -97,6 +103,15 @@ export const CONTACT_SOURCE_OPTIONS = [
   'Otro',
 ] as const
 
+export const CONTACT_LEGAL_BASIS_OPTIONS: { value: ContactLegalBasis; label: string }[] = [
+  { value: 'consentimiento', label: 'Consentimiento' },
+  { value: 'contrato', label: 'Ejecución de contrato' },
+  { value: 'interes_legitimo', label: 'Interés legítimo' },
+  { value: 'obligacion_legal', label: 'Obligación legal' },
+  { value: 'interes_vital', label: 'Interés vital' },
+  { value: 'datos_economicos', label: 'Datos económicos / comerciales' },
+]
+
 export function createToContactFormValues(
   partial?: Partial<ContactFormValues>,
 ): ContactFormValues {
@@ -124,6 +139,10 @@ export function createToContactFormValues(
     industry: '',
     website: '',
     employees: '',
+    treatmentOpposition: false,
+    treatmentBlocked: false,
+    marketingConsent: '',
+    legalBasis: '',
     ...partial,
     identifierType:
       partial?.identifierType ??
@@ -183,6 +202,15 @@ export function contactDetailToFormValues(contact: ContactDetail): ContactFormVa
     industry: contact.companyDetail.industry,
     website: contact.companyDetail.website,
     employees: contact.companyDetail.employees,
+    treatmentOpposition: contact.treatmentOpposition ?? false,
+    treatmentBlocked: Boolean(contact.treatmentBlockedAt),
+    marketingConsent:
+      contact.marketingConsent === true
+        ? 'true'
+        : contact.marketingConsent === false
+          ? 'false'
+          : '',
+    legalBasis: contact.legalBasis ?? '',
   }
 }
 
@@ -329,5 +357,20 @@ export function applyFormValuesToContact(
       website: values.website.trim(),
       employees: linked?.employees ?? values.employees.trim(),
     },
+    treatmentOpposition: values.treatmentOpposition,
+    treatmentBlockedAt: values.treatmentBlocked
+      ? contact.treatmentBlockedAt ?? new Date().toISOString()
+      : undefined,
+    marketingConsent:
+      values.marketingConsent === 'true'
+        ? true
+        : values.marketingConsent === 'false'
+          ? false
+          : null,
+    marketingConsentAt:
+      values.marketingConsent === 'true' && contact.marketingConsent !== true
+        ? new Date().toISOString()
+        : contact.marketingConsentAt,
+    legalBasis: values.legalBasis || undefined,
   }
 }

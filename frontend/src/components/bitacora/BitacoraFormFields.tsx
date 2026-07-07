@@ -39,8 +39,9 @@ export function BitacoraFormFields({
   }, [allUsers, form.assignedUserId, form.assignedUserName, onChange])
 
   return (
-    <div className="space-y-4">
+    <div className="w-full min-w-0 space-y-4">
       <SolicitudLookupField
+        className="w-full min-w-0"
         value={form.solicitudId}
         solicitudTitle={form.solicitudTitle}
         solicitudCode={form.solicitudCode}
@@ -54,32 +55,38 @@ export function BitacoraFormFields({
         }}
       />
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <ContactFormField label="Fecha" htmlFor={`${idPrefix}-work-date`}>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-start">
+        <ContactFormField
+          className="min-w-0"
+          label="Fecha"
+          htmlFor={`${idPrefix}-work-date`}
+        >
           <Input
             id={`${idPrefix}-work-date`}
             type="date"
+            className="w-full"
             value={form.workDate}
             disabled={disabled}
             onChange={(e) => onChange({ workDate: e.target.value })}
           />
         </ContactFormField>
 
-        <ContactFormField label="Horas" htmlFor={`${idPrefix}-hours`}>
+        <ContactFormField className="min-w-0" label="Horas" htmlFor={`${idPrefix}-hours`}>
           <Input
             id={`${idPrefix}-hours`}
             type="number"
             min={0.5}
             step={0.5}
+            className="w-full"
             value={Number.isFinite(form.hours) ? form.hours : ''}
             disabled={disabled}
             onChange={(e) => onChange({ hours: Number.parseFloat(e.target.value) || 0 })}
           />
-          <p className="text-xs text-muted-foreground">
-            Mínimo 0,5 · múltiplos de 0,5 (ej. 1, 5,5, 10)
-          </p>
         </ContactFormField>
       </div>
+      <p className="text-xs text-muted-foreground">
+        Horas: mínimo 0,5 · múltiplos de 0,5 (ej. 1, 5,5, 10)
+      </p>
 
       <ContactFormCheckbox
         id={`${idPrefix}-billable`}
@@ -107,6 +114,7 @@ export function BitacoraFormFields({
       ) : null}
 
       <UserLookupField
+        className="w-full min-w-0"
         label="Usuario asignado"
         value={form.assignedUserName}
         disabled={disabled}

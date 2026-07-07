@@ -196,7 +196,9 @@ Reemplaza `{categoryId}` por el `id` obtenido del listado de categorías.
         "status": "Activo",
         "stockNum": 42,
         "imageUrl": "https://koracrm.cl/api/v1/integrations/catalog/products/c3d4e5f6-a7b8-9012-cdef-123456789012/image",
-        "barcode": "7801234567890"
+        "barcode": "7801234567890",
+        "brand": "Bosch",
+        "description": "Filtro de aceite para motores diésel de alta exigencia."
       }
     ],
     "meta": {
@@ -208,6 +210,18 @@ Reemplaza `{categoryId}` por el `id` obtenido del listado de categorías.
   }
 }
 ```
+
+### Visibilidad en el catálogo (configuración en Kora)
+
+Desde la ficha de cada producto en Kora CRM se controla qué se expone en esta API:
+
+| Opción en Kora | Efecto en el JSON |
+|----------------|-------------------|
+| **Publicar en integración** desmarcado | El producto **no aparece** en ningún endpoint del catálogo |
+| **Publicar en integración** marcado, **Publicar precio** desmarcado | El producto aparece **sin** campos `price`, `priceNum` ni `priceCurrency` |
+| Ambos marcados (por defecto al crear) | Producto visible con precio completo |
+
+---
 
 ### Campos del producto
 
@@ -221,13 +235,15 @@ Reemplaza `{categoryId}` por el `id` obtenido del listado de categorías.
 | `productType` | string | Ej. `Producto`, `Servicio` |
 | `unitOfMeasure` | string | Unidad de medida (ej. `ud`, `kg`) |
 | `billingPeriod` | string? | Periodo de cobro si aplica (ej. `Mensual`, `Por unidad`) |
-| `price` | string | Precio formateado para mostrar (incluye sufijo `/ud`, `/mes`, etc.) |
-| `priceNum` | number | Monto numérico del precio |
-| `priceCurrency` | string | `CLP`, `UF`, `USD` o `EUR` |
+| `price` | string? | Precio formateado para mostrar (incluye sufijo `/ud`, `/mes`, etc.). Solo si el producto tiene «Publicar precio» activo |
+| `priceNum` | number? | Monto numérico del precio. Solo si el producto tiene «Publicar precio» activo |
+| `priceCurrency` | string? | `CLP`, `UF`, `USD` o `EUR`. Solo si el producto tiene «Publicar precio» activo |
 | `status` | string | `Activo`, `Agotado` o `Borrador` |
 | `stockNum` | number \| null | Stock disponible; `null` si el producto no controla inventario |
 | `imageUrl` | string? | URL absoluta para mostrar la imagen (ver sección [Imágenes](#imágenes-de-producto)) |
 | `barcode` | string? | Código de barras (si existe) |
+| `brand` | string? | Marca del producto (si está definida) |
+| `description` | string? | Descripción larga del producto (si está definida) |
 
 ---
 

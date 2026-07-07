@@ -24,6 +24,7 @@ import type {
   OpportunityListItem,
   UpdateOpportunityInput,
 } from '../types/opportunity.js'
+import { probabilityPercentForStage } from '../lib/opportunity-stage.js'
 import { parseDateInput } from '../utils/format.js'
 import {
   parseMoneyToCents,
@@ -200,7 +201,8 @@ export async function createOpportunity(
   const lines = computeOpportunityLines(input.lineItems)
   const lineTotal = sumLineTotals(lines)
   const amountCents = resolveAmountCents(input, lineTotal)
-  const probabilityPct = parsePercentToInt(input.probability)
+  const stage = input.stage ?? 'Calificados'
+  const probabilityPct = probabilityPercentForStage(stage)
   const weighted = weightedCents(amountCents, probabilityPct)
 
   const customer = await resolveCustomerSnapshots({
@@ -241,7 +243,7 @@ export async function createOpportunity(
         customer.contactName,
         amountCents,
         weighted,
-        input.stage ?? 'Calificados',
+        stage,
         probabilityPct,
         parseDateInput(input.closeDate),
         input.owner?.trim() || actor.userName,
@@ -321,10 +323,13 @@ export async function updateOpportunity(
         ? parseMoneyToCents(input.amount)
         : lineTotal ?? parseMoneyToCents(existing.amount)
 
+  const nextStage = input.stage ?? existing.stage
   const probabilityPct =
-    input.probability !== undefined
-      ? parsePercentToInt(input.probability)
-      : parsePercentToInt(existing.probability)
+    input.stage !== undefined
+      ? probabilityPercentForStage(nextStage)
+      : input.probability !== undefined
+        ? parsePercentToInt(input.probability)
+        : probabilityPercentForStage(existing.stage)
 
   const client = await pool.connect()
   try {
@@ -406,7 +411,7 @@ export async function updateOpportunity(
         contactName,
         amountCents,
         weightedCents(amountCents, probabilityPct),
-        input.stage ?? existing.stage,
+        nextStage,
         probabilityPct,
         input.closeDate !== undefined ? parseDateInput(input.closeDate) : null,
         input.owner?.trim() ?? existing.owner,

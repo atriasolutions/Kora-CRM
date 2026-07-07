@@ -13,6 +13,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { getRutValidationMessage } from '@/lib/contact-rut'
 import { getEmailValidationError, getPhoneValidationError } from '@/lib/form-input-format'
+import { PrivacyConsentField } from '@/components/legal/PrivacyConsentField'
+import { PLATFORM_LEGAL } from '@/lib/platform-legal'
 import { MARKETING_TRIAL_COPY } from '@/lib/marketing-content'
 import type { TaxIdentifierType } from '@/lib/tax-identifier'
 import { toast } from '@/lib/toast'
@@ -33,6 +35,7 @@ type FormState = {
   email: string
   phone: string
   message: string
+  privacyConsentAccepted: boolean
 }
 
 const emptyForm = (): FormState => ({
@@ -47,6 +50,7 @@ const emptyForm = (): FormState => ({
   email: '',
   phone: '',
   message: '',
+  privacyConsentAccepted: false,
 })
 
 export function TrialLeadForm({ onSuccess }: TrialLeadFormProps) {
@@ -101,6 +105,10 @@ export function TrialLeadForm({ onSuccess }: TrialLeadFormProps) {
       toast.warning(phoneError)
       return
     }
+    if (!form.privacyConsentAccepted) {
+      toast.warning('Debes aceptar la política de tratamiento de datos personales.')
+      return
+    }
 
     setSaving(true)
     try {
@@ -115,6 +123,8 @@ export function TrialLeadForm({ onSuccess }: TrialLeadFormProps) {
         email: form.email.trim(),
         phone: form.phone.trim(),
         message: form.message.trim() || undefined,
+        privacyConsentAccepted: true as const,
+        privacyPolicyVersion: PLATFORM_LEGAL.privacyVersion,
       })
 
       if (result.trial?.provisioned && result.trial.loginUrl) {
@@ -284,6 +294,12 @@ export function TrialLeadForm({ onSuccess }: TrialLeadFormProps) {
               onChange={(message) => patch({ message })}
               rows={3}
               placeholder="¿Qué procesos quieres ordenar con Kora CRM?"
+            />
+            <PrivacyConsentField
+              id="trial-privacy-consent"
+              checked={form.privacyConsentAccepted}
+              onChange={(privacyConsentAccepted) => patch({ privacyConsentAccepted })}
+              disabled={saving}
             />
             <Button type="submit" size="lg" className="min-h-12 w-full rounded-xl" disabled={saving}>
               {saving ? (

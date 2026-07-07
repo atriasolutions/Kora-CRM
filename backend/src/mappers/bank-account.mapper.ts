@@ -9,6 +9,7 @@ export type BankAccountRow = {
   bank_name: string
   account_type: string
   account_number: string
+  rut: string
   email: string
   is_default: boolean
   sort_order: number
@@ -24,6 +25,7 @@ export function mapBankAccount(row: BankAccountRow): BankAccount {
     bankName: row.bank_name,
     accountType: row.account_type,
     accountNumber: row.account_number,
+    rut: row.rut ?? '',
     email: row.email ?? '',
     isDefault: row.is_default,
     sortOrder: row.sort_order,

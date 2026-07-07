@@ -29,7 +29,8 @@ const SELECT_COLUMNS = `
     ELSE p.stock_qty
   END AS stock_qty,
   p.status, p.track_inventory, p.min_stock, p.max_stock,
-  p.barcode, p.image_url,
+  p.barcode, p.image_url, p.description, p.brand,
+  p.publish_in_integration, p.publish_price_in_integration,
   p.created_at, p.created_by_id, p.created_by_name, p.owner_name,
   p.updated_at, p.updated_by_id, p.updated_by_name
 `
@@ -60,6 +61,8 @@ export type ListProductsParams = {
   status?: string
   categoryId?: string
   archivedOnly?: boolean
+  /** Solo productos visibles en API de integración externa */
+  integrationPublishedOnly?: boolean
 }
 
 function toCents(amount?: number): number {
@@ -378,6 +381,9 @@ export async function listProductRows(
     values.push(`%${params.q}%`)
     idx++
   }
+  if (params.integrationPublishedOnly) {
+    conditions.push('p.publish_in_integration = true')
+  }
 
   const where = `WHERE ${conditions.join(' AND ')}`
 
@@ -452,6 +458,17 @@ async function assertSkuAvailable(
   }
 }
 
+function normalizeIntegrationPublishFlags(input: {
+  publishInIntegration?: boolean
+  publishPriceInIntegration?: boolean
+}): { publishInIntegration: boolean; publishPriceInIntegration: boolean } {
+  const publishInIntegration = input.publishInIntegration ?? true
+  const publishPriceInIntegration = publishInIntegration
+    ? (input.publishPriceInIntegration ?? true)
+    : false
+  return { publishInIntegration, publishPriceInIntegration }
+}
+
 export async function createProduct(
   input: CreateProductInput,
   actor: AuditActor,
@@ -484,18 +501,21 @@ export async function createProduct(
     await assertSkuAvailable(input.sku.trim(), undefined, client)
 
     const priceFields = priceFieldsFromInput(input)
+    const publishFlags = normalizeIntegrationPublishFlags(input)
 
     const result = await client.query<{ id: string }>(
       `INSERT INTO crm_products (
         name, sku, category_id, product_type, unit_of_measure, billing_period,
         price_cents, price_currency, price_amount, cost_price_cents, stock_qty, status, track_inventory,
-        min_stock, max_stock, barcode, image_url,
-        created_by_id, created_by_name, owner_name, updated_by_id, updated_by_name, tenant_id
+        min_stock, max_stock, barcode, image_url, description,
+        created_by_id, created_by_name, owner_name, updated_by_id, updated_by_name, tenant_id, brand,
+        publish_in_integration, publish_price_in_integration
       ) VALUES (
         $1, $2, $3, $4, $5, $6,
         $7, $8, $9, $10, $11, $12, $13,
-        $14, $15, $16, $17,
-        $18, $19, $20, $18, $19, $21
+        $14, $15, $16, $17, $18,
+        $19, $20, $21, $19, $20, $22, $23,
+        $24, $25
       ) RETURNING id`,
       [
         input.name.trim(),
@@ -515,10 +535,14 @@ export async function createProduct(
         input.maxStock ?? null,
         input.barcode?.trim() || null,
         input.imageUrl?.trim() || null,
+        input.description?.trim() || null,
         actor.userId,
         actor.userName,
         input.ownerName?.trim() || actor.userName,
         getTenantIdOrDefault(),
+        input.brand?.trim() || null,
+        publishFlags.publishInIntegration,
+        publishFlags.publishPriceInIntegration,
       ],
     )
     const productId = result.rows[0]!.id
@@ -644,6 +668,26 @@ export async function updateProduct(
     sets.push(`image_url = $${idx++}`)
     values.push(input.imageUrl.trim() || null)
   }
+  if (input.description !== undefined) {
+    sets.push(`description = $${idx++}`)
+    values.push(input.description.trim() || null)
+  }
+  if (input.brand !== undefined) {
+    sets.push(`brand = $${idx++}`)
+    values.push(input.brand.trim() || null)
+  }
+  if (input.publishInIntegration !== undefined || input.publishPriceInIntegration !== undefined) {
+    const publishFlags = normalizeIntegrationPublishFlags({
+      publishInIntegration:
+        input.publishInIntegration ?? existing.publishInIntegration,
+      publishPriceInIntegration:
+        input.publishPriceInIntegration ?? existing.publishPriceInIntegration,
+    })
+    sets.push(`publish_in_integration = $${idx++}`)
+    values.push(publishFlags.publishInIntegration)
+    sets.push(`publish_price_in_integration = $${idx++}`)
+    values.push(publishFlags.publishPriceInIntegration)
+  }
 
   const nextTrackInventory = input.trackInventory ?? previousTrackInventory
   const nextName = input.name?.trim() ?? existing.name
@@ -706,6 +750,14 @@ export async function updateProduct(
     await client.query('COMMIT')
   } catch (err) {
     await client.query('ROLLBACK')
+    if (
+      err &&
+      typeof err === 'object' &&
+      'code' in err &&
+      (err as { code: string }).code === '23505'
+    ) {
+      throw badRequest('Ya existe un producto o posición de inventario con ese SKU')
+    }
     throw err
   } finally {
     client.release()

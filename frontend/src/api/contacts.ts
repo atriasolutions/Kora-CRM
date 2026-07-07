@@ -41,6 +41,10 @@ export type ContactApiBody = {
   source?: string
   initialNote?: string
   ownerName?: string
+  treatmentOpposition?: boolean
+  treatmentBlocked?: boolean
+  marketingConsent?: boolean | null
+  legalBasis?: import('@/types/privacy').ContactLegalBasis
 }
 
 export function contactFormToApiBody(
@@ -155,5 +159,9 @@ export function contactDetailToApiBody(detail: ContactDetail): ContactApiBody {
     source: detail.source,
     initialNote: detail.initialNote,
     ownerName: resolveRecordOwnerName(detail) || undefined,
+    treatmentOpposition: detail.treatmentOpposition,
+    treatmentBlocked: Boolean(detail.treatmentBlockedAt),
+    marketingConsent: detail.marketingConsent,
+    legalBasis: detail.legalBasis,
   }
 }

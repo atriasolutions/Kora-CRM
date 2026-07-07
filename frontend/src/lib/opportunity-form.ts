@@ -126,6 +126,23 @@ export function computeWeightedAmount(amount: string, probability: string): stri
   return `$${Math.round((num * pct) / 100).toLocaleString('es-CL')}`
 }
 
+/** Sincroniza probabilidad y monto ponderado según la etapa del pipeline. */
+export function syncOpportunityStageMetrics<
+  T extends {
+    stage: OpportunityStage
+    amount: string
+    probability: string
+    weightedAmount: string
+  },
+>(record: T): T {
+  const probability = probabilityLabelForStage(record.stage)
+  return {
+    ...record,
+    probability,
+    weightedAmount: computeWeightedAmount(record.amount, probability),
+  }
+}
+
 export function applyFormValuesToOpportunity(
   opp: OpportunityDetail,
   values: OpportunityFormValues,

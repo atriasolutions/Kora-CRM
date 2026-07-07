@@ -17,6 +17,12 @@ import { quoteLineSubjectToVat } from '@/lib/quote-line-item'
 import type { OrganizationSettings } from '@/types/organization-settings'
 
 const TEXT: [number, number, number] = [15, 23, 42]
+const MARGIN = 14
+/** Zona inferior reservada para el pie «Documento generado por Kora CRM…» */
+const PAGE_FOOTER_RESERVE = 24
+const PAGE_TOP = 14
+
+type AutoTableDoc = jsPDF & { lastAutoTable?: { finalY: number } }
 
 function pdfText(value: string | undefined | null, fallback = '—'): string {
   const trimmed = value?.trim()
@@ -34,6 +40,63 @@ function formatAmount(value: number): string {
 function parseDiscountPercent(discount: string): number {
   const n = Number.parseInt(discount.replace(/[^\d]/g, ''), 10)
   return Number.isNaN(n) ? 0 : n
+}
+
+function pageHeight(doc: jsPDF): number {
+  return doc.internal.pageSize.getHeight()
+}
+
+function pageWidth(doc: jsPDF): number {
+  return doc.internal.pageSize.getWidth()
+}
+
+function tableFinalY(doc: jsPDF, fallbackY: number): number {
+  return (doc as AutoTableDoc).lastAutoTable?.finalY ?? fallbackY
+}
+
+function maxContentY(doc: jsPDF): number {
+  return pageHeight(doc) - PAGE_FOOTER_RESERVE
+}
+
+function ensurePageSpace(doc: jsPDF, y: number, neededMm: number): number {
+  if (y + neededMm > maxContentY(doc)) {
+    doc.addPage()
+    return PAGE_TOP
+  }
+  return y
+}
+
+function collectPdfTermLines(quote: QuoteDetail): string[] {
+  const lines: string[] = []
+  const payment = quote.paymentTerms?.trim()
+  const delivery = quote.deliveryTerms?.trim()
+  const termsText = quote.terms?.trim()
+  if (payment) lines.push(`Pago: ${payment}`)
+  if (delivery) lines.push(`Entrega: ${delivery}`)
+  if (termsText) lines.push(termsText)
+  return lines
+}
+
+
+function stampAllPageFooters(doc: jsPDF, margin: number): void {
+  const total = doc.getNumberOfPages()
+  for (let page = 1; page <= total; page += 1) {
+    doc.setPage(page)
+    const pageH = pageHeight(doc)
+    const pageW = pageWidth(doc)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(7)
+    doc.setTextColor(100, 116, 139)
+    const footerY = pageH - 12
+    doc.text(
+      'Documento generado por Kora CRM. Validez y condiciones según lo indicado en esta cotización.',
+      margin,
+      footerY,
+    )
+    if (total > 1) {
+      doc.text(`Página ${page} de ${total}`, pageW - margin, footerY, { align: 'right' })
+    }
+  }
 }
 
 function logoFormat(logoUrl: string): 'PNG' | 'JPEG' | 'WEBP' | null {
@@ -177,7 +240,46 @@ function buildQuoteLineTable(lineItems: QuoteLineItem[]) {
         })
       : [['—', 'Sin líneas de detalle', '—', '—', ...(showDiscountCol ? ['—'] : []), ...(showDeferredCol ? ['—'] : []), '—']]
 
-  return { head: [head], body }
+  return { head: [head], body, showDiscountCol, showDeferredCol }
+}
+
+function buildLineTableColumnStyles(
+  pageW: number,
+  margin: number,
+  showDiscountCol: boolean,
+  showDeferredCol: boolean,
+): Record<number, { cellWidth: number; halign?: 'left' | 'center' | 'right'; overflow?: 'linebreak' }> {
+  const tableWidth = pageW - margin * 2
+  const skuW = 17
+  const qtyW = 11
+  const unitW = 22
+  const discountW = showDiscountCol ? 13 : 0
+  const deferredW = showDeferredCol ? 26 : 0
+  const totalW = 24
+  const descW = Math.max(
+    42,
+    tableWidth - skuW - qtyW - unitW - discountW - deferredW - totalW,
+  )
+
+  const styles: Record<number, { cellWidth: number; halign?: 'left' | 'center' | 'right'; overflow?: 'linebreak' }> = {
+    0: { cellWidth: skuW, overflow: 'linebreak' },
+    1: { cellWidth: descW, overflow: 'linebreak' },
+    2: { cellWidth: qtyW, halign: 'center' },
+    3: { cellWidth: unitW, halign: 'right', overflow: 'linebreak' },
+  }
+
+  let col = 4
+  if (showDiscountCol) {
+    styles[col] = { cellWidth: discountW, halign: 'center' }
+    col += 1
+  }
+  if (showDeferredCol) {
+    styles[col] = { cellWidth: deferredW, overflow: 'linebreak' }
+    col += 1
+  }
+  styles[col] = { cellWidth: totalW, halign: 'right' }
+
+  return styles
 }
 
 function drawBankDetailsBlock(
@@ -187,23 +289,34 @@ function drawBankDetailsBlock(
   pageW: number,
   startY: number,
 ): number {
-  let y = startY
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(8)
-  doc.text('Datos para transferencia', margin, y)
-  y += 5
-  doc.setFont('helvetica', 'normal')
   const rows = [
     `Cuenta: ${account.accountName}`,
+    ...(account.rut?.trim() ? [`RUT: ${account.rut.trim()}`] : []),
     `Banco: ${account.bankName}`,
     `Tipo: ${account.accountType}`,
     `Número: ${account.accountNumber}`,
+    ...(account.email?.trim() ? [`Correo: ${account.email.trim()}`] : []),
   ]
-  if (account.email?.trim()) rows.push(`Correo: ${account.email.trim()}`)
+  let blockHeight = 9
+  doc.setFontSize(8)
+  for (const line of rows) {
+    blockHeight += doc.splitTextToSize(line, pageW - margin * 2).length * 3.8 + 1
+  }
+  blockHeight += 4
+
+  let y = ensurePageSpace(doc, startY, blockHeight)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(8)
+  doc.setTextColor(...TEXT)
+  doc.text('Datos para transferencia', margin, y)
+  y += 5
+  doc.setFont('helvetica', 'normal')
   for (const line of rows) {
     const wrapped = doc.splitTextToSize(line, pageW - margin * 2)
+    const lineHeight = wrapped.length * 3.8 + 1
+    y = ensurePageSpace(doc, y, lineHeight)
     doc.text(wrapped, margin, y)
-    y += wrapped.length * 3.8 + 1
+    y += lineHeight
   }
   return y + 4
 }
@@ -229,9 +342,9 @@ export function buildQuotePdf(
     customerCompany,
     customerHeadquarters,
   )
-  const pageW = doc.internal.pageSize.getWidth()
-  const margin = 14
-  let y = 14
+  const pageW = pageWidth(doc)
+  const margin = MARGIN
+  let y = PAGE_TOP
 
   addLogo(doc, resolveOrganizationLogoUrl(organization.logoUrl), margin, y, 40, 22)
   const issuerX = margin + 44
@@ -285,13 +398,32 @@ export function buildQuotePdf(
     startY: y,
     head: lineTable.head,
     body: lineTable.body,
-    styles: { fontSize: 8, cellPadding: 2 },
-    headStyles: { fillColor: [229, 231, 235], textColor: TEXT, fontStyle: 'bold' },
-    margin: { left: margin, right: margin },
+    styles: {
+      fontSize: 8,
+      cellPadding: 2,
+      overflow: 'linebreak',
+      valign: 'top',
+      textColor: TEXT,
+    },
+    headStyles: {
+      fillColor: [229, 231, 235],
+      textColor: TEXT,
+      fontStyle: 'bold',
+      valign: 'middle',
+      overflow: 'linebreak',
+    },
+    columnStyles: buildLineTableColumnStyles(
+      pageW,
+      margin,
+      lineTable.showDiscountCol,
+      lineTable.showDeferredCol,
+    ),
+    margin: { left: margin, right: margin, bottom: PAGE_FOOTER_RESERVE },
+    showHead: 'everyPage',
+    rowPageBreak: 'auto',
   })
 
-  y = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y + 20
-  y += 6
+  y = tableFinalY(doc, y + 20) + 6
 
   const subtotal = parseMoney(quote.subtotal ?? '$0')
   const discount = parseMoney(quote.discountAmount ?? '$0')
@@ -320,37 +452,37 @@ export function buildQuotePdf(
   )
 
   const totalsX = pageW - margin - 58
+  const totalsTableHeight = totalsBody.length * 7 + 4
+  y = ensurePageSpace(doc, y, totalsTableHeight)
   autoTable(doc, {
     startY: y,
-    margin: { left: totalsX },
+    margin: { left: totalsX, right: margin, bottom: PAGE_FOOTER_RESERVE },
     tableWidth: 58,
     body: totalsBody,
-    styles: { fontSize: 8 },
+    styles: { fontSize: 8, textColor: TEXT },
     theme: 'grid',
   })
 
-  y = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y + 24
-  y += 4
+  y = tableFinalY(doc, y + 24) + 4
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(8)
-  doc.text(`SON: ${amountInWordsSpanish(total)}`, margin, y)
-  y += 8
+  doc.setTextColor(...TEXT)
+  const amountWords = doc.splitTextToSize(`SON: ${amountInWordsSpanish(total)}`, pageW - margin * 2)
+  y = ensurePageSpace(doc, y, amountWords.length * 3.8 + 6)
+  doc.text(amountWords, margin, y)
+  y += amountWords.length * 3.8 + 6
 
-  const payment = quote.paymentTerms?.trim()
-  const delivery = quote.deliveryTerms?.trim()
-  const termsText = quote.terms?.trim()
-  const pdfTermLines: string[] = []
-  if (payment) pdfTermLines.push(`Pago: ${payment}`)
-  if (delivery) pdfTermLines.push(`Entrega: ${delivery}`)
-  if (termsText) pdfTermLines.push(termsText)
+  const pdfTermLines = collectPdfTermLines(quote)
 
   if (pdfTermLines.length > 0) {
+    y = ensurePageSpace(doc, y, 12)
     doc.setFont('helvetica', 'bold')
     doc.text('Términos', margin, y)
     y += 4
     doc.setFont('helvetica', 'normal')
     for (const t of pdfTermLines) {
       const lines = doc.splitTextToSize(t, pageW - margin * 2)
+      y = ensurePageSpace(doc, y, lines.length * 3.8 + 4)
       doc.text(lines, margin, y)
       y += lines.length * 3.8 + 2
     }
@@ -361,13 +493,7 @@ export function buildQuotePdf(
     y = drawBankDetailsBlock(doc, bankAccount, margin, pageW, y)
   }
 
-  doc.setFontSize(7)
-  doc.setTextColor(100, 116, 139)
-  doc.text(
-    'Documento generado por Kora CRM. Validez y condiciones según lo indicado en esta cotización.',
-    margin,
-    doc.internal.pageSize.getHeight() - 10,
-  )
+  stampAllPageFooters(doc, margin)
 }
 
 export function generateQuotePdf(input: QuotePdfInput): Blob {

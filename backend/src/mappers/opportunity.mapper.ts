@@ -7,7 +7,10 @@ import {
   formatCentsToMoney,
   formatDiscountPct,
   formatPercent,
+  parseMoneyToCents,
+  weightedCents,
 } from '../utils/money.js'
+import { probabilityPercentForStage } from '../lib/opportunity-stage.js'
 import { formatActivityLabel, formatDateLabel, toIsoString } from '../utils/format.js'
 
 export type OpportunityRow = {
@@ -85,6 +88,10 @@ function mapOpportunityDetailFields(row: OpportunityRow) {
 }
 
 export function mapOpportunityRow(row: OpportunityRow): OpportunityListItem {
+  const probabilityPct = probabilityPercentForStage(row.stage)
+  const amountCents = parseMoneyToCents(row.amount_cents)
+  const weightedAmountCents = weightedCents(amountCents, probabilityPct)
+
   return {
     id: row.id,
     name: row.name,
@@ -94,9 +101,9 @@ export function mapOpportunityRow(row: OpportunityRow): OpportunityListItem {
     contactId: row.contact_id ?? undefined,
     contactName: row.contact_name,
     amount: formatCentsToMoney(row.amount_cents),
-    weightedAmount: formatCentsToMoney(row.weighted_amount_cents),
+    weightedAmount: formatCentsToMoney(weightedAmountCents),
     stage: row.stage,
-    probability: formatPercent(row.probability_pct),
+    probability: formatPercent(probabilityPct),
     closeDate: formatDateLabel(row.close_date),
     owner: row.owner_name ?? '',
     type: row.opp_type ?? '',

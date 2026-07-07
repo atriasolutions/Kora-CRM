@@ -187,23 +187,21 @@ export function ProductFormFields({
           value={form.ownerName}
           onChange={(ownerName) => patch({ ownerName })}
         />
+        <ContactFormInput
+          id="pd-form-brand"
+          label="Marca"
+          inputVariant="alphanumeric"
+          value={form.brand}
+          onChange={(brand) => patch({ brand })}
+        />
         {!compact ? (
-          <>
-            <ContactFormInput
-              id="pd-form-brand"
-              label="Marca"
-              inputVariant="alphanumeric"
-              value={form.brand}
-              onChange={(brand) => patch({ brand })}
-            />
-            <ContactFormInput
-              id="pd-form-short"
-              label="Descripción corta"
-              inputVariant="alphanumeric"
-              value={form.shortDescription}
-              onChange={(shortDescription) => patch({ shortDescription })}
-            />
-          </>
+          <ContactFormInput
+            id="pd-form-short"
+            label="Descripción corta"
+            inputVariant="alphanumeric"
+            value={form.shortDescription}
+            onChange={(shortDescription) => patch({ shortDescription })}
+          />
         ) : null}
       </div>
 
@@ -319,6 +317,42 @@ export function ProductFormFields({
             Sin control de stock numérico (servicios, digitales u otros sin bodega).
           </p>
         )}
+      </div>
+
+      <Separator />
+
+      <div className="space-y-3">
+        <h4 className="text-sm font-semibold text-foreground">Integración externa</h4>
+        <p className="text-xs text-muted-foreground">
+          Controla si el producto aparece en el catálogo de integración (API por tenant) y si
+          incluye precio en la respuesta JSON.
+        </p>
+        <ContactFormCheckbox
+          id="pd-form-publish-integration"
+          label="Publicar en integración"
+          checked={form.publishInIntegration}
+          onChange={(publishInIntegration) => {
+            if (publishInIntegration) {
+              patch({
+                publishInIntegration: true,
+                publishPriceInIntegration: true,
+              })
+              return
+            }
+            patch({
+              publishInIntegration: false,
+              publishPriceInIntegration: false,
+            })
+          }}
+        />
+        {form.publishInIntegration ? (
+          <ContactFormCheckbox
+            id="pd-form-publish-price"
+            label="Publicar precio"
+            checked={form.publishPriceInIntegration}
+            onChange={(publishPriceInIntegration) => patch({ publishPriceInIntegration })}
+          />
+        ) : null}
       </div>
 
       {showPhysical ? (

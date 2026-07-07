@@ -23,6 +23,19 @@ export const createContactSchema = z.object({
   source: z.string().max(128).optional(),
   initialNote: z.string().max(10000).optional(),
   ownerName: z.string().max(255).optional(),
+  treatmentOpposition: z.boolean().optional(),
+  treatmentBlocked: z.boolean().optional(),
+  marketingConsent: z.boolean().nullable().optional(),
+  legalBasis: z
+    .enum([
+      'consentimiento',
+      'contrato',
+      'interes_legitimo',
+      'obligacion_legal',
+      'interes_vital',
+      'datos_economicos',
+    ])
+    .optional(),
 })
 
 export const updateContactSchema = createContactSchema.partial()

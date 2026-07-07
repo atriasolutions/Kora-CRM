@@ -30,6 +30,10 @@ export type ProductListItem = {
   maxStockNum?: number
   imageUrl?: string
   barcode?: string
+  description?: string
+  brand?: string
+  publishInIntegration?: boolean
+  publishPriceInIntegration?: boolean
 } & RecordAuditFields
 
 export const PRODUCT_LIST_TOTAL_DEMO = 56

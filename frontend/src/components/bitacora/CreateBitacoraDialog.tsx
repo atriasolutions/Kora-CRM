@@ -79,7 +79,7 @@ export function CreateBitacoraDialog({
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
-        <form className="space-y-4" onSubmit={handleSubmit}>
+        <form className="w-full min-w-0 space-y-4" onSubmit={handleSubmit}>
           <BitacoraFormFields
             form={form}
             onChange={patch}

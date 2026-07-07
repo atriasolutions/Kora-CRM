@@ -16,6 +16,8 @@ import { Separator } from '@/components/ui/separator'
 import type { OpportunityDetail } from '@/data/opportunity-detail.mock'
 import type { OpportunityOutcome } from '@/data/opportunities.mock'
 import { resolveOpportunityCustomerKind } from '@/lib/opportunity-customer'
+import { syncOpportunityStageMetrics } from '@/lib/opportunity-form'
+import { probabilityLabelForStage } from '@/lib/opportunity-metadata'
 
 function InfoRow({
   icon: Icon,
@@ -43,6 +45,7 @@ type OpportunityDetailSidebarProps = {
 
 export function OpportunityDetailSidebar({ opportunity }: OpportunityDetailSidebarProps) {
   const outcomeLabel: OpportunityOutcome = opportunity.outcome
+  const metrics = syncOpportunityStageMetrics(opportunity)
 
   return (
     <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
@@ -54,8 +57,8 @@ export function OpportunityDetailSidebar({ opportunity }: OpportunityDetailSideb
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <InfoRow icon={DollarSign} label="Monto / Ponderado" value={`${opportunity.amount} · ${opportunity.weightedAmount}`} />
-          <InfoRow icon={TrendingUp} label="Probabilidad" value={opportunity.probability} />
+          <InfoRow icon={DollarSign} label="Monto / Ponderado" value={`${metrics.amount} · ${metrics.weightedAmount}`} />
+          <InfoRow icon={TrendingUp} label="Probabilidad" value={probabilityLabelForStage(opportunity.stage)} />
           <InfoRow icon={Calendar} label="Cierre estimado" value={opportunity.closeDate} />
           <InfoRow icon={UserRound} label="Responsable" value={opportunity.owner} />
           <Separator />

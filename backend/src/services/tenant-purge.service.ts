@@ -98,31 +98,26 @@ export async function truncateTenantRecords(
   return { slug: tenant.slug, displayName: tenant.displayName, requiresReLogin: true }
 }
 
-async function deleteTenantScopedUsers(tenantId: string): Promise<void> {
+async function deleteExclusiveUserSessionsAndTokens(tenantId: string): Promise<void> {
+  const exclusiveUsersSql = `
+    SELECT m.user_id FROM crm_tenant_memberships m
+    WHERE m.tenant_id = $1
+      AND NOT EXISTS (
+        SELECT 1 FROM crm_tenant_memberships m2
+        WHERE m2.user_id = m.user_id AND m2.tenant_id <> $1
+      )
+  `
+
   await platformQuery(
     `DELETE FROM crm_user_auth_sessions s
-     WHERE s.user_id IN (
-       SELECT m.user_id FROM crm_tenant_memberships m
-       WHERE m.tenant_id = $1
-         AND NOT EXISTS (
-           SELECT 1 FROM crm_tenant_memberships m2
-           WHERE m2.user_id = m.user_id AND m2.tenant_id <> $1
-         )
-     )`,
+     WHERE s.user_id IN (${exclusiveUsersSql})`,
     [tenantId],
   )
 
   if (await tableExists('crm_user_sessions') && (await tableHasTenantColumn('crm_user_sessions'))) {
     await platformQuery(
       `DELETE FROM crm_user_sessions s
-       WHERE s.user_id IN (
-         SELECT m.user_id FROM crm_tenant_memberships m
-         WHERE m.tenant_id = $1
-           AND NOT EXISTS (
-             SELECT 1 FROM crm_tenant_memberships m2
-             WHERE m2.user_id = m.user_id AND m2.tenant_id <> $1
-           )
-       )`,
+       WHERE s.user_id IN (${exclusiveUsersSql})`,
       [tenantId],
     )
   }
@@ -131,27 +126,18 @@ async function deleteTenantScopedUsers(tenantId: string): Promise<void> {
     `DELETE FROM crm_user_verification_tokens t
      USING crm_users u
      WHERE t.user_id = u.id
-       AND u.id IN (
-         SELECT m.user_id FROM crm_tenant_memberships m
-         WHERE m.tenant_id = $1
-           AND NOT EXISTS (
-             SELECT 1 FROM crm_tenant_memberships m2
-             WHERE m2.user_id = m.user_id AND m2.tenant_id <> $1
-           )
-       )`,
+       AND u.id IN (${exclusiveUsersSql})`,
     [tenantId],
   )
+}
 
+async function deleteTenantExclusiveUsers(tenantId: string): Promise<void> {
   await platformQuery(
     `DELETE FROM crm_users u
-     WHERE u.id IN (
-       SELECT m.user_id FROM crm_tenant_memberships m
-       WHERE m.tenant_id = $1
-         AND NOT EXISTS (
-           SELECT 1 FROM crm_tenant_memberships m2
-           WHERE m2.user_id = m.user_id AND m2.tenant_id <> $1
-         )
-     )`,
+     WHERE u.tenant_id = $1
+       AND NOT EXISTS (
+         SELECT 1 FROM crm_tenant_memberships m WHERE m.user_id = u.id
+       )`,
     [tenantId],
   )
 }
@@ -192,9 +178,10 @@ async function deleteTenantShell(tenantId: string): Promise<void> {
   }
 
   await repointMultiTenantUsersBeforeShellDelete(tenantId)
-  await deleteTenantScopedUsers(tenantId)
+  await deleteExclusiveUserSessionsAndTokens(tenantId)
 
   await platformQuery(`DELETE FROM crm_tenant_memberships WHERE tenant_id = $1`, [tenantId])
+  await deleteTenantExclusiveUsers(tenantId)
 
   await platformQuery(
     `DELETE FROM crm_access_profile_permissions p

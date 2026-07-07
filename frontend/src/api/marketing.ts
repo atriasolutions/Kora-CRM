@@ -15,6 +15,8 @@ export type TrialLeadBody = {
   email: string
   phone: string
   message?: string
+  privacyConsentAccepted: true
+  privacyPolicyVersion?: string
 }
 
 export type TrialLeadSubmission = {
@@ -53,6 +55,8 @@ export type SupportRequestBody = {
   company?: string
   topic: 'technical' | 'access' | 'usage' | 'billing' | 'other'
   message: string
+  privacyConsentAccepted: true
+  privacyPolicyVersion?: string
 }
 
 export async function submitSupportRequestApi(

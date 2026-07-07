@@ -90,8 +90,8 @@ export function RegistryEntityLookupField({
   const showSearchInput = !selected || open
 
   return (
-    <ContactFormField label={label} id={inputId} className={className}>
-      <div ref={containerRef} className="relative">
+    <ContactFormField label={label} id={inputId} className={cn('w-full min-w-0', className)}>
+      <div ref={containerRef} className="relative w-full min-w-0">
         <input
           type="text"
           tabIndex={-1}
@@ -103,7 +103,7 @@ export function RegistryEntityLookupField({
         {selected && !open ? (
           <div
             className={cn(
-              'flex items-center gap-2 rounded-md border border-input bg-background px-2 py-1.5 shadow-sm',
+              'flex w-full min-w-0 items-center gap-2 rounded-md border border-input bg-background px-2 py-1.5 shadow-sm',
               disabled && 'opacity-60',
             )}
           >
@@ -152,7 +152,7 @@ export function RegistryEntityLookupField({
             ) : null}
           </div>
         ) : (
-          <div className="relative">
+          <div className="relative w-full min-w-0">
             <Search
               aria-hidden
               className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"

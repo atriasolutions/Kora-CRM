@@ -16,6 +16,7 @@ import { ContactActivitiesPanel } from '@/components/contacts/ContactActivitiesP
 import { ContactFilesPanel } from '@/components/contacts/ContactFilesPanel'
 import { ContactDetailHeader } from '@/components/contacts/ContactDetailHeader'
 import { ContactDetailProfile } from '@/components/contacts/ContactDetailProfile'
+import { ContactPrivacyPanel } from '@/components/contacts/ContactPrivacyPanel'
 import { CreateContactDialog } from '@/components/contacts/CreateContactDialog'
 import { EditContactDialog } from '@/components/contacts/EditContactDialog'
 import { RegisterActivityDialog } from '@/components/contacts/RegisterActivityDialog'
@@ -352,6 +353,7 @@ export function ContactDetailPage() {
           {tab === 'detalle' ? (
             <div className="space-y-4">
               <ContactDetailProfile contact={contact} />
+              <ContactPrivacyPanel contact={contact} onContactUpdated={() => void reload()} />
               {contact.subtitle?.trim() || contact.initialNote?.trim() ? (
                 <Card className="shadow-sm">
                   <CardHeader>

@@ -83,6 +83,8 @@ export type ProductFormValues = {
   licenseTerms: string
   supplierName: string
   supplierSku: string
+  publishInIntegration: boolean
+  publishPriceInIntegration: boolean
 }
 
 export {
@@ -139,6 +141,8 @@ export function productDetailToFormValues(product: ProductDetail): ProductFormVa
     licenseTerms: product.licenseTerms,
     supplierName: product.supplierName,
     supplierSku: product.supplierSku,
+    publishInIntegration: product.publishInIntegration !== false,
+    publishPriceInIntegration: product.publishPriceInIntegration !== false,
   }
 }
 
@@ -207,6 +211,10 @@ export function applyFormValuesToProduct(
     licenseTerms: values.licenseTerms.trim(),
     supplierName: product.supplierName,
     supplierSku: product.supplierSku,
+    publishInIntegration: values.publishInIntegration,
+    publishPriceInIntegration: values.publishInIntegration
+      ? values.publishPriceInIntegration
+      : false,
     marginPercent: computeMarginPercent(costPriceNum, priceNum),
     markupPercent: computeMarkupPercent(costPriceNum, priceNum),
     revenue:

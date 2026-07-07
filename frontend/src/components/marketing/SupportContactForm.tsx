@@ -10,10 +10,12 @@ import {
 } from '@/components/contacts/ContactFormField'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { PrivacyConsentField } from '@/components/legal/PrivacyConsentField'
 import {
   MARKETING_SUPPORT_COPY,
   MARKETING_SUPPORT_TOPICS_FORM,
 } from '@/lib/marketing-content'
+import { PLATFORM_LEGAL } from '@/lib/platform-legal'
 import { toast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
@@ -28,6 +30,7 @@ type FormState = {
   company: string
   topic: SupportRequestBody['topic']
   message: string
+  privacyConsentAccepted: boolean
 }
 
 const emptyForm = (): FormState => ({
@@ -36,6 +39,7 @@ const emptyForm = (): FormState => ({
   company: '',
   topic: 'technical',
   message: '',
+  privacyConsentAccepted: false,
 })
 
 export function SupportContactForm({ onSuccess, className }: SupportContactFormProps) {
@@ -59,6 +63,10 @@ export function SupportContactForm({ onSuccess, className }: SupportContactFormP
       toast.warning('Describe tu consulta con al menos 10 caracteres.')
       return
     }
+    if (!form.privacyConsentAccepted) {
+      toast.warning('Debes aceptar la política de tratamiento de datos personales.')
+      return
+    }
 
     setSaving(true)
     try {
@@ -68,6 +76,8 @@ export function SupportContactForm({ onSuccess, className }: SupportContactFormP
         company: form.company.trim() || undefined,
         topic: form.topic,
         message: form.message.trim(),
+        privacyConsentAccepted: true as const,
+        privacyPolicyVersion: PLATFORM_LEGAL.privacyVersion,
       })
       setSubmitted(true)
       setForm(emptyForm())
@@ -161,6 +171,12 @@ export function SupportContactForm({ onSuccess, className }: SupportContactFormP
               rows={5}
               placeholder="Cuéntanos qué ocurre, qué módulo usabas y qué esperabas que pasara…"
               required
+            />
+            <PrivacyConsentField
+              id="support-privacy-consent"
+              checked={form.privacyConsentAccepted}
+              onChange={(privacyConsentAccepted) => patch({ privacyConsentAccepted })}
+              disabled={saving}
             />
             <Button
               type="submit"

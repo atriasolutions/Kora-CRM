@@ -18,7 +18,8 @@ import type {
 const SELECT_COLUMNS = `
   id, legal_name, trade_name, tagline, rut, giro, address, city, region, commune,
   phone, email, logo_url, default_vat_percent, invoicing_mode, economic_activity_code,
-  default_solicitud_assignee_user_id, default_solicitud_assignee_name
+  default_solicitud_assignee_user_id, default_solicitud_assignee_name,
+  privacy_policy_url, privacy_contact_email, dpo_name, privacy_policy_version, data_retention_days
 `
 
 const DEFAULTS = {
@@ -50,6 +51,15 @@ function normalizeOrganizationSettingValue(
   }
   if (key === 'logoUrl') {
     return typeof value === 'string' ? value : ''
+  }
+  if (key === 'privacyPolicyUrl' || key === 'privacyContactEmail' || key === 'dpoName') {
+    if (value == null) return null
+    const trimmed = typeof value === 'string' ? value.trim() : ''
+    return trimmed || null
+  }
+  if (key === 'dataRetentionDays') {
+    const n = Number(value)
+    return Number.isFinite(n) ? n : 2555
   }
   return value
 }
@@ -179,6 +189,11 @@ export async function updateOrganizationSettings(
     ['economicActivityCode', 'economic_activity_code'],
     ['defaultSolicitudAssigneeUserId', 'default_solicitud_assignee_user_id'],
     ['defaultSolicitudAssigneeName', 'default_solicitud_assignee_name'],
+    ['privacyPolicyUrl', 'privacy_policy_url'],
+    ['privacyContactEmail', 'privacy_contact_email'],
+    ['dpoName', 'dpo_name'],
+    ['privacyPolicyVersion', 'privacy_policy_version'],
+    ['dataRetentionDays', 'data_retention_days'],
   ]
 
   for (const [key, column] of fieldMap) {

@@ -19,6 +19,11 @@ export type OrganizationSettings = {
   economicActivityCode: number | null
   defaultSolicitudAssigneeUserId: string | null
   defaultSolicitudAssigneeName: string
+  privacyPolicyUrl: string
+  privacyContactEmail: string
+  dpoName: string
+  privacyPolicyVersion: string
+  dataRetentionDays: number
 }
 
 export type UpdateOrganizationSettingsInput = Partial<

@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { PageScrollArea } from '@/components/layout/PageScrollArea'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { apiActionErrorMessage } from '@/api/errors'
+import { toast } from '@/lib/toast'
 import { mergeProductDetailFromListItem } from '@/api/products'
 import { useModulePermissions } from '@/hooks/use-module-permissions'
 import { getCurrentUser } from '@/lib/current-user'
@@ -130,11 +131,18 @@ export function ProductDetailPage() {
 
   const handleProductSaved = useCallback(
     async (updated: ProductDetail, previousSku?: string) => {
-      const saved = await updateProductFromDetail(updated, { previousSku })
-      setProduct(
-        saved ? mergeProductDetailFromListItem(updated, saved) : updated,
-      )
-      toast.success(`Producto «${updated.name}» actualizado correctamente.`)
+      try {
+        const saved = await updateProductFromDetail(updated, { previousSku })
+        setProduct(
+          saved ? mergeProductDetailFromListItem(updated, saved) : updated,
+        )
+        toast.success(`Producto «${updated.name}» actualizado correctamente.`)
+      } catch (error) {
+        toast.error(
+          apiActionErrorMessage(error, 'No se pudo guardar el producto.'),
+        )
+        throw error
+      }
     },
     [updateProductFromDetail],
   )

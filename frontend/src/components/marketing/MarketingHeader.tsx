@@ -3,6 +3,11 @@ import { useEffect, useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 
 import { LoginAtriaCredit } from '@/components/auth/LoginAtriaCredit'
+import {
+  PLATFORM_PRIVACY_POLICY_PATH,
+  PLATFORM_SUBPROCESSORS_PATH,
+  PLATFORM_TERMS_PATH,
+} from '@/lib/platform-legal'
 import { MarketingBrandBackdrop } from '@/components/marketing/MarketingBrandBackdrop'
 import { KoraLogoMark } from '@/components/layout/KoraLogoMark'
 import { Button } from '@/components/ui/button'
@@ -217,7 +222,7 @@ export function MarketingFooter() {
   return (
     <footer className="relative shrink-0 overflow-x-hidden border-t border-white/10 bg-gradient-to-br from-[#0f0818] via-[#15103a] to-[#0a2d45] pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-16 text-white">
       <MarketingBrandBackdrop variant="hero" className="opacity-60" />
-      <div className="relative mx-auto grid max-w-6xl gap-10 px-4 sm:px-6 lg:grid-cols-3 lg:px-8">
+      <div className="relative mx-auto grid max-w-6xl gap-10 px-4 sm:px-6 lg:grid-cols-4 lg:px-8">
         <div>
           <KoraLogoMark variant="hero" size="sm" tone="light" align="start" />
           <p className="mt-4 max-w-xs text-sm leading-relaxed text-white/55">
@@ -237,6 +242,29 @@ export function MarketingFooter() {
                 </Link>
               </li>
             ))}
+          </ul>
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-white/90">Legal</p>
+          <ul className="mt-4 space-y-2.5 text-sm text-white/55">
+            <li>
+              <Link to={PLATFORM_PRIVACY_POLICY_PATH} className="transition-colors hover:text-cyan-300">
+                Privacidad
+              </Link>
+            </li>
+            <li>
+              <Link to={PLATFORM_TERMS_PATH} className="transition-colors hover:text-cyan-300">
+                Términos de uso
+              </Link>
+            </li>
+            <li>
+              <Link
+                to={PLATFORM_SUBPROCESSORS_PATH}
+                className="transition-colors hover:text-cyan-300"
+              >
+                Subprocesadores
+              </Link>
+            </li>
           </ul>
         </div>
         <div>

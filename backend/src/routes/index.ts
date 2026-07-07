@@ -33,12 +33,14 @@ import { notificationsRouter } from './notifications.routes.js'
 import { marketingRouter } from './marketing.routes.js'
 import { integrationsRouter } from './integrations.routes.js'
 import { tenantQuotasRouter } from './tenant-quotas.routes.js'
+import { privacyRouter } from './privacy.routes.js'
 
 export const apiRouter = Router()
 
 apiRouter.use('/integrations', integrationsRouter)
 apiRouter.use('/tenant', tenantQuotasRouter)
 apiRouter.use('/marketing', marketingRouter)
+apiRouter.use('/privacy', privacyRouter)
 apiRouter.use('/auth', authRouter)
 apiRouter.use('/dashboard', dashboardRouter)
 apiRouter.use('/activities', activitiesRouter)

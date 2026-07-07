@@ -28,6 +28,10 @@ export type ProductApiBody = {
   status?: string
   imageUrl?: string
   barcode?: string
+  description?: string
+  brand?: string
+  publishInIntegration?: boolean
+  publishPriceInIntegration?: boolean
   trackInventory?: boolean
   minStock?: number
   maxStock?: number
@@ -66,6 +70,16 @@ export function productFormToApiBody(
     status: values.status,
     imageUrl: values.imageUrl?.trim() || undefined,
     barcode: values.barcode?.trim() || undefined,
+    description: 'description' in values ? values.description?.trim() || undefined : undefined,
+    brand: 'brand' in values ? values.brand?.trim() || undefined : undefined,
+    publishInIntegration:
+      'publishInIntegration' in values ? values.publishInIntegration : undefined,
+    publishPriceInIntegration:
+      'publishPriceInIntegration' in values
+        ? values.publishInIntegration
+          ? values.publishPriceInIntegration
+          : false
+        : undefined,
     trackInventory,
     minStock: trackInventory && minStockNum >= 0 ? minStockNum : undefined,
     maxStock: trackInventory && maxStockNum >= 0 ? maxStockNum : undefined,
@@ -97,6 +111,12 @@ export function productDetailToApiBody(detail: ProductDetail): ProductApiBody {
     status: detail.status,
     imageUrl: detail.imageUrl?.trim() || undefined,
     barcode: detail.barcode,
+    description: detail.description?.trim() || undefined,
+    brand: detail.brand?.trim() || undefined,
+    publishInIntegration: detail.publishInIntegration,
+    publishPriceInIntegration: detail.publishInIntegration
+      ? detail.publishPriceInIntegration
+      : false,
     trackInventory: detail.trackInventory,
     minStock: detail.trackInventory ? (minStock ?? 0) : undefined,
     maxStock: detail.trackInventory ? (maxStock ?? 0) : undefined,
@@ -111,6 +131,10 @@ export function mergeProductDetailFromListItem(
   return {
     ...detail,
     ...saved,
+    description: saved.description?.trim() || detail.description,
+    brand: saved.brand?.trim() || detail.brand,
+    publishInIntegration: saved.publishInIntegration !== false,
+    publishPriceInIntegration: saved.publishPriceInIntegration !== false,
     trackInventory: refreshed.trackInventory,
     minStock: refreshed.minStock,
     maxStock: refreshed.maxStock,

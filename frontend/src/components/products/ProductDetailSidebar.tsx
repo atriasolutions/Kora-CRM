@@ -4,6 +4,7 @@ import {
   DollarSign,
   Layers,
   Ruler,
+  Share2,
   Snowflake,
   Tag,
   TrendingUp,
@@ -95,6 +96,19 @@ export function ProductDetailSidebar({
         <ProfileRow label="Tipo" value={product.productType} />
         <ProfileRow label="Categoría" value={product.category} />
         <ProfileRow label="Proveedor" value={supplierLabel} />
+      </ContactFormSection>
+
+      <ContactFormSection title="Integración" icon={Share2} className="bg-card">
+        <ProfileRow
+          label="Publicar en integración"
+          value={product.publishInIntegration ? 'Sí' : 'No'}
+        />
+        {product.publishInIntegration ? (
+          <ProfileRow
+            label="Publicar precio"
+            value={product.publishPriceInIntegration ? 'Sí' : 'No'}
+          />
+        ) : null}
       </ContactFormSection>
 
       <ContactFormSection title="Inventario" icon={Layers} className="bg-card">

@@ -22,6 +22,11 @@ export const updateOrganizationSettingsSchema = z.object({
   economicActivityCode: z.number().int().positive().max(99999999).nullable().optional(),
   defaultSolicitudAssigneeUserId: z.string().uuid().nullable().optional(),
   defaultSolicitudAssigneeName: z.string().max(255).optional(),
+  privacyPolicyUrl: z.string().url().or(z.literal('')).optional(),
+  privacyContactEmail: z.string().email().max(320).or(z.literal('')).optional(),
+  dpoName: z.string().max(255).optional(),
+  privacyPolicyVersion: z.string().max(32).optional(),
+  dataRetentionDays: z.number().int().min(30).max(36500).optional(),
 })
 
 export const createWarehouseSchema = z.object({

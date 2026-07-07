@@ -23,6 +23,11 @@ export type OrganizationSettingsRow = {
   economic_activity_code: number | null
   default_solicitud_assignee_user_id: string | null
   default_solicitud_assignee_name: string | null
+  privacy_policy_url: string | null
+  privacy_contact_email: string | null
+  dpo_name: string | null
+  privacy_policy_version: string | null
+  data_retention_days: number | null
 }
 
 export type WarehouseRow = {
@@ -65,6 +70,11 @@ export function mapOrganizationSettings(
       row.economic_activity_code != null ? Number(row.economic_activity_code) : null,
     defaultSolicitudAssigneeUserId: row.default_solicitud_assignee_user_id ?? null,
     defaultSolicitudAssigneeName: row.default_solicitud_assignee_name ?? '',
+    privacyPolicyUrl: row.privacy_policy_url ?? '',
+    privacyContactEmail: row.privacy_contact_email ?? '',
+    dpoName: row.dpo_name ?? '',
+    privacyPolicyVersion: row.privacy_policy_version ?? '1.0',
+    dataRetentionDays: Number(row.data_retention_days ?? 2555),
   }
 }
 

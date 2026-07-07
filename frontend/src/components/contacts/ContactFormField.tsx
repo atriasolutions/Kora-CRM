@@ -57,7 +57,7 @@ export function ContactFormField({
   children: React.ReactNode
 }) {
   return (
-    <div className={cn('space-y-1.5', className)}>
+    <div className={cn('w-full min-w-0 space-y-1.5', className)}>
       <label htmlFor={id} className="text-xs font-medium text-muted-foreground">
         {label}
       </label>

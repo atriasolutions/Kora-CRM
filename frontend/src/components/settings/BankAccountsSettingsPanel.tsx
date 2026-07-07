@@ -12,10 +12,12 @@ import {
 } from '@/api/bank-accounts'
 import { isApiEnabled } from '@/api/config'
 import { ContactFormInput, ContactFormSelect } from '@/components/contacts/ContactFormField'
+import { ContactRutInput } from '@/components/contacts/ContactRutInput'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useModulePermissions } from '@/hooks/use-module-permissions'
 import { CHILE_ACCOUNT_TYPES, CHILE_BANKS, normalizeChileBankCode } from '@/lib/chile-banks'
+import { getRutValidationMessage } from '@/lib/contact-rut'
 import { cn } from '@/lib/utils'
 
 const emptyDraft = (): BankAccountInput => ({
@@ -23,8 +25,17 @@ const emptyDraft = (): BankAccountInput => ({
   bankCode: CHILE_BANKS[0]?.code ?? '1',
   accountType: CHILE_ACCOUNT_TYPES[0],
   accountNumber: '',
+  rut: '',
   email: '',
 })
+
+function isBankDraftValid(values: BankAccountInput): boolean {
+  return (
+    values.accountName.trim().length > 0 &&
+    values.accountNumber.trim().length > 0 &&
+    getRutValidationMessage(values.rut, { required: true }) === null
+  )
+}
 
 export function BankAccountsSettingsPanel() {
   const { canCreate, canEdit, canDelete } = useModulePermissions('configuracion')
@@ -33,6 +44,8 @@ export function BankAccountsSettingsPanel() {
   const [draft, setDraft] = useState<BankAccountInput>(emptyDraft)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState<BankAccountInput>(emptyDraft)
+  const [createAttempted, setCreateAttempted] = useState(false)
+  const [editAttemptedId, setEditAttemptedId] = useState<string | null>(null)
 
   const reload = useCallback(async () => {
     if (!isApiEnabled()) {
@@ -63,29 +76,39 @@ export function BankAccountsSettingsPanel() {
     }
   }
 
-  const handleCreate = () =>
-    run(async () => {
+  const handleCreate = () => {
+    setCreateAttempted(true)
+    if (!isBankDraftValid(draft)) return
+    void run(async () => {
       await createBankAccountApi(draft)
       setDraft(emptyDraft())
+      setCreateAttempted(false)
     }, 'Cuenta bancaria creada.')
+  }
 
   const startEdit = (account: BankAccount) => {
     setEditingId(account.id)
+    setEditAttemptedId(null)
     setEditDraft({
       accountName: account.accountName,
       bankCode: normalizeChileBankCode(account.bankCode),
       accountType: account.accountType,
       accountNumber: account.accountNumber,
+      rut: account.rut,
       email: account.email,
       isDefault: account.isDefault,
     })
   }
 
-  const handleUpdate = (id: string) =>
-    run(async () => {
+  const handleUpdate = (id: string) => {
+    setEditAttemptedId(id)
+    if (!isBankDraftValid(editDraft)) return
+    void run(async () => {
       await updateBankAccountApi(id, editDraft)
       setEditingId(null)
+      setEditAttemptedId(null)
     }, 'Cuenta actualizada.')
+  }
 
   const handleSetDefault = (id: string) =>
     run(async () => {
@@ -105,6 +128,7 @@ export function BankAccountsSettingsPanel() {
     values: BankAccountInput,
     onChange: (patch: Partial<BankAccountInput>) => void,
     idPrefix: string,
+    forceRutError = false,
   ) => (
     <div className="grid gap-3 sm:grid-cols-2">
       <ContactFormInput
@@ -112,6 +136,13 @@ export function BankAccountsSettingsPanel() {
         label="Nombre de la cuenta"
         value={values.accountName}
         onChange={(accountName) => onChange({ accountName })}
+      />
+      <ContactRutInput
+        id={`${idPrefix}-rut`}
+        label="RUT"
+        value={values.rut}
+        onChange={(rut) => onChange({ rut })}
+        forceShowError={forceRutError}
       />
       <ContactFormSelect
         id={`${idPrefix}-bank`}
@@ -185,7 +216,12 @@ export function BankAccountsSettingsPanel() {
                 >
                   {editingId === account.id ? (
                     <div className="space-y-3">
-                      {renderForm(editDraft, (p) => setEditDraft((d) => ({ ...d, ...p })), `edit-${account.id}`)}
+                      {renderForm(
+                        editDraft,
+                        (p) => setEditDraft((d) => ({ ...d, ...p })),
+                        `edit-${account.id}`,
+                        editAttemptedId === account.id,
+                      )}
                       <div className="flex flex-wrap gap-2">
                         {canEdit ? (
                           <Button type="button" size="sm" onClick={() => handleUpdate(account.id)}>
@@ -217,6 +253,9 @@ export function BankAccountsSettingsPanel() {
                           <p className="text-sm text-muted-foreground">
                             {account.bankName} · {account.accountType}
                           </p>
+                          {account.rut?.trim() ? (
+                            <p className="text-sm tabular-nums text-foreground">RUT {account.rut}</p>
+                          ) : null}
                           <p className="text-sm tabular-nums text-foreground">
                             {account.accountNumber}
                           </p>
@@ -274,8 +313,12 @@ export function BankAccountsSettingsPanel() {
             <CardTitle className="text-base">Nueva cuenta</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {renderForm(draft, (p) => setDraft((d) => ({ ...d, ...p })), 'new')}
-            <Button type="button" onClick={handleCreate} disabled={!draft.accountName.trim()}>
+            {renderForm(draft, (p) => setDraft((d) => ({ ...d, ...p })), 'new', createAttempted)}
+            <Button
+              type="button"
+              onClick={handleCreate}
+              disabled={!isBankDraftValid(draft)}
+            >
               <Plus aria-hidden className="size-4" />
               Agregar cuenta
             </Button>

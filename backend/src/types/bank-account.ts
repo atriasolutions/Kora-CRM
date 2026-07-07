@@ -5,6 +5,7 @@ export type BankAccount = {
   bankName: string
   accountType: string
   accountNumber: string
+  rut: string
   email: string
   isDefault: boolean
   sortOrder: number
@@ -17,6 +18,7 @@ export type CreateBankAccountInput = {
   bankCode: string
   accountType: string
   accountNumber: string
+  rut: string
   email?: string
   isDefault?: boolean
   sortOrder?: number

@@ -2,6 +2,7 @@ import {
   Briefcase,
   MapPin,
   Share2,
+  Shield,
   UserRound,
   Users,
 } from 'lucide-react'
@@ -10,6 +11,7 @@ import {
   ContactFormInput,
   ContactFormSelect,
   ContactFormTextarea,
+  ContactFormCheckbox,
 } from '@/components/contacts/ContactFormField'
 import { ContactFormSection } from '@/components/contacts/ContactFormSection'
 import { TaxIdentifierFields } from '@/components/shared/TaxIdentifierFields'
@@ -19,6 +21,7 @@ import { RegionCommuneFields } from '@/components/shared/RegionCommuneFields'
 import { UserLookupField } from '@/components/shared/UserLookupField'
 import {
   CONTACT_KIND_OPTIONS,
+  CONTACT_LEGAL_BASIS_OPTIONS,
   CONTACT_SOURCE_OPTIONS,
   CONTACT_STATUS_OPTIONS,
   type ContactFormValues,
@@ -253,6 +256,60 @@ export function ContactFormFields({
           onChange={(initialNote) => patch({ initialNote })}
           placeholder="Preferencias de contacto, contexto de la relación, próximos pasos…"
           rows={3}
+        />
+      </ContactFormSection>
+
+      <ContactFormSection
+        title="Protección de datos personales"
+        description="Cumplimiento Ley 21.719 — bases de licitud y derechos del titular"
+        icon={Shield}
+      >
+        <ContactFormSelect
+          id={`${idPrefix}-legal-basis`}
+          label="Base legal del tratamiento"
+          value={values.legalBasis || '__none__'}
+          onChange={(legalBasis) =>
+            patch({
+              legalBasis:
+                legalBasis === '__none__'
+                  ? ''
+                  : (legalBasis as (typeof values)['legalBasis']),
+            })
+          }
+          options={[
+            { value: '__none__', label: 'Sin especificar' },
+            ...CONTACT_LEGAL_BASIS_OPTIONS,
+          ]}
+        />
+        <ContactFormSelect
+          id={`${idPrefix}-marketing-consent`}
+          label="Consentimiento comunicaciones comerciales"
+          value={values.marketingConsent || '__none__'}
+          onChange={(v) =>
+            patch({
+              marketingConsent:
+                v === '__none__' ? '' : (v as 'true' | 'false'),
+            })
+          }
+          options={[
+            { value: '__none__', label: 'Sin registrar' },
+            { value: 'true', label: 'Otorgado' },
+            { value: 'false', label: 'No otorgado / revocado' },
+          ]}
+        />
+        <ContactFormCheckbox
+          id={`${idPrefix}-treatment-opposition`}
+          label="Oposición al tratamiento"
+          checked={values.treatmentOpposition}
+          onChange={(treatmentOpposition) => patch({ treatmentOpposition })}
+          description="El titular se opone al tratamiento de sus datos en los casos previstos por ley."
+        />
+        <ContactFormCheckbox
+          id={`${idPrefix}-treatment-blocked`}
+          label="Bloqueo temporal del tratamiento"
+          checked={values.treatmentBlocked}
+          onChange={(treatmentBlocked) => patch({ treatmentBlocked })}
+          description="Suspende el tratamiento mientras se resuelve una solicitud del titular."
         />
       </ContactFormSection>
     </div>

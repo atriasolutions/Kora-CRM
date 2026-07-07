@@ -23,6 +23,11 @@ export type ContactRow = {
   initial_note: string | null
   owner_name: string | null
   last_contact_at: Date | null
+  treatment_opposition: boolean
+  treatment_blocked_at: Date | null
+  marketing_consent: boolean | null
+  marketing_consent_at: Date | null
+  legal_basis: string | null
   created_at: Date
   created_by_id: string | null
   created_by_name: string | null
@@ -60,6 +65,15 @@ export function mapContactRow(row: ContactRow): ContactListItem {
     source: row.source ?? undefined,
     initialNote: row.initial_note ?? undefined,
     ownerName: row.owner_name ?? undefined,
+    treatmentOpposition: row.treatment_opposition,
+    treatmentBlockedAt: row.treatment_blocked_at
+      ? toIsoString(row.treatment_blocked_at)
+      : undefined,
+    marketingConsent: row.marketing_consent,
+    marketingConsentAt: row.marketing_consent_at
+      ? toIsoString(row.marketing_consent_at)
+      : undefined,
+    legalBasis: row.legal_basis as ContactListItem['legalBasis'],
     createdAt: toIsoString(row.created_at),
     createdById: row.created_by_id ?? '',
     createdByName: row.created_by_name ?? '',

@@ -1,5 +1,13 @@
 export type ContactStatus = 'Prospecto' | 'Cliente' | 'Proveedor'
 
+export type ContactLegalBasis =
+  | 'consentimiento'
+  | 'contrato'
+  | 'interes_legitimo'
+  | 'obligacion_legal'
+  | 'interes_vital'
+  | 'datos_economicos'
+
 export type ContactListItem = {
   id: string
   name: string
@@ -21,6 +29,11 @@ export type ContactListItem = {
   source?: string
   initialNote?: string
   ownerName?: string
+  treatmentOpposition?: boolean
+  treatmentBlockedAt?: string
+  marketingConsent?: boolean | null
+  marketingConsentAt?: string
+  legalBasis?: ContactLegalBasis
   createdAt: string
   createdById: string
   createdByName: string
@@ -52,6 +65,10 @@ export type CreateContactInput = {
   initialNote?: string
   ownerName?: string
   subtitle?: string
+  treatmentOpposition?: boolean
+  treatmentBlocked?: boolean
+  marketingConsent?: boolean | null
+  legalBasis?: ContactLegalBasis
 }
 
 export type UpdateContactInput = Partial<CreateContactInput>

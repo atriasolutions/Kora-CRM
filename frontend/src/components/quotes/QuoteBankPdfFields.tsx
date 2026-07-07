@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { listBankAccountsApi, type BankAccount } from '@/api/bank-accounts'
 import { isApiEnabled } from '@/api/config'
@@ -16,6 +16,24 @@ type QuoteBankPdfFieldsProps = {
   values: QuoteBankPdfValues
   onChange: (patch: Partial<QuoteBankPdfValues>) => void
   idPrefix?: string
+}
+
+function BankAccountPreview({ account }: { account: BankAccount }) {
+  return (
+    <div className="rounded-md border border-border/80 bg-background/80 p-3 text-sm">
+      <p className="font-medium text-foreground">{account.accountName}</p>
+      {account.rut?.trim() ? (
+        <p className="tabular-nums text-muted-foreground">RUT {account.rut}</p>
+      ) : null}
+      <p className="text-muted-foreground">
+        {account.bankName} · {account.accountType}
+      </p>
+      <p className="tabular-nums text-foreground">{account.accountNumber}</p>
+      {account.email?.trim() ? (
+        <p className="text-xs text-muted-foreground">{account.email}</p>
+      ) : null}
+    </div>
+  )
 }
 
 export function QuoteBankPdfFields({
@@ -38,6 +56,12 @@ export function QuoteBankPdfFields({
   }))
 
   const defaultId = accounts.find((a) => a.isDefault)?.id ?? accounts[0]?.id ?? ''
+  const selectedId = values.bankAccountId || defaultId
+
+  const selectedAccount = useMemo(
+    () => accounts.find((a) => a.id === selectedId),
+    [accounts, selectedId],
+  )
 
   useEffect(() => {
     if (!values.includeBankDetails || values.bankAccountId || !defaultId) return
@@ -58,13 +82,16 @@ export function QuoteBankPdfFields({
         onChange={(includeBankDetails) => onChange({ includeBankDetails })}
       />
       {values.includeBankDetails ? (
-        <ContactFormSelect
-          id={`${idPrefix}-account`}
-          label="Cuenta bancaria"
-          value={values.bankAccountId || defaultId}
-          onChange={(bankAccountId) => onChange({ bankAccountId })}
-          options={options}
-        />
+        <>
+          <ContactFormSelect
+            id={`${idPrefix}-account`}
+            label="Cuenta bancaria"
+            value={selectedId}
+            onChange={(bankAccountId) => onChange({ bankAccountId })}
+            options={options}
+          />
+          {selectedAccount ? <BankAccountPreview account={selectedAccount} /> : null}
+        </>
       ) : null}
     </div>
   )

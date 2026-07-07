@@ -24,6 +24,10 @@ export type ProductRow = {
   max_stock: number | null
   barcode: string | null
   image_url: string | null
+  description: string | null
+  brand: string | null
+  publish_in_integration: boolean
+  publish_price_in_integration: boolean
   created_at: Date
   created_by_id: string | null
   created_by_name: string | null
@@ -106,6 +110,11 @@ export function mapProductRow(row: ProductRow): ProductListItem {
     owner: row.owner_name?.trim() || row.created_by_name?.trim() || '—',
     imageUrl: imageUrlForList(row.image_url),
     barcode: row.barcode ?? undefined,
+    description: row.description?.trim() || undefined,
+    brand: row.brand?.trim() || undefined,
+    publishInIntegration: row.publish_in_integration,
+    publishPriceInIntegration:
+      row.publish_in_integration && row.publish_price_in_integration,
     createdAt: toIsoString(row.created_at),
     createdById: row.created_by_id ?? '',
     createdByName: row.created_by_name ?? '',

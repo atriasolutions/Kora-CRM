@@ -20,7 +20,7 @@ type ContactRutInputProps = {
   forceShowError?: boolean
   className?: string
   placeholder?: string
-  /** Por defecto valida RUT de persona (< 50.000.000). */
+  /** Por defecto valida RUT de persona (< 50.000.000). Omitir para aceptar cualquier RUT válido. */
   range?: RutRange
 }
 
@@ -33,11 +33,18 @@ export function ContactRutInput({
   forceShowError = false,
   className,
   placeholder = '12.345.678-9',
-  range = 'person',
+  range,
 }: ContactRutInputProps) {
   const [touched, setTouched] = useState(false)
   const showError = touched || forceShowError
   const error = showError ? getRutValidationMessage(value, { required, range }) : null
+
+  const helpText =
+    range === 'company'
+      ? 'Formato chileno · dígito verificador · empresas (50.000.000 o superior).'
+      : range === 'person'
+        ? 'Formato chileno · dígito verificador · personas naturales (inferior a 50.000.000).'
+        : 'Formato chileno con dígito verificador.'
 
   return (
     <ContactFormField label={required ? `${label} *` : label} id={id} className={className}>
@@ -66,11 +73,7 @@ export function ContactRutInput({
           {error}
         </p>
       ) : (
-        <p className="text-xs text-muted-foreground">
-          {range === 'company'
-            ? 'Formato chileno · dígito verificador · empresas (50.000.000 o superior).'
-            : 'Formato chileno · dígito verificador · personas naturales (inferior a 50.000.000).'}
-        </p>
+        <p className="text-xs text-muted-foreground">{helpText}</p>
       )}
     </ContactFormField>
   )

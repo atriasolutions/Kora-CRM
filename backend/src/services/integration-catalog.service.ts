@@ -23,13 +23,15 @@ export type IntegrationCatalogProduct = {
   productType: string
   unitOfMeasure: string
   billingPeriod?: string
-  price: string
-  priceNum: number
-  priceCurrency: ProductListItem['priceCurrency']
+  price?: string
+  priceNum?: number
+  priceCurrency?: ProductListItem['priceCurrency']
   status: ProductListItem['status']
   stockNum: number | null
   imageUrl?: string
   barcode?: string
+  brand?: string
+  description?: string
 }
 
 export type IntegrationCatalogCategoriesResult = {
@@ -76,12 +78,18 @@ function mapCategory(category: ProductCategory): IntegrationCatalogCategory {
   }
 }
 
+function isProductPublishedInIntegration(product: ProductListItem): boolean {
+  return product.publishInIntegration !== false
+}
+
 function mapProduct(
   product: ProductListItem,
   categoryId: string,
   storedImageUrl: string | null | undefined,
   includeImages = false,
-): IntegrationCatalogProduct {
+): IntegrationCatalogProduct | null {
+  if (!isProductPublishedInIntegration(product)) return null
+
   const mapped: IntegrationCatalogProduct = {
     id: product.id,
     name: product.name,
@@ -91,13 +99,19 @@ function mapProduct(
     productType: product.productType,
     unitOfMeasure: product.unitOfMeasure,
     billingPeriod: product.billingPeriod,
-    price: product.price,
-    priceNum: product.priceNum,
-    priceCurrency: product.priceCurrency,
     status: product.status,
     stockNum: product.stockNum >= 0 ? product.stockNum : null,
     barcode: product.barcode,
+    brand: product.brand,
+    description: product.description,
   }
+
+  if (product.publishPriceInIntegration !== false) {
+    mapped.price = product.price
+    mapped.priceNum = product.priceNum
+    mapped.priceCurrency = product.priceCurrency
+  }
+
   const imageUrl = resolveIntegrationProductImageForResponse(
     product.id,
     storedImageUrl,
@@ -105,6 +119,18 @@ function mapProduct(
   )
   if (imageUrl) mapped.imageUrl = imageUrl
   return mapped
+}
+
+function mapIntegrationProductsFromRows(
+  rows: Awaited<ReturnType<typeof productsRepo.listProductRows>>['items'],
+  categoryId: string,
+  includeImages: boolean,
+): IntegrationCatalogProduct[] {
+  return rows
+    .map((row) =>
+      mapProduct(mapProductRow(row), categoryId, row.image_url, includeImages),
+    )
+    .filter((product): product is IntegrationCatalogProduct => product != null)
 }
 
 async function listAllProductRowsForCategory(
@@ -123,6 +149,7 @@ async function listAllProductRowsForCategory(
       categoryId,
       status,
       archivedOnly: false,
+      integrationPublishedOnly: true,
     })
     items.push(...result.items)
     totalPages = Math.ceil(result.total / pageSize) || 1
@@ -196,15 +223,20 @@ export async function listIntegrationCatalogProductsByCategory(
         status,
         q: options.q,
         archivedOnly: false,
+        integrationPublishedOnly: true,
       })
+
+      const products = mapIntegrationProductsFromRows(
+        result.items,
+        category.id,
+        includeImages,
+      )
 
       return {
         tenantId: apiKey.tenantId,
         tenantSlug: apiKey.tenantSlug,
         category: mapCategory(category),
-        products: result.items.map((row) =>
-          mapProduct(mapProductRow(row), category.id, row.image_url, includeImages),
-        ),
+        products,
         meta: {
           page,
           pageSize,
@@ -242,8 +274,10 @@ export async function getIntegrationCatalogSnapshot(
 
       for (const category of filtered) {
         const rows = await listAllProductRowsForCategory(category.id, status)
-        const products = rows.map((row) =>
-          mapProduct(mapProductRow(row), category.id, row.image_url, includeImages),
+        const products = mapIntegrationProductsFromRows(
+          rows,
+          category.id,
+          includeImages,
         )
         productCount += products.length
         categoriesWithProducts.push({

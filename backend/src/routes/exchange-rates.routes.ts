@@ -5,12 +5,8 @@ import {
   getPublicExchangeRates,
   getStoredExchangeRates,
   syncExchangeRatesForDate,
-  updateStoredExchangeRates,
 } from '../services/exchange-rates.service.js'
-import {
-  syncExchangeRatesSchema,
-  updateStoredExchangeRatesSchema,
-} from '../validators/exchange-rates.validator.js'
+import { syncExchangeRatesSchema } from '../validators/exchange-rates.validator.js'
 
 export const exchangeRatesRouter = Router()
 
@@ -45,20 +41,6 @@ exchangeRatesRouter.get('/stored', async (req, res, next) => {
     next(error)
   }
 })
-
-exchangeRatesRouter.patch(
-  '/stored',
-  requirePermission('configuracion', 'edit'),
-  async (req, res, next) => {
-    try {
-      const body = updateStoredExchangeRatesSchema.parse(req.body)
-      const rates = await updateStoredExchangeRates(body)
-      res.json({ data: rates })
-    } catch (error) {
-      next(error)
-    }
-  },
-)
 
 exchangeRatesRouter.post(
   '/sync',

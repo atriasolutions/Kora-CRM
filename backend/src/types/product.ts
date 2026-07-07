@@ -22,6 +22,10 @@ export type ProductListItem = {
   owner: string
   imageUrl?: string
   barcode?: string
+  description?: string
+  brand?: string
+  publishInIntegration: boolean
+  publishPriceInIntegration: boolean
   createdAt: string
   createdById: string
   createdByName: string
@@ -45,6 +49,10 @@ export type CreateProductInput = {
   status?: ProductStatus
   imageUrl?: string
   barcode?: string
+  description?: string
+  brand?: string
+  publishInIntegration?: boolean
+  publishPriceInIntegration?: boolean
   trackInventory?: boolean
   minStock?: number
   maxStock?: number

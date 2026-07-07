@@ -23,9 +23,12 @@ export function chileDateTimeParts(date = new Date()): {
   const get = (type: Intl.DateTimeFormatPartTypes) =>
     parts.find((p) => p.type === type)?.value ?? ''
 
+  // Con hour12:false algunos entornos (p.ej. Node 20) formatean la medianoche
+  // como "24" en vez de "00". Normalizamos a 0..23 para no romper comparaciones horarias.
+  const rawHour = Number.parseInt(get('hour'), 10) || 0
   return {
     date: `${get('year')}-${get('month')}-${get('day')}`,
-    hour: Number.parseInt(get('hour'), 10) || 0,
+    hour: rawHour % 24,
     minute: Number.parseInt(get('minute'), 10) || 0,
   }
 }

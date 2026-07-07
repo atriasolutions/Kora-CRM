@@ -32,6 +32,7 @@ const SELECT_COLUMNS = `
   email, phone, mobile_phone, job_title, status, rut,
   street_address, region, commune, linked_in, source, initial_note,
   owner_name, last_contact_at,
+  treatment_opposition, treatment_blocked_at, marketing_consent, marketing_consent_at, legal_basis,
   created_at, created_by_id, created_by_name,
   updated_at, updated_by_id, updated_by_name
 `
@@ -248,6 +249,42 @@ export async function updateContact(
   await assertUniqueContactRut(nextRut, id)
   await assertUniqueContactEmail(nextEmail, id)
 
+  const nextOpposition =
+    input.treatmentOpposition !== undefined
+      ? input.treatmentOpposition
+      : (existing.treatmentOpposition ?? false)
+
+  let nextBlockedAt: Date | null = existing.treatmentBlockedAt
+    ? new Date(existing.treatmentBlockedAt)
+    : null
+  if (input.treatmentBlocked === true) {
+    nextBlockedAt = new Date()
+  } else if (input.treatmentBlocked === false) {
+    nextBlockedAt = null
+  }
+
+  const nextMarketingConsent =
+    input.marketingConsent !== undefined
+      ? input.marketingConsent
+      : (existing.marketingConsent ?? null)
+
+  let nextMarketingConsentAt: Date | null = existing.marketingConsentAt
+    ? new Date(existing.marketingConsentAt)
+    : null
+  if (
+    input.marketingConsent === true &&
+    existing.marketingConsent !== true
+  ) {
+    nextMarketingConsentAt = new Date()
+  } else if (input.marketingConsent === false) {
+    nextMarketingConsentAt = null
+  }
+
+  const nextLegalBasis =
+    input.legalBasis !== undefined
+      ? input.legalBasis
+      : existing.legalBasis ?? null
+
   const result = await tenantQuery<ContactRow>(
     `UPDATE crm_contacts SET
       name = $2,
@@ -268,10 +305,15 @@ export async function updateContact(
       source = $17,
       initial_note = $18,
       owner_name = $19,
-      updated_by_id = $20,
-      updated_by_name = $21,
+      treatment_opposition = $20,
+      treatment_blocked_at = $21,
+      marketing_consent = $22,
+      marketing_consent_at = $23,
+      legal_basis = $24,
+      updated_by_id = $25,
+      updated_by_name = $26,
       updated_at = now()
-    WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(22)}
+    WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(27)}
     RETURNING ${SELECT_COLUMNS}`,
     [
       id,
@@ -293,6 +335,11 @@ export async function updateContact(
       input.source?.trim() ?? existing.source ?? null,
       input.initialNote?.trim() ?? existing.initialNote ?? null,
       input.ownerName?.trim() ?? existing.ownerName ?? actor.userName,
+      nextOpposition,
+      nextBlockedAt,
+      nextMarketingConsent,
+      nextMarketingConsentAt,
+      nextLegalBasis,
       actor.userId,
       actor.userName,
       getTenantIdOrDefault(),

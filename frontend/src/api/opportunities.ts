@@ -5,7 +5,9 @@ import type { ApiItemResponse } from '@/api/types'
 import type { OpportunityDetail } from '@/data/opportunity-detail.mock'
 import type { OpportunityLineItem } from '@/data/opportunity-detail.mock'
 import type { OpportunityListItem } from '@/data/opportunities.mock'
+import type { OpportunityStage } from '@/data/opportunities.mock'
 import type { OpportunityFormValues } from '@/lib/opportunity-form'
+import { probabilityLabelForStage } from '@/lib/opportunity-metadata'
 import { purchaseDisplayDateToInput } from '@/lib/purchase-dates'
 
 const BASE = `${API_V1}/opportunities`
@@ -86,7 +88,7 @@ export function opportunityFormToApiBody(
     contactName: values.contactName?.trim() || undefined,
     amount: values.amount?.trim() || undefined,
     stage: values.stage,
-    probability: values.probability,
+    probability: probabilityLabelForStage(values.stage),
     closeDate: opportunityCloseDateForApi(values.closeDate),
     owner: values.ownerName?.trim() || undefined,
     type: values.type,
@@ -109,7 +111,7 @@ export function opportunityDetailToApiBody(
     contactName: detail.contactName,
     amount: detail.amount,
     stage: detail.stage,
-    probability: detail.probability,
+    probability: probabilityLabelForStage(detail.stage as OpportunityStage),
     closeDate: detail.closeDate,
     owner: detail.owner,
     type: detail.type,

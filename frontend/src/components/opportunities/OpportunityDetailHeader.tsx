@@ -31,8 +31,10 @@ import type { OpportunityStage } from '@/data/opportunities.mock'
 import {
   OPPORTUNITY_PRIORITY_OPTIONS,
   OPPORTUNITY_STAGE_OPTIONS,
+  syncOpportunityStageMetrics,
   type OpportunityFormValues,
 } from '@/lib/opportunity-form'
+import { probabilityLabelForStage } from '@/lib/opportunity-metadata'
 import { resolveOpportunityCustomerKind } from '@/lib/opportunity-customer'
 import { opportunityStageVariant } from '@/lib/opportunity-journey'
 import { useDetailHeaderPermissions } from '@/hooks/use-detail-header-permissions'
@@ -64,8 +66,14 @@ export function OpportunityDetailHeader({
 
   const metrics = [
     { label: 'Monto', value: opportunity.amount },
-    { label: 'Ponderado', value: opportunity.weightedAmount },
-    { label: 'Probabilidad', value: opportunity.probability },
+    {
+      label: 'Ponderado',
+      value: syncOpportunityStageMetrics(opportunity).weightedAmount,
+    },
+    {
+      label: 'Probabilidad',
+      value: probabilityLabelForStage(opportunity.stage),
+    },
     { label: 'Días en etapa', value: String(opportunity.daysInStage) },
     { label: 'Cotizaciones', value: String(opportunity.quoteCount) },
     { label: 'Actividades pend.', value: String(opportunity.pendingActivities) },
@@ -114,7 +122,15 @@ export function OpportunityDetailHeader({
                     id="opp-header-stage"
                     label="Etapa"
                     value={form.stage}
-                    onChange={(stage) => patch({ stage: stage as OpportunityStage })}
+                    onChange={(stage) => {
+                      const nextStage = stage as OpportunityStage
+                      patch(
+                        syncOpportunityStageMetrics({
+                          ...form,
+                          stage: nextStage,
+                        }),
+                      )
+                    }}
                     options={OPPORTUNITY_STAGE_OPTIONS.map((s) => ({
                       value: s,
                       label: s,

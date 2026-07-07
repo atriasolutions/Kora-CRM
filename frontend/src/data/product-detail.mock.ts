@@ -42,6 +42,8 @@ export type ProductDetail = ProductListItem & {
   licenseTerms: string
   supplierName: string
   supplierSku: string
+  publishInIntegration: boolean
+  publishPriceInIntegration: boolean
   unitsSold: number
   revenue: string
   marginPercent: number
@@ -95,9 +97,9 @@ export function buildDetailFromList(base: ProductListItem, id: string): ProductD
   return {
     ...base,
     owner: base.owner ?? '—',
-    description: buildDescription(base),
+    description: base.description?.trim() || buildDescription(base),
     shortDescription: `SKU ${base.sku} · ${base.productType} · ${base.category}`,
-    brand: '',
+    brand: base.brand?.trim() || '',
     internalCode: base.sku.replace(/-/g, ''),
     billingPeriod: hasSavedBillingPeriod
       ? (savedBillingPeriod as BillingPeriod)
@@ -130,6 +132,9 @@ export function buildDetailFromList(base: ProductListItem, id: string): ProductD
       : '',
     supplierName: '',
     supplierSku: isPhysical ? `SUP-${base.sku}` : '',
+    publishInIntegration: base.publishInIntegration !== false,
+    publishPriceInIntegration:
+      base.publishInIntegration !== false && base.publishPriceInIntegration !== false,
     unitsSold: 0,
     revenue: base.priceNum > 0 ? formatMoneyCLP(0) : 'A medida',
     marginPercent: computeMarginPercent(base.costPriceNum, base.priceNum),

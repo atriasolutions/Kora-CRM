@@ -77,6 +77,7 @@ import { getInvoiceFiles } from '@/lib/invoice-files'
 import { getPurchaseFiles } from '@/lib/purchase-files'
 import { getQuoteFiles } from '@/lib/quote-files'
 import { getOpportunityFiles } from '@/lib/opportunity-files'
+import { syncOpportunityStageMetrics } from '@/lib/opportunity-form'
 import { getProjectFiles } from '@/lib/project-files'
 import { getSolicitudFiles } from '@/lib/solicitud-files'
 import type { ContactActivityType } from '@/data/contact-detail.mock'
@@ -254,7 +255,7 @@ export function normalizeOpportunityDetail(
     (isApiEnabled() ? [] : quoteSummariesForOpportunity(api.id))
   const lineItems = api.lineItems ?? []
 
-  return {
+  return syncOpportunityStageMetrics({
     ...api,
     description: api.description ?? '',
     stageEnteredAt: api.stageEnteredAt ?? '',
@@ -276,7 +277,7 @@ export function normalizeOpportunityDetail(
     daysInStage: api.daysInStage ?? 0,
     primaryQuoteId:
       (api as { primaryQuoteId?: string }).primaryQuoteId ?? undefined,
-  }
+  })
 }
 
 export async function loadOpportunityDetail(id: string): Promise<OpportunityDetail> {

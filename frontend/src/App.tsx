@@ -56,6 +56,9 @@ import { MarketingHomePage } from '@/pages/marketing/MarketingHomePage'
 import { MarketingPricingPage } from '@/pages/marketing/MarketingPricingPage'
 import { MarketingTrialPage } from '@/pages/marketing/MarketingTrialPage'
 import { MarketingSupportPage } from '@/pages/marketing/MarketingSupportPage'
+import { LegalPrivacyPage } from '@/pages/legal/LegalPrivacyPage'
+import { LegalTermsPage } from '@/pages/legal/LegalTermsPage'
+import { LegalSubprocessorsPage } from '@/pages/legal/LegalSubprocessorsPage'
 
 const listRoutePaths = new Set<string>(listModuleSlugs)
 
@@ -78,6 +81,10 @@ export default function App() {
             <Route path="planes" element={<MarketingPricingPage />} />
             <Route path="prueba-gratis" element={<MarketingTrialPage />} />
             <Route path="soporte" element={<MarketingSupportPage />} />
+            <Route path="legal" element={<Navigate to="/legal/privacidad" replace />} />
+            <Route path="legal/privacidad" element={<LegalPrivacyPage />} />
+            <Route path="legal/terminos" element={<LegalTermsPage />} />
+            <Route path="legal/subprocesadores" element={<LegalSubprocessorsPage />} />
           </Route>
           <Route path="login" element={<LoginPage />} />
           <Route path="activar-cuenta" element={<ActivateAccountPage />} />

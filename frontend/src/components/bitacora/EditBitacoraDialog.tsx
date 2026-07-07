@@ -86,7 +86,7 @@ export function EditBitacoraDialog({
             Actualice las horas, fecha o descripción del registro.
           </DialogDescription>
         </DialogHeader>
-        <form className="space-y-4" onSubmit={handleSubmit}>
+        <form className="w-full min-w-0 space-y-4" onSubmit={handleSubmit}>
           <BitacoraFormFields form={form} onChange={patch} idPrefix="bitacora-edit" />
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

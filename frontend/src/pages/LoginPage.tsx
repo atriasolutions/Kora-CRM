@@ -26,6 +26,10 @@ import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import { useTenantBranding } from '@/hooks/use-tenant-branding'
 import { CONNECTION_TITLE, isLoginConnectionError } from '@/lib/login-errors'
 import { getPostLoginRedirect } from '@/lib/auth-routes'
+import {
+  PLATFORM_PRIVACY_POLICY_PATH,
+  PLATFORM_TERMS_PATH,
+} from '@/lib/platform-legal'
 import { loadAuthSession, saveAuthSession } from '@/lib/auth-session'
 import { isCentralAppHost, resolveTenantSlugFromHostname, tenantAppOrigin } from '@/lib/tenant-host'
 import { marketingTheme } from '@/lib/marketing-theme'
@@ -561,6 +565,16 @@ export function LoginPage() {
 
           <p className="mt-7 max-w-[420px] text-center text-xs leading-relaxed text-muted-foreground">
             ¿Primera vez? Revisa el correo de bienvenida para activar tu cuenta.
+          </p>
+
+          <p className="mt-4 max-w-[420px] text-center text-xs leading-relaxed text-muted-foreground">
+            <Link to={PLATFORM_PRIVACY_POLICY_PATH} className="underline-offset-2 hover:underline">
+              Privacidad
+            </Link>
+            {' · '}
+            <Link to={PLATFORM_TERMS_PATH} className="underline-offset-2 hover:underline">
+              Términos
+            </Link>
           </p>
 
           <div className="mt-8 flex w-full max-w-[420px] flex-col items-center gap-3 border-t border-border/60 pt-6 lg:hidden">

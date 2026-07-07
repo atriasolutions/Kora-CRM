@@ -24,6 +24,11 @@ export function defaultOrganizationSettings(): OrganizationSettings {
     economicActivityCode: null,
     defaultSolicitudAssigneeUserId: null,
     defaultSolicitudAssigneeName: '',
+    privacyPolicyUrl: '',
+    privacyContactEmail: '',
+    dpoName: '',
+    privacyPolicyVersion: '1.0',
+    dataRetentionDays: 2555,
   }
 }
 
@@ -118,6 +123,28 @@ export function organizationSolicitudesSettingsFrom(
   return {
     defaultSolicitudAssigneeUserId: settings.defaultSolicitudAssigneeUserId,
     defaultSolicitudAssigneeName: settings.defaultSolicitudAssigneeName,
+  }
+}
+
+/** Campos editables en Configuración → Privacidad. */
+export type OrganizationPrivacySettings = Pick<
+  OrganizationSettings,
+  | 'privacyPolicyUrl'
+  | 'privacyContactEmail'
+  | 'dpoName'
+  | 'privacyPolicyVersion'
+  | 'dataRetentionDays'
+>
+
+export function organizationPrivacySettingsFrom(
+  settings: OrganizationSettings,
+): OrganizationPrivacySettings {
+  return {
+    privacyPolicyUrl: settings.privacyPolicyUrl,
+    privacyContactEmail: settings.privacyContactEmail,
+    dpoName: settings.dpoName,
+    privacyPolicyVersion: settings.privacyPolicyVersion,
+    dataRetentionDays: settings.dataRetentionDays,
   }
 }
 
