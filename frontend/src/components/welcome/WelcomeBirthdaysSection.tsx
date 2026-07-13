@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { Cake, Gift, PartyPopper, Sparkles } from 'lucide-react'
-import { Link } from 'react-router-dom'
 
 import { EntityAvatarImage } from '@/components/shared/EntityAvatarImage'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -12,7 +11,6 @@ import {
   type TenantBirthdayItem,
 } from '@/api/users'
 import { chilePartsFromDate } from '@/lib/chile-timezone'
-import { getUserDetailPath } from '@/lib/user-routes'
 import {
   buildBirthdayReminderMessage,
   firstNameOf,
@@ -38,21 +36,29 @@ function initials(name: string): string {
 function BirthdayAvatar({
   person,
   highlight = false,
+  size = 'md',
 }: {
   person: BirthdayPerson
   highlight?: boolean
+  size?: 'md' | 'lg'
 }) {
   return (
     <Avatar
       className={cn(
-        'size-9 border shadow-sm',
+        'shrink-0 border shadow-sm',
+        size === 'lg' ? 'size-12' : 'size-11',
         highlight ? 'border-primary/40 ring-2 ring-primary/20' : 'border-border/60',
       )}
     >
       {person.avatarUrl ? (
         <EntityAvatarImage src={person.avatarUrl} alt={person.name} />
       ) : null}
-      <AvatarFallback className="bg-primary/10 text-[11px] font-semibold text-primary">
+      <AvatarFallback
+        className={cn(
+          'bg-primary/10 font-semibold text-primary',
+          size === 'lg' ? 'text-sm' : 'text-xs',
+        )}
+      >
         {initials(person.name)}
       </AvatarFallback>
     </Avatar>
@@ -169,17 +175,16 @@ export function WelcomeBirthdaysSection({
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2 sm:max-w-xs sm:justify-end">
+            <div className="flex flex-wrap gap-2.5 sm:max-w-sm sm:justify-end">
               {celebrants.map((person) => (
-                <Link
+                <div
                   key={person.id}
-                  to={getUserDetailPath(person.id)}
-                  className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background py-1.5 pe-3.5 ps-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted/50"
+                  className="inline-flex items-center gap-2.5 rounded-full border border-border/70 bg-background py-1.5 pe-4 ps-1.5 text-sm font-medium text-foreground shadow-sm"
                 >
-                  <BirthdayAvatar person={person} highlight />
-                  <span className="max-w-[10rem] truncate">{person.name}</span>
-                  <Gift aria-hidden className="size-3.5 text-primary" />
-                </Link>
+                  <BirthdayAvatar person={person} highlight size="lg" />
+                  <span className="max-w-[11rem] truncate">{person.name}</span>
+                  <Gift aria-hidden className="size-3.5 shrink-0 text-primary" />
+                </div>
               ))}
             </div>
           </div>
@@ -224,31 +229,33 @@ export function WelcomeBirthdaysSection({
               const personDay = Number(person.birthDate.slice(8, 10))
               const isPast = personDay < day && !today
               return (
-                <li key={person.id}>
-                  <Link
-                    to={getUserDetailPath(person.id)}
-                    className={cn(
-                      'flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-muted/40',
-                      today && 'bg-primary/[0.06]',
-                    )}
-                  >
-                    <BirthdayAvatar person={person} highlight={today} />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-foreground">
-                        {person.name}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatBirthdayDayLabel(person.birthDate)}
-                        {today ? ' · Hoy' : isPast ? ' · Ya celebrado' : ''}
-                      </p>
-                    </div>
-                    {today ? (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/[0.08] px-2.5 py-1 text-[11px] font-semibold text-primary">
-                        <PartyPopper aria-hidden className="size-3" />
-                        Hoy
-                      </span>
-                    ) : null}
-                  </Link>
+                <li
+                  key={person.id}
+                  className={cn(
+                    'flex items-center gap-3.5 px-5 py-3.5',
+                    today && 'bg-primary/[0.06]',
+                  )}
+                >
+                  <BirthdayAvatar
+                    person={person}
+                    highlight={today}
+                    size={today ? 'lg' : 'md'}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-foreground">
+                      {person.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatBirthdayDayLabel(person.birthDate)}
+                      {today ? ' · Hoy' : isPast ? ' · Ya celebrado' : ''}
+                    </p>
+                  </div>
+                  {today ? (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/[0.08] px-2.5 py-1 text-[11px] font-semibold text-primary">
+                      <PartyPopper aria-hidden className="size-3" />
+                      Hoy
+                    </span>
+                  ) : null}
                 </li>
               )
             })}
