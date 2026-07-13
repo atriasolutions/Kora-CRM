@@ -1,40 +1,44 @@
-/** Globos cayendo + fuegos artificiales para el día de cumpleaños. */
+/** Efectos sutiles de celebración (colores cercanos a la paleta de la app). */
 export function WelcomeBirthdayEffects() {
+  const brandColors = [
+    'hsl(262 83% 58%)',
+    'hsl(280 70% 55%)',
+    'hsl(230 70% 60%)',
+    'hsl(190 65% 48%)',
+    'hsl(40 90% 55%)',
+    'hsl(330 70% 58%)',
+  ]
+
   const balloons = [
-    { left: '6%', delay: '0s', duration: '9s', color: '#ff6b9d', size: 28 },
-    { left: '14%', delay: '1.2s', duration: '11s', color: '#ffd166', size: 22 },
-    { left: '22%', delay: '0.4s', duration: '10s', color: '#06d6a0', size: 26 },
-    { left: '33%', delay: '2.1s', duration: '12s', color: '#4cc9f0', size: 24 },
-    { left: '41%', delay: '0.8s', duration: '9.5s', color: '#f72585', size: 30 },
-    { left: '52%', delay: '1.6s', duration: '11.5s', color: '#ff9f1c', size: 23 },
-    { left: '61%', delay: '0.2s', duration: '10.5s', color: '#7b2cbf', size: 27 },
-    { left: '72%', delay: '2.4s', duration: '9.8s', color: '#2ec4b6', size: 25 },
-    { left: '81%', delay: '1s', duration: '12.2s', color: '#ef476f', size: 29 },
-    { left: '90%', delay: '1.8s', duration: '10.2s', color: '#118ab2', size: 22 },
+    { left: '8%', delay: '0s', duration: '11s', color: brandColors[0]!, size: 24 },
+    { left: '18%', delay: '1.4s', duration: '12s', color: brandColors[2]!, size: 20 },
+    { left: '30%', delay: '0.6s', duration: '10.5s', color: brandColors[1]!, size: 26 },
+    { left: '48%', delay: '2s', duration: '13s', color: brandColors[4]!, size: 22 },
+    { left: '62%', delay: '0.9s', duration: '11.5s', color: brandColors[3]!, size: 24 },
+    { left: '76%', delay: '1.8s', duration: '12.5s', color: brandColors[5]!, size: 21 },
+    { left: '88%', delay: '0.3s', duration: '10.8s', color: brandColors[0]!, size: 25 },
   ]
 
   const fireworks = [
-    { left: '12%', top: '18%', delay: '0s', color: '#ff6b9d' },
-    { left: '28%', top: '28%', delay: '1.4s', color: '#ffd166' },
-    { left: '48%', top: '14%', delay: '0.7s', color: '#4cc9f0' },
-    { left: '68%', top: '24%', delay: '2.1s', color: '#06d6a0' },
-    { left: '84%', top: '16%', delay: '1.1s', color: '#f72585' },
-    { left: '38%', top: '40%', delay: '2.8s', color: '#ff9f1c' },
+    { left: '15%', top: '16%', delay: '0s', color: brandColors[0]! },
+    { left: '42%', top: '22%', delay: '1.6s', color: brandColors[4]! },
+    { left: '70%', top: '14%', delay: '0.9s', color: brandColors[2]! },
+    { left: '85%', top: '28%', delay: '2.4s', color: brandColors[5]! },
   ]
 
-  const confetti = Array.from({ length: 24 }, (_, i) => ({
-    left: `${4 + ((i * 17) % 92)}%`,
-    delay: `${(i % 8) * 0.35}s`,
-    duration: `${5.5 + (i % 5) * 0.7}s`,
-    color: ['#ff6b9d', '#ffd166', '#06d6a0', '#4cc9f0', '#f72585', '#ff9f1c'][i % 6]!,
-    rotate: `${(i * 37) % 360}deg`,
-    width: 6 + (i % 4) * 2,
-    height: 10 + (i % 3) * 3,
+  const confetti = Array.from({ length: 16 }, (_, i) => ({
+    left: `${6 + ((i * 19) % 88)}%`,
+    delay: `${(i % 7) * 0.4}s`,
+    duration: `${6.5 + (i % 4) * 0.8}s`,
+    color: brandColors[i % brandColors.length]!,
+    rotate: `${(i * 41) % 360}deg`,
+    width: 5 + (i % 3) * 2,
+    height: 8 + (i % 3) * 2,
   }))
 
   return (
     <div
-      className="birthday-fx pointer-events-none fixed inset-0 z-40 overflow-hidden"
+      className="birthday-fx pointer-events-none fixed inset-0 z-40 overflow-hidden opacity-70"
       aria-hidden
     >
       {balloons.map((balloon, index) => (
@@ -81,12 +85,12 @@ export function WelcomeBirthdayEffects() {
             ['--fw-color' as string]: burst.color,
           }}
         >
-          {Array.from({ length: 10 }, (_, ray) => (
+          {Array.from({ length: 8 }, (_, ray) => (
             <span
               key={ray}
               className="birthday-firework-ray"
               style={{
-                ['--ray-angle' as string]: `${ray * 36}deg`,
+                ['--ray-angle' as string]: `${ray * 45}deg`,
               }}
             />
           ))}
