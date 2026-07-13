@@ -29,6 +29,8 @@ export type UserDetail = UserListItem & {
   jobTitle: string
   timezone: string
   language: string
+  /** YYYY-MM-DD */
+  birthDate?: string
   memberSince: string
   twoFactorEnabled: boolean
   twoFactorConfigured?: boolean

@@ -5,6 +5,7 @@ import { tenantWhereParam } from '../lib/tenant-sql.js'
 import { statusCountsTowardSeat } from '../lib/tenant-quota-modules.js'
 import { enforceSeatQuota } from '../lib/tenant-quota-enforce.js'
 import { mapUserDetail, mapUserRow, type UserRow } from '../mappers/user.mapper.js'
+import { imageUrlForList } from '../utils/entity-image.js'
 import {
   assertUserEmailAvailable,
   assertUserEmailNotInTenant,
@@ -25,7 +26,13 @@ import {
 import { isGuestProfileId } from '../services/default-tenant-profiles.service.js'
 import { isPlatformOperator } from './tenants.repository.js'
 import type { AuditActor } from '../types/audit.js'
-import type { CreateUserInput, UpdateUserInput, UserDetail, UserListItem } from '../types/user.js'
+import type {
+  CreateUserInput,
+  TenantBirthdayItem,
+  UpdateUserInput,
+  UserDetail,
+  UserListItem,
+} from '../types/user.js'
 import { paginationOffset } from '../utils/pagination.js'
 
 const MEMBERSHIP_JOIN = `
@@ -54,6 +61,7 @@ const TENANT_SCOPED_USER_COLUMNS = `
 const SELECT_DETAIL_COLUMNS = `
   u.id, u.email, u.status, u.avatar_url,
   u.timezone, u.language,
+  u.birth_date::text AS birth_date,
   u.two_factor_enabled, u.totp_secret_encrypted, u.totp_verified_at,
   ${TENANT_SCOPED_USER_COLUMNS}
 `
@@ -61,6 +69,7 @@ const SELECT_DETAIL_COLUMNS = `
 const SELECT_LIST_COLUMNS = `
   u.id, u.email, u.status, u.avatar_url,
   u.timezone, u.language,
+  u.birth_date::text AS birth_date,
   u.two_factor_enabled, u.totp_secret_encrypted, u.totp_verified_at,
   ${TENANT_SCOPED_USER_COLUMNS}
 `
@@ -328,6 +337,43 @@ export async function listUsersForAssignee(): Promise<UserListItem[]> {
   return result.rows.map(mapUserRow)
 }
 
+/** Cumpleaños del equipo del tenant actual (nunca cruza otras instancias). */
+export async function listTenantBirthdays(): Promise<TenantBirthdayItem[]> {
+  const tenantId = getTenantIdOrDefault()
+  const result = await tenantQuery<{
+    id: string
+    name: string
+    avatar_url: string | null
+    birth_date: string
+  }>(
+    `SELECT
+       u.id,
+       COALESCE(NULLIF(trim(mem.display_name), ''), u.name) AS name,
+       u.avatar_url,
+       u.birth_date::text AS birth_date
+     FROM crm_users u
+     ${MEMBERSHIP_JOIN}
+     ${PROFILE_JOIN}
+     WHERE u.deleted_at IS NULL
+       AND u.birth_date IS NOT NULL
+       AND mem.status = 'active'
+       AND u.status = 'Activo'
+       AND ${USER_DIRECTORY_VISIBLE_CONDITION_U}
+     ORDER BY
+       EXTRACT(MONTH FROM u.birth_date)::int ASC,
+       EXTRACT(DAY FROM u.birth_date)::int ASC,
+       name ASC`,
+    [tenantId],
+  )
+
+  return result.rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    avatarUrl: imageUrlForList(row.avatar_url),
+    birthDate: row.birth_date.slice(0, 10),
+  }))
+}
+
 export async function loadTenantScopedUserRow(
   userId: string,
   tenantId: string,
@@ -453,14 +499,14 @@ export async function createUser(
     ? await tenantQuery<{ id: string }>(
         `INSERT INTO crm_users (
           email, name, password_hash, role, profile_id, status, avatar_url,
-          phone, department, job_title, timezone, language, bio,
+          phone, department, job_title, timezone, language, birth_date, bio,
           created_by_id, created_by_name, updated_by_id, updated_by_name,
           tenant_id
         ) VALUES (
           lower($1), $2, crypt($3, gen_salt('bf')), $4, $5, $6, $7,
-          $8, $9, $10, $11, $12, $13,
-          $14, $15, $14, $15,
-          $16
+          $8, $9, $10, $11, $12, $13::date, $14,
+          $15, $16, $15, $16,
+          $17
         ) RETURNING id`,
         [
           input.email.trim(),
@@ -475,6 +521,7 @@ export async function createUser(
           input.jobTitle?.trim() || null,
           input.timezone?.trim() || 'America/Santiago',
           input.language?.trim() || 'es',
+          input.birthDate ?? null,
           input.bio?.trim() || null,
           actor.userId,
           actor.userName,
@@ -484,14 +531,14 @@ export async function createUser(
     : await tenantQuery<{ id: string }>(
         `INSERT INTO crm_users (
           email, name, password_hash, role, profile_id, status, avatar_url,
-          phone, department, job_title, timezone, language, bio,
+          phone, department, job_title, timezone, language, birth_date, bio,
           created_by_id, created_by_name, updated_by_id, updated_by_name,
           tenant_id
         ) VALUES (
           lower($1), $2, NULL, $3, $4, $5, $6,
-          $7, $8, $9, $10, $11, $12,
-          $13, $14, $13, $14,
-          $15
+          $7, $8, $9, $10, $11, $12::date, $13,
+          $14, $15, $14, $15,
+          $16
         ) RETURNING id`,
         [
           input.email.trim(),
@@ -505,6 +552,7 @@ export async function createUser(
           input.jobTitle?.trim() || null,
           input.timezone?.trim() || 'America/Santiago',
           input.language?.trim() || 'es',
+          input.birthDate ?? null,
           input.bio?.trim() || null,
           actor.userId,
           actor.userName,
@@ -668,6 +716,10 @@ export async function updateUser(
   if (input.language !== undefined) {
     globalSets.push(`language = $${globalIdx++}`)
     globalValues.push(input.language.trim())
+  }
+  if (input.birthDate !== undefined) {
+    globalSets.push(`birth_date = $${globalIdx++}::date`)
+    globalValues.push(input.birthDate)
   }
   if (input.password?.trim()) {
     globalSets.push(`password_hash = crypt($${globalIdx++}, gen_salt('bf'))`)

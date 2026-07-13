@@ -7,6 +7,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { UserDetail } from '@/data/user-detail.mock'
 import { isGuestUserDetail, userRoleLabel, userStatusVariant } from '@/lib/user-display'
 
+function formatUserBirthDate(value: string | undefined): string {
+  const iso = value?.trim().slice(0, 10)
+  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return '—'
+  const [y, m, d] = iso.split('-').map(Number)
+  if (!y || !m || !d) return '—'
+  return new Intl.DateTimeFormat('es-CL', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(Date.UTC(y, m - 1, d)))
+}
+
 function ProfileRow({ label, value }: { label: string; value: string }) {
   const display = value.trim() || '—'
   return (
@@ -32,6 +45,10 @@ export function UserDetailSidebar({ user }: UserDetailSidebarProps) {
         <ProfileRow label="Nombre" value={user.name} />
         <ProfileRow label="Correo" value={user.email} />
         <ProfileRow label="Teléfono" value={user.phone} />
+        <ProfileRow
+          label="Fecha de nacimiento"
+          value={formatUserBirthDate(user.birthDate)}
+        />
         <ProfileRow label="Cargo" value={user.jobTitle} />
         <ProfileRow label="Departamento" value={user.department} />
         <div className="pt-1">

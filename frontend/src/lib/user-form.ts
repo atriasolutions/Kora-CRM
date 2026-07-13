@@ -99,6 +99,8 @@ export type UserFormValues = {
   avatarUrl: string
   timezone: string
   language: string
+  /** YYYY-MM-DD o vacío */
+  birthDate: string
   twoFactorEnabled: boolean
   /** Equipos separados por coma. */
   teamsInput: string
@@ -127,6 +129,7 @@ export function createDefaultUserFormValues(
     avatarUrl: '',
     timezone: 'America/Santiago',
     language: 'Español (Chile)',
+    birthDate: '',
     twoFactorEnabled: false,
     teamsInput: '',
     guestCompanyId: '',
@@ -160,6 +163,7 @@ export function userDetailToFormValues(user: UserDetail): UserFormValues {
     avatarUrl: user.avatarUrl ?? '',
     timezone: user.timezone,
     language: user.language,
+    birthDate: user.birthDate?.trim().slice(0, 10) || '',
     twoFactorEnabled: user.twoFactorEnabled,
     teamsInput: teamsInputFromList(user.teams),
     guestCompanyId: user.guestCompanyId ?? '',
@@ -188,6 +192,7 @@ export function applyFormValuesToUser(
     avatarUrl,
     timezone: values.timezone,
     language: values.language,
+    birthDate: values.birthDate.trim().slice(0, 10) || undefined,
     twoFactorEnabled: values.twoFactorEnabled,
     teams,
     permissions: user.permissions,

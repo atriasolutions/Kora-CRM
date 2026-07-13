@@ -158,6 +158,7 @@ CREATE TABLE IF NOT EXISTS crm_users (
   job_title           VARCHAR(128),
   timezone            VARCHAR(64) DEFAULT 'America/Santiago',
   language            VARCHAR(16) DEFAULT 'es',
+  birth_date          DATE,
   two_factor_enabled  BOOLEAN NOT NULL DEFAULT false,
   bio                 TEXT,
   last_login_at       TIMESTAMPTZ,

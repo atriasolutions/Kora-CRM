@@ -39,6 +39,8 @@ export type UserApiBody = {
   jobTitle?: string
   timezone?: string
   language?: string
+  /** YYYY-MM-DD o null para limpiar */
+  birthDate?: string | null
   bio?: string
   password?: string
   sendInvite?: boolean
@@ -66,6 +68,7 @@ export function userFormToApiBody(
     jobTitle: values.jobTitle?.trim() || undefined,
     timezone: values.timezone,
     language: values.language,
+    birthDate: values.birthDate.trim() || null,
     bio: values.bio?.trim() || undefined,
     twoFactorEnabled: values.twoFactorEnabled,
     guestCompanyId: values.guestCompanyId.trim() || null,
@@ -85,6 +88,7 @@ export function userDetailToApiBody(detail: UserDetail): UserApiBody {
     jobTitle: detail.jobTitle,
     timezone: detail.timezone,
     language: detail.language,
+    birthDate: detail.birthDate?.trim() || null,
     bio: detail.bio,
     twoFactorEnabled: detail.twoFactorEnabled,
     guestCompanyId: detail.guestCompanyId ?? null,
@@ -100,6 +104,23 @@ export async function listUsersApi(): Promise<UserListItem[]> {
 export async function listUserAssigneesApi(): Promise<UserListItem[]> {
   const res = await fetchJSON<ApiItemResponse<UserListItem[]>>(`${BASE}/assignees`)
   return res.data.map(normalizeUserListItem)
+}
+
+export type TenantBirthdayItem = {
+  id: string
+  name: string
+  avatarUrl?: string
+  /** YYYY-MM-DD */
+  birthDate: string
+}
+
+/** Cumpleaños del equipo en el tenant actual (aislados por instancia). */
+export async function listTenantBirthdaysApi(): Promise<TenantBirthdayItem[]> {
+  const res = await fetchJSON<ApiItemResponse<TenantBirthdayItem[]>>(`${BASE}/birthdays`)
+  return res.data.map((item) => ({
+    ...item,
+    avatarUrl: resolveEntityImageSrc(item.avatarUrl),
+  }))
 }
 
 export async function getUserApi(id: string): Promise<UserDetail> {

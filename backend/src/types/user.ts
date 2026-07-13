@@ -27,6 +27,8 @@ export type UserDetail = UserListItem & {
   jobTitle: string
   timezone: string
   language: string
+  /** Fecha de nacimiento YYYY-MM-DD (opcional). */
+  birthDate?: string
   memberSince: string
   twoFactorEnabled: boolean
   /** App autenticadora vinculada (TOTP confirmado). */
@@ -36,6 +38,15 @@ export type UserDetail = UserListItem & {
   /** Empresa del cliente invitado (solo perfil guest). */
   guestCompanyId?: string
   guestCompanyName?: string
+}
+
+/** Cumpleaños visibles en el tenant (solo miembros de esa instancia). */
+export type TenantBirthdayItem = {
+  id: string
+  name: string
+  avatarUrl?: string
+  /** YYYY-MM-DD */
+  birthDate: string
 }
 
 export type CreateUserInput = {
@@ -50,6 +61,8 @@ export type CreateUserInput = {
   jobTitle?: string
   timezone?: string
   language?: string
+  /** YYYY-MM-DD o null para limpiar. */
+  birthDate?: string | null
   bio?: string
   password?: string
   /** Si true y sin contraseña, envía correo de activación (por defecto true). */

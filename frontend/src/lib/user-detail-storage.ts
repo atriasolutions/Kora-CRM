@@ -10,6 +10,7 @@ export type UserDetailOverride = Partial<UserListItem> & {
   bio?: string
   timezone?: string
   language?: string
+  birthDate?: string
   teams?: string[]
   twoFactorEnabled?: boolean
 }

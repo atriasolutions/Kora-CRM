@@ -4,6 +4,7 @@ import { getAuditActor } from '../middleware/audit-actor.js'
 import { forbidden } from '../middleware/errors.js'
 import {
   requireAssigneeLookup,
+  requireMentionLookup,
   requirePermission,
 } from '../middleware/require-permission.js'
 import { routeParam } from '../lib/route-params.js'
@@ -30,6 +31,19 @@ usersRouter.get(
   async (_req, res, next) => {
     try {
       const items = await usersRepo.listUsersForAssignee()
+      res.json({ data: items })
+    } catch (e) {
+      next(e)
+    }
+  },
+)
+
+usersRouter.get(
+  '/birthdays',
+  requireMentionLookup(),
+  async (_req, res, next) => {
+    try {
+      const items = await usersRepo.listTenantBirthdays()
       res.json({ data: items })
     } catch (e) {
       next(e)

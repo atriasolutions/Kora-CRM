@@ -16,6 +16,7 @@ export type UserRow = {
   job_title: string | null
   timezone: string | null
   language: string | null
+  birth_date?: Date | string | null
   two_factor_enabled: boolean
   totp_secret_encrypted?: string | null
   totp_verified_at?: Date | null
@@ -24,6 +25,16 @@ export type UserRow = {
   created_at: Date
   guest_company_id?: string | null
   guest_company_name?: string | null
+}
+
+function mapBirthDate(value: Date | string | null | undefined): string | undefined {
+  if (value == null) return undefined
+  if (typeof value === 'string') {
+    const trimmed = value.trim().slice(0, 10)
+    return /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ? trimmed : undefined
+  }
+  const iso = value.toISOString().slice(0, 10)
+  return iso
 }
 
 const MODULE_LABELS: Record<string, string> = {
@@ -71,6 +82,7 @@ export function mapUserDetail(row: UserRow): UserDetail {
     jobTitle: row.job_title ?? '',
     timezone: row.timezone ?? 'America/Santiago',
     language: row.language ?? 'es',
+    birthDate: mapBirthDate(row.birth_date),
     memberSince: formatDateLabel(row.created_at),
     twoFactorEnabled: row.two_factor_enabled,
     twoFactorConfigured: Boolean(

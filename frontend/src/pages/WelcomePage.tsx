@@ -1,6 +1,7 @@
 import { Compass } from 'lucide-react'
 
 import { PageScrollArea } from '@/components/layout/PageScrollArea'
+import { WelcomeBirthdaysSection } from '@/components/welcome/WelcomeBirthdaysSection'
 import { WelcomeHeroSection } from '@/components/welcome/WelcomeHeroSection'
 import { WelcomeInsightsPanel } from '@/components/welcome/WelcomeInsightsPanel'
 import { WelcomeModuleGrid } from '@/components/welcome/WelcomeModuleGrid'
@@ -57,6 +58,11 @@ export function WelcomePage() {
           showDashboard={showDashboard}
           hasCustomLogo={hasCustomLogo}
           logoUrl={settings.logoUrl}
+        />
+
+        <WelcomeBirthdaysSection
+          currentUserId={session?.userId}
+          currentUserName={displayName}
         />
 
         <div className="grid gap-8 xl:grid-cols-[1fr_340px] xl:gap-10">

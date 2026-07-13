@@ -4,6 +4,19 @@ import { entityImageUrlSchema } from './image-url.schema.js'
 
 const userStatus = z.enum(['Activo', 'Invitado', 'Inactivo', 'Por verificar'])
 
+const birthDateSchema = z
+  .union([
+    z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Usa el formato YYYY-MM-DD'),
+    z.literal(''),
+    z.null(),
+  ])
+  .optional()
+  .transform((value) => {
+    if (value === undefined) return undefined
+    if (value === null || value === '') return null
+    return value
+  })
+
 export const createUserSchema = z.object({
   name: z.string().min(1).max(255),
   email: z.string().email().max(320),
@@ -16,6 +29,7 @@ export const createUserSchema = z.object({
   jobTitle: z.string().max(128).optional(),
   timezone: z.string().max(64).optional(),
   language: z.string().max(16).optional(),
+  birthDate: birthDateSchema,
   bio: z.string().max(5000).optional(),
   password: z.string().min(8).max(128).optional(),
   sendInvite: z.boolean().optional(),

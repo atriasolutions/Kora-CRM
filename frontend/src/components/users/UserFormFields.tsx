@@ -6,6 +6,7 @@ import {
 } from '@/components/contacts/ContactFormField'
 import { CompanyLookupField } from '@/components/shared/CompanyLookupField'
 import { AvatarImageUpload } from '@/components/shared/AvatarImageUpload'
+import { Input } from '@/components/ui/input'
 import { isGuestAccessProfile } from '@/lib/access-profile-admin'
 import { resolveProfileIdForRole } from '@/lib/user-form'
 import { useProfilesRegistry } from '@/hooks/use-profiles-registry'
@@ -78,6 +79,19 @@ export function UserFormFields({
           value={form.phone}
           onChange={(phone) => patch({ phone })}
         />
+        <ContactFormField label="Fecha de nacimiento" id="user-birth-date">
+          <Input
+            id="user-birth-date"
+            type="date"
+            value={form.birthDate}
+            max={new Date().toISOString().slice(0, 10)}
+            className="h-9 bg-background shadow-sm"
+            onChange={(e) => patch({ birthDate: e.target.value })}
+          />
+          <p className="mt-1 text-xs text-muted-foreground">
+            Opcional. Se usa en la pantalla de bienvenida para cumpleaños del equipo.
+          </p>
+        </ContactFormField>
         <div className="grid gap-4 sm:grid-cols-2">
           <ContactFormInput
             id="user-dept"
