@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 
 import { EntityAvatarImage } from '@/components/shared/EntityAvatarImage'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { WelcomeSectionLabel } from '@/components/welcome/WelcomePageBackdrop'
+import { WelcomeBirthdayEffects } from '@/components/welcome/WelcomeBirthdayEffects'
 import { isApiEnabled } from '@/api/config'
 import {
   listTenantBirthdaysApi,
@@ -34,13 +34,33 @@ function initials(name: string): string {
   return `${parts[0]![0] ?? ''}${parts[1]![0] ?? ''}`.toUpperCase()
 }
 
-function BirthdayAvatar({ person }: { person: BirthdayPerson }) {
+function BirthdayAvatar({
+  person,
+  festive = false,
+}: {
+  person: BirthdayPerson
+  festive?: boolean
+}) {
   return (
-    <Avatar className="size-9 border border-border/60 shadow-sm">
+    <Avatar
+      className={cn(
+        'size-9 border shadow-sm',
+        festive
+          ? 'border-white/80 ring-2 ring-[#ff6b9d]/50'
+          : 'border-border/60',
+      )}
+    >
       {person.avatarUrl ? (
         <EntityAvatarImage src={person.avatarUrl} alt={person.name} />
       ) : null}
-      <AvatarFallback className="bg-primary/10 text-[11px] font-semibold text-primary">
+      <AvatarFallback
+        className={cn(
+          'text-[11px] font-semibold',
+          festive
+            ? 'bg-gradient-to-br from-[#ff6b9d] to-[#ff9f1c] text-white'
+            : 'bg-primary/10 text-primary',
+        )}
+      >
         {initials(person.name)}
       </AvatarFallback>
     </Avatar>
@@ -90,108 +110,112 @@ export function WelcomeBirthdaysSection({
   const hasTodayCelebration =
     isCurrentUserBirthday || todayColleagueBirthdays.length > 0
 
+  const celebrants = (
+    isCurrentUserBirthday
+      ? items.filter((p) => p.id === currentUserId)
+      : []
+  ).concat(todayColleagueBirthdays)
+
   return (
     <div className="space-y-4">
+      {hasTodayCelebration ? <WelcomeBirthdayEffects /> : null}
+
       {hasTodayCelebration ? (
         <section
-          className={cn(
-            'relative overflow-hidden rounded-[1.5rem] border px-5 py-5 shadow-sm sm:px-6',
-            'border-amber-300/60 bg-gradient-to-br from-amber-50 via-rose-50 to-sky-50',
-            'dark:border-amber-500/30 dark:from-amber-950/40 dark:via-rose-950/30 dark:to-sky-950/30',
-          )}
+          className="birthday-celebration-card relative overflow-hidden rounded-[1.75rem] border px-5 py-6 sm:px-7 sm:py-7"
           aria-live="polite"
         >
-          <div
-            className="pointer-events-none absolute -right-6 -top-8 size-28 rounded-full bg-amber-200/40 blur-2xl dark:bg-amber-400/10"
-            aria-hidden
-          />
-          <div
-            className="pointer-events-none absolute -bottom-10 left-8 size-24 rounded-full bg-rose-200/40 blur-2xl dark:bg-rose-400/10"
-            aria-hidden
-          />
-          <div className="relative flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="flex items-start gap-3">
-              <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-amber-500/15 text-amber-700 dark:text-amber-300">
-                <PartyPopper aria-hidden className="size-5" />
+          <div className="relative z-[1] flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-start gap-3.5">
+              <span className="birthday-pulse-icon grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-[#ff6b9d] to-[#ff9f1c] text-white shadow-lg shadow-[#ff6b9d]/35">
+                <PartyPopper aria-hidden className="size-6" />
               </span>
-              <div className="min-w-0 space-y-1.5">
+              <div className="min-w-0 space-y-2">
                 {isCurrentUserBirthday ? (
                   <>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                    <p className="inline-flex items-center gap-1.5 rounded-full bg-[#ff6b9d]/20 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-[#c9184a]">
+                      <Sparkles aria-hidden className="size-3.5 text-[#ff9f1c]" />
                       ¡Hoy es tu día!
                     </p>
-                    <h2 className="text-balance text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+                    <h2 className="text-balance text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
                       Feliz cumpleaños,{' '}
-                      <span className="welcome-name-gradient">
+                      <span className="birthday-name-gradient">
                         {firstNameOf(currentUserName ?? '')}
                       </span>
+                      !
                     </h2>
-                    <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-                      Que tengas un excelente día. Tu equipo en esta instancia
-                      también lo celebra contigo.
+                    <p className="max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                      Que tengas un día increíble. Tu equipo en esta instancia
+                      también lo celebra contigo
+                      {todayColleagueBirthdays.length > 0
+                        ? ' — ¡y no es el único festejo de hoy!'
+                        : '.'}
                     </p>
                   </>
                 ) : (
                   <>
-                    <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
-                      <Sparkles aria-hidden className="size-3.5" />
+                    <p className="inline-flex items-center gap-1.5 rounded-full bg-[#4cc9f0]/25 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-[#0077b6]">
+                      <Sparkles aria-hidden className="size-3.5 text-[#ff9f1c]" />
                       Cumpleaños de hoy
                     </p>
-                    <h2 className="text-balance text-lg font-bold tracking-tight text-foreground sm:text-xl">
+                    <h2 className="text-balance text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl dark:text-white">
                       {buildBirthdayReminderMessage(todayColleagueBirthdays)}
                     </h2>
+                    <p className="max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                      Un saludo rápido les puede alegrar el día.
+                    </p>
                   </>
                 )}
                 {isCurrentUserBirthday && todayColleagueBirthdays.length > 0 ? (
-                  <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+                  <p className="max-w-2xl rounded-xl bg-white/55 px-3 py-2 text-sm font-medium leading-relaxed text-slate-700 backdrop-blur dark:bg-black/25 dark:text-slate-200">
                     {buildBirthdayReminderMessage(todayColleagueBirthdays)}
                   </p>
                 ) : null}
               </div>
             </div>
-            <div className="flex flex-wrap gap-2 sm:justify-end">
-              {(isCurrentUserBirthday
-                ? items.filter((p) => p.id === currentUserId)
-                : []
-              )
-                .concat(todayColleagueBirthdays)
-                .map((person) => (
-                  <Link
-                    key={person.id}
-                    to={getUserDetailPath(person.id)}
-                    className="inline-flex items-center gap-2 rounded-full border border-amber-300/70 bg-background/80 py-1 pe-3 ps-1 text-sm font-medium text-foreground shadow-sm backdrop-blur hover:bg-background"
-                  >
-                    <BirthdayAvatar person={person} />
-                    <span className="max-w-[10rem] truncate">{person.name}</span>
-                    <Gift aria-hidden className="size-3.5 text-amber-600" />
-                  </Link>
-                ))}
+
+            <div className="flex flex-wrap gap-2 sm:max-w-xs sm:justify-end">
+              {celebrants.map((person) => (
+                <Link
+                  key={person.id}
+                  to={getUserDetailPath(person.id)}
+                  className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/85 py-1.5 pe-3.5 ps-1.5 text-sm font-semibold text-slate-800 shadow-md shadow-[#ff6b9d]/20 backdrop-blur transition hover:-translate-y-0.5 hover:bg-white dark:border-white/20 dark:bg-slate-900/70 dark:text-white"
+                >
+                  <BirthdayAvatar person={person} festive />
+                  <span className="max-w-[10rem] truncate">{person.name}</span>
+                  <Gift aria-hidden className="size-3.5 text-[#ff6b9d]" />
+                </Link>
+              ))}
             </div>
           </div>
+
           <div
-            className="pointer-events-none absolute inset-x-0 bottom-0 h-1 bg-[linear-gradient(90deg,#f59e0b,#f43f5e,#38bdf8,#f59e0b)] bg-[length:200%_100%] opacity-80"
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-1.5 bg-[linear-gradient(90deg,#ff6b9d,#ffd166,#06d6a0,#4cc9f0,#f72585,#ff6b9d)] bg-[length:220%_100%] opacity-90"
+            style={{ animation: 'birthday-banner-shimmer 3.5s linear infinite' }}
             aria-hidden
           />
         </section>
       ) : null}
 
-      <section className="overflow-hidden rounded-[1.5rem] border border-border/70 bg-card shadow-sm">
-        <div className="flex items-start justify-between gap-3 border-b border-border/60 bg-muted/25 px-5 py-4">
+      <section className="birthday-month-card overflow-hidden rounded-[1.5rem] border shadow-sm">
+        <div className="flex items-start justify-between gap-3 border-b border-[#ff8fab]/25 bg-gradient-to-r from-[#fff0f5] via-[#fff8e7] to-[#e8fff8] px-5 py-4 dark:from-[#2a1620] dark:via-[#2a2416] dark:to-[#142422]">
           <div className="flex items-start gap-3">
-            <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary">
+            <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-[#ff6b9d] to-[#ff9f1c] text-white shadow-md shadow-[#ff6b9d]/30">
               <Cake aria-hidden className="size-5" />
             </span>
             <div>
-              <WelcomeSectionLabel>Equipo</WelcomeSectionLabel>
-              <h2 className="text-lg font-semibold tracking-tight text-foreground">
+              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#c9184a]">
+                Equipo
+              </p>
+              <h2 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">
                 Cumpleaños del mes
               </h2>
-              <p className="mt-0.5 text-sm text-muted-foreground">
+              <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-300">
                 Celebraciones de {monthName} en tu instancia
               </p>
             </div>
           </div>
-          <span className="rounded-full border border-border/70 bg-background px-2.5 py-1 text-xs font-medium tabular-nums text-muted-foreground">
+          <span className="rounded-full bg-gradient-to-r from-[#ff6b9d] to-[#ff9f1c] px-2.5 py-1 text-xs font-bold tabular-nums text-white shadow-sm">
             {monthBirthdays.length}
           </span>
         </div>
@@ -206,7 +230,7 @@ export function WelcomeBirthdaysSection({
             </p>
           </div>
         ) : (
-          <ul className="divide-y divide-border/50">
+          <ul className="divide-y divide-[#ff8fab]/20">
             {monthBirthdays.map((person) => {
               const today = isBirthdayToday(person.birthDate)
               const day = chilePartsFromDate(new Date()).day
@@ -217,22 +241,22 @@ export function WelcomeBirthdaysSection({
                   <Link
                     to={getUserDetailPath(person.id)}
                     className={cn(
-                      'flex items-center gap-3 px-5 py-3 transition-colors hover:bg-muted/40',
-                      today && 'bg-amber-50/70 dark:bg-amber-950/20',
+                      'flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-[#fff0f5]/70 dark:hover:bg-white/5',
+                      today && 'birthday-today-row',
                     )}
                   >
-                    <BirthdayAvatar person={person} />
+                    <BirthdayAvatar person={person} festive={today} />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-foreground">
+                      <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
                         {person.name}
                       </p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-slate-600 dark:text-slate-300">
                         {formatBirthdayDayLabel(person.birthDate)}
                         {today ? ' · Hoy' : isPast ? ' · Ya celebrado' : ''}
                       </p>
                     </div>
                     {today ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:text-amber-200">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-[#ff6b9d] to-[#ff9f1c] px-2.5 py-1 text-[11px] font-bold text-white shadow-sm">
                         <PartyPopper aria-hidden className="size-3" />
                         Hoy
                       </span>
