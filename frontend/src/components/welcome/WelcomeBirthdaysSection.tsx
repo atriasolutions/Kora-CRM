@@ -40,14 +40,16 @@ function BirthdayAvatar({
 }: {
   person: BirthdayPerson
   highlight?: boolean
-  size?: 'md' | 'lg'
+  size?: 'md' | 'lg' | 'xl'
 }) {
   return (
     <Avatar
       className={cn(
         'shrink-0 border shadow-sm',
-        size === 'lg' ? 'size-12' : 'size-11',
-        highlight ? 'border-primary/40 ring-2 ring-primary/20' : 'border-border/60',
+        size === 'xl' && 'size-24 sm:size-28',
+        size === 'lg' && 'size-12',
+        size === 'md' && 'size-11',
+        highlight ? 'border-primary/40 ring-2 ring-primary/25' : 'border-border/60',
       )}
     >
       {person.avatarUrl ? (
@@ -56,7 +58,7 @@ function BirthdayAvatar({
       <AvatarFallback
         className={cn(
           'bg-primary/10 font-semibold text-primary',
-          size === 'lg' ? 'text-sm' : 'text-xs',
+          size === 'xl' ? 'text-2xl' : size === 'lg' ? 'text-sm' : 'text-xs',
         )}
       >
         {initials(person.name)}
@@ -175,15 +177,17 @@ export function WelcomeBirthdaysSection({
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2.5 sm:max-w-sm sm:justify-end">
+            <div className="flex flex-wrap items-center gap-3 sm:justify-end">
               {celebrants.map((person) => (
                 <div
                   key={person.id}
-                  className="inline-flex items-center gap-2.5 rounded-full border border-border/70 bg-background py-1.5 pe-4 ps-1.5 text-sm font-medium text-foreground shadow-sm"
+                  className="relative shrink-0"
+                  title={person.name}
                 >
-                  <BirthdayAvatar person={person} highlight size="lg" />
-                  <span className="max-w-[11rem] truncate">{person.name}</span>
-                  <Gift aria-hidden className="size-3.5 shrink-0 text-primary" />
+                  <BirthdayAvatar person={person} highlight size="xl" />
+                  <span className="absolute -bottom-0.5 -end-0.5 grid size-8 place-items-center rounded-full border-2 border-card bg-primary text-primary-foreground shadow-md">
+                    <Gift aria-hidden className="size-3.5" />
+                  </span>
                 </div>
               ))}
             </div>
