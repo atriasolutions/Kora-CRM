@@ -30,7 +30,7 @@ import {
   PRODUCT_CURRENCY_LABELS,
 } from '@/lib/product-form'
 import { ProductPriceInput } from '@/components/products/ProductPriceInput'
-import { useProductCategoryOptions } from '@/hooks/use-catalog-options'
+import { useProductCategoryOptions, useProductSubcategoryOptions } from '@/hooks/use-catalog-options'
 import { inventoryQuantityInputValue, parseStockNum } from '@/lib/product-display'
 import {
   formatProductInventoryStockSummary,
@@ -61,6 +61,7 @@ export function ProductFormFields({
   inventoryContextSku,
 }: ProductFormFieldsProps) {
   const categoryOptions = useProductCategoryOptions()
+  const subcategoryOptions = useProductSubcategoryOptions(form.category)
   const patch = (partial: Partial<ProductFormValues>) => onChange(partial)
   const [disableTrackDialogOpen, setDisableTrackDialogOpen] = useState(false)
   const [disableTrackLoading, setDisableTrackLoading] = useState(false)
@@ -178,8 +179,24 @@ export function ProductFormFields({
             id="pd-form-category"
             label="Categoría"
             value={form.category}
-            onChange={(category) => patch({ category })}
+            onChange={(category) =>
+              patch({
+                category,
+                subcategory: '',
+              })
+            }
             options={categoryOptions.map((c) => ({ value: c, label: c }))}
+          />
+          <ContactFormSelect
+            id="pd-form-subcategory"
+            label="Subcategoría (opcional)"
+            value={form.subcategory}
+            onChange={(subcategory) => patch({ subcategory })}
+            disabled={subcategoryOptions.length === 0}
+            options={[
+              { value: '', label: 'Sin subcategoría' },
+              ...subcategoryOptions.map((c) => ({ value: c, label: c })),
+            ]}
           />
         </div>
         <UserLookupField

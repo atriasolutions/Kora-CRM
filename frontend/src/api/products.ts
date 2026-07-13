@@ -18,6 +18,7 @@ export type ProductApiBody = {
   sku: string
   ownerName?: string
   category?: string
+  subcategory?: string
   productType?: string
   unitOfMeasure?: string
   billingPeriod?: string
@@ -60,6 +61,10 @@ export function productFormToApiBody(
     sku: values.sku.trim(),
     ownerName: values.ownerName?.trim(),
     category: values.category?.trim(),
+    subcategory:
+      'subcategory' in values && values.subcategory?.trim()
+        ? values.subcategory.trim()
+        : undefined,
     productType: values.productType,
     unitOfMeasure: unitFromForm(values),
     billingPeriod: 'billingPeriod' in values ? values.billingPeriod : undefined,
@@ -101,6 +106,7 @@ export function productDetailToApiBody(detail: ProductDetail): ProductApiBody {
     sku: detail.sku,
     ownerName: detail.owner?.trim() || undefined,
     category: detail.category,
+    subcategory: detail.subcategory?.trim() || undefined,
     productType: detail.productType,
     unitOfMeasure: detail.unitOfMeasure,
     billingPeriod: detail.billingPeriod,

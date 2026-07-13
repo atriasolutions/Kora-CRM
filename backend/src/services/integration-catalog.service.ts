@@ -12,6 +12,8 @@ export type IntegrationCatalogCategory = {
   id: string
   name: string
   active: boolean
+  parentId?: string | null
+  subcategories?: IntegrationCatalogCategory[]
 }
 
 export type IntegrationCatalogProduct = {
@@ -20,6 +22,8 @@ export type IntegrationCatalogProduct = {
   sku: string
   categoryId: string
   categoryName: string
+  subcategoryId?: string
+  subcategoryName?: string
   productType: string
   unitOfMeasure: string
   billingPeriod?: string
@@ -75,7 +79,21 @@ function mapCategory(category: ProductCategory): IntegrationCatalogCategory {
     id: category.id,
     name: category.name,
     active: category.active,
+    parentId: category.parentId ?? null,
   }
+}
+
+function buildCategoryTree(
+  categories: ProductCategory[],
+): IntegrationCatalogCategory[] {
+  const roots = categories.filter((category) => !category.parentId)
+  const children = categories.filter((category) => category.parentId)
+  return roots.map((root) => ({
+    ...mapCategory(root),
+    subcategories: children
+      .filter((child) => child.parentId === root.id)
+      .map(mapCategory),
+  }))
 }
 
 function isProductPublishedInIntegration(product: ProductListItem): boolean {
@@ -94,8 +112,10 @@ function mapProduct(
     id: product.id,
     name: product.name,
     sku: product.sku,
-    categoryId,
+    categoryId: product.rootCategoryId ?? categoryId,
     categoryName: product.category,
+    subcategoryId: product.subcategoryId,
+    subcategoryName: product.subcategory,
     productType: product.productType,
     unitOfMeasure: product.unitOfMeasure,
     billingPeriod: product.billingPeriod,
@@ -190,7 +210,7 @@ export async function listIntegrationCatalogCategories(
       return {
         tenantId: apiKey.tenantId,
         tenantSlug: apiKey.tenantSlug,
-        categories: filtered.map(mapCategory),
+        categories: buildCategoryTree(filtered),
       }
     },
   )
@@ -268,11 +288,12 @@ export async function getIntegrationCatalogSnapshot(
       const filtered = activeOnly
         ? categories.filter((category) => category.active)
         : categories
+      const roots = filtered.filter((category) => !category.parentId)
 
       const categoriesWithProducts: IntegrationCatalogCategoryWithProducts[] = []
       let productCount = 0
 
-      for (const category of filtered) {
+      for (const category of roots) {
         const rows = await listAllProductRowsForCategory(category.id, status)
         const products = mapIntegrationProductsFromRows(
           rows,
@@ -282,6 +303,9 @@ export async function getIntegrationCatalogSnapshot(
         productCount += products.length
         categoriesWithProducts.push({
           ...mapCategory(category),
+          subcategories: filtered
+            .filter((child) => child.parentId === category.id)
+            .map(mapCategory),
           products,
           productCount: products.length,
         })

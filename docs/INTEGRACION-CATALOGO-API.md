@@ -124,7 +124,15 @@ Authorization: Bearer TU_API_KEY
       {
         "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
         "name": "Repuestos",
-        "active": true
+        "active": true,
+        "subcategories": [
+          {
+            "id": "c4d5e6f7-a8b9-0123-cdef-234567890123",
+            "name": "Filtros",
+            "active": true,
+            "parentId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          }
+        ]
       },
       {
         "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
@@ -143,8 +151,13 @@ Authorization: Bearer TU_API_KEY
 | `categories[].id` | UUID de la categoría — úsalo en el endpoint de productos |
 | `categories[].name` | Nombre visible en el CRM |
 | `categories[].active` | Si la categoría está activa en configuración |
+| `categories[].subcategories` | Array opcional de subcategorías hijas (un solo nivel) |
+| `categories[].subcategories[].id` | UUID de la subcategoría |
+| `categories[].subcategories[].parentId` | UUID de la categoría raíz padre |
 
-Las categorías vienen ordenadas **alfabéticamente** por nombre.
+Las categorías raíz vienen ordenadas **alfabéticamente** por nombre. Las subcategorías dentro de cada raíz también van ordenadas alfabéticamente.
+
+> Al consultar productos con `GET /catalog/categories/{categoryId}/products`, puedes usar el `id` de una **categoría raíz** o de una **subcategoría**. Si usas el id de la raíz, se incluyen productos asignados directamente a esa categoría y a cualquiera de sus subcategorías.
 
 ---
 
@@ -187,6 +200,8 @@ Reemplaza `{categoryId}` por el `id` obtenido del listado de categorías.
         "sku": "FLT-001",
         "categoryId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
         "categoryName": "Repuestos",
+        "subcategoryId": "c4d5e6f7-a8b9-0123-cdef-234567890123",
+        "subcategoryName": "Filtros",
         "productType": "Producto",
         "unitOfMeasure": "ud",
         "billingPeriod": "Por unidad",
@@ -230,8 +245,10 @@ Desde la ficha de cada producto en Kora CRM se controla qué se expone en esta A
 | `id` | UUID | Identificador del producto en Kora |
 | `name` | string | Nombre comercial |
 | `sku` | string | Código SKU |
-| `categoryId` | UUID | Categoría a la que pertenece |
-| `categoryName` | string | Nombre de la categoría |
+| `categoryId` | UUID | Categoría **raíz** del producto |
+| `categoryName` | string | Nombre de la categoría raíz |
+| `subcategoryId` | UUID? | Subcategoría asignada al producto (si existe) |
+| `subcategoryName` | string? | Nombre de la subcategoría (si existe) |
 | `productType` | string | Ej. `Producto`, `Servicio` |
 | `unitOfMeasure` | string | Unidad de medida (ej. `ud`, `kg`) |
 | `billingPeriod` | string? | Periodo de cobro si aplica (ej. `Mensual`, `Por unidad`) |

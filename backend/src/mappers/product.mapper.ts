@@ -9,7 +9,11 @@ export type ProductRow = {
   id: string
   name: string
   sku: string
+  category_id: string | null
+  root_category_id: string | null
   category_name: string | null
+  subcategory_id: string | null
+  subcategory_name: string | null
   product_type: string | null
   unit_of_measure: string | null
   billing_period: string | null
@@ -88,6 +92,10 @@ export function mapProductRow(row: ProductRow): ProductListItem {
     name: row.name,
     sku: row.sku,
     category: row.category_name ?? 'Sin categoría',
+    subcategory: row.subcategory_name?.trim() || undefined,
+    categoryId: row.category_id ?? undefined,
+    subcategoryId: row.subcategory_id ?? undefined,
+    rootCategoryId: row.root_category_id ?? row.category_id ?? undefined,
     productType: row.product_type ?? 'Producto',
     unitOfMeasure: unit,
     billingPeriod,

@@ -18,10 +18,19 @@ import type {
 import { normalizeProductCurrency } from '../types/currency.js'
 import { paginationOffset } from '../utils/pagination.js'
 import { purgeEntityNotesAndFiles } from '../services/entity-purge.service.js'
-import { resolveProductCategoryIdByName } from './product-categories.repository.js'
+import {
+  getProductCategoryScopeIds,
+  resolveProductCategoryIdForProduct,
+} from './product-categories.repository.js'
 
 const SELECT_COLUMNS = `
-  p.id, p.name, p.sku, c.name AS category_name, p.product_type, p.unit_of_measure,
+  p.id, p.name, p.sku,
+  p.category_id,
+  CASE WHEN c.parent_id IS NULL THEN c.id ELSE c.parent_id END AS root_category_id,
+  CASE WHEN c.parent_id IS NULL THEN c.name ELSE parent.name END AS category_name,
+  CASE WHEN c.parent_id IS NOT NULL THEN c.id ELSE NULL END AS subcategory_id,
+  CASE WHEN c.parent_id IS NOT NULL THEN c.name ELSE NULL END AS subcategory_name,
+  p.product_type, p.unit_of_measure,
   p.billing_period,
   p.price_cents, p.price_currency, p.price_amount, p.cost_price_cents,
   CASE
@@ -39,6 +48,8 @@ const FROM_JOIN = `
   FROM crm_products p
   LEFT JOIN crm_product_categories c
     ON c.id = p.category_id AND c.tenant_id = p.tenant_id AND c.deleted_at IS NULL
+  LEFT JOIN crm_product_categories parent
+    ON parent.id = c.parent_id AND parent.tenant_id = p.tenant_id AND parent.deleted_at IS NULL
   LEFT JOIN LATERAL (
     SELECT COALESCE(SUM(ip.quantity_on_hand), 0) AS total_on_hand
     FROM crm_inventory_positions ip
@@ -52,6 +63,8 @@ const FROM_COUNT = `
   FROM crm_products p
   LEFT JOIN crm_product_categories c
     ON c.id = p.category_id AND c.tenant_id = p.tenant_id AND c.deleted_at IS NULL
+  LEFT JOIN crm_product_categories parent
+    ON parent.id = c.parent_id AND parent.tenant_id = p.tenant_id AND parent.deleted_at IS NULL
 `
 
 export type ListProductsParams = {
@@ -371,12 +384,13 @@ export async function listProductRows(
     values.push(params.status)
   }
   if (params.categoryId) {
-    conditions.push(`p.category_id = $${idx++}`)
-    values.push(params.categoryId)
+    const scopeIds = await getProductCategoryScopeIds(params.categoryId)
+    conditions.push(`p.category_id = ANY($${idx++}::uuid[])`)
+    values.push(scopeIds)
   }
   if (params.q) {
     conditions.push(
-      `(p.name ILIKE $${idx} OR p.sku ILIKE $${idx} OR c.name ILIKE $${idx})`,
+      `(p.name ILIKE $${idx} OR p.sku ILIKE $${idx} OR c.name ILIKE $${idx} OR parent.name ILIKE $${idx})`,
     )
     values.push(`%${params.q}%`)
     idx++
@@ -440,13 +454,24 @@ async function assertSkuAvailable(
   const trimmed = sku.trim()
   if (!trimmed) return
 
-  const sql = `SELECT id, name
+  const tenantId = getTenantIdOrDefault()
+  const sql = excludeProductId
+    ? `SELECT id, name
      FROM crm_products
      WHERE lower(trim(sku)) = lower($1)
        AND deleted_at IS NULL
-       ${excludeProductId ? 'AND id <> $2' : ''}
+       AND tenant_id = $3
+       AND id <> $2
      LIMIT 1`
-  const params = excludeProductId ? [trimmed, excludeProductId] : [trimmed]
+    : `SELECT id, name
+     FROM crm_products
+     WHERE lower(trim(sku)) = lower($1)
+       AND deleted_at IS NULL
+       AND tenant_id = $2
+     LIMIT 1`
+  const params = excludeProductId
+    ? [trimmed, excludeProductId, tenantId]
+    : [trimmed, tenantId]
   const result = client
     ? await client.query<{ id: string; name: string }>(sql, params)
     : await tenantQuery<{ id: string; name: string }>(sql, params)
@@ -477,7 +502,10 @@ export async function createProduct(
   if (!input.name?.trim()) throw badRequest('El nombre es obligatorio')
   if (!input.sku?.trim()) throw badRequest('El SKU es obligatorio')
 
-  const categoryId = await resolveProductCategoryIdByName(input.category)
+  const categoryId = await resolveProductCategoryIdForProduct(
+    input.category,
+    input.subcategory,
+  )
   const trackInventory = input.trackInventory ?? true
   const stockQty =
     trackInventory && input.stockNum != null ? input.stockNum : null
@@ -598,9 +626,15 @@ export async function updateProduct(
     sets.push(`sku = $${idx++}`)
     values.push(nextSku)
   }
-  if (input.category !== undefined) {
+  if (input.category !== undefined || input.subcategory !== undefined) {
+    const nextCategory =
+      input.category !== undefined ? input.category : existing.category
+    const nextSubcategory =
+      input.subcategory !== undefined ? input.subcategory : existing.subcategory
     sets.push(`category_id = $${idx++}`)
-    values.push(await resolveProductCategoryIdByName(input.category))
+    values.push(
+      await resolveProductCategoryIdForProduct(nextCategory, nextSubcategory),
+    )
   }
   if (input.ownerName !== undefined) {
     sets.push(`owner_name = $${idx++}`)

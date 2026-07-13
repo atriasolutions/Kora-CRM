@@ -11,6 +11,7 @@ export type ProductListItem = {
   name: string
   sku: string
   category: string
+  subcategory?: string
   productType: ProductType
   unitOfMeasure: string
   billingPeriod?: BillingPeriod

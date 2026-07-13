@@ -16,6 +16,7 @@ export type CreateProductFormValues = {
   name: string
   sku: string
   category: string
+  subcategory?: string
   productType: ProductType
   unitOfMeasure: string
   customUnit: string
@@ -35,6 +36,7 @@ export function createDefaultProductFormValues(
     name: '',
     sku: '',
     category: 'General',
+    subcategory: '',
     productType: 'Físico',
     unitOfMeasure: 'unidad',
     customUnit: '',
@@ -56,6 +58,7 @@ export function duplicateProductFormValues(
     name: `${source.name.replace(/ \(copia\)$/i, '')} (copia)`,
     sku: `${source.sku}-COPY`,
     category: source.category,
+    subcategory: source.subcategory ?? '',
     productType: source.productType,
     unitOfMeasure: source.unitOfMeasure,
     customUnit: source.customUnit ?? '',
@@ -121,6 +124,7 @@ export function formValuesToListItem(
     name: values.name.trim(),
     sku: values.sku.trim(),
     category: values.category.trim(),
+    subcategory: values.subcategory?.trim() || undefined,
     productType: values.productType,
     unitOfMeasure: values.unitOfMeasure,
     customUnit: values.unitOfMeasure === 'otra' ? values.customUnit.trim() : undefined,
@@ -144,6 +148,8 @@ const PRODUCT_CSV_HEADERS: Record<string, keyof CreateProductFormValues | 'stock
   sku: 'sku',
   categoria: 'category',
   category: 'category',
+  subcategoria: 'subcategory',
+  subcategory: 'subcategory',
   tipo: 'productType',
   type: 'productType',
   unidad: 'unitOfMeasure',

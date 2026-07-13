@@ -19,7 +19,7 @@ export type CatalogSettingsContextValue = {
   ) => Promise<WarehouseSetting>
   deleteWarehouse: (id: string) => Promise<void>
   setDefaultWarehouse: (id: string) => Promise<void>
-  createCategory: (name: string) => Promise<ProductCategorySetting>
+  createCategory: (name: string, parentId?: string | null) => Promise<ProductCategorySetting>
   updateCategory: (
     id: string,
     patch: Partial<ProductCategorySetting>,

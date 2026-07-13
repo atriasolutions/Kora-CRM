@@ -52,6 +52,7 @@ export const updateWarehouseSchema = z.object({
 export const createProductCategorySchema = z.object({
   name: z.string().min(1).max(255),
   active: z.boolean().optional(),
+  parentId: z.string().uuid().nullable().optional(),
 })
 
 export const updateProductCategorySchema = z.object({

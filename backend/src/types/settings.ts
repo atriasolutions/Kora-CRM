@@ -59,11 +59,13 @@ export type ProductCategory = {
   id: string
   name: string
   active: boolean
+  parentId?: string | null
 }
 
 export type CreateProductCategoryInput = {
   name: string
   active?: boolean
+  parentId?: string | null
 }
 
 export type UpdateProductCategoryInput = Partial<

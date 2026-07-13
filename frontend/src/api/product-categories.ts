@@ -13,6 +13,7 @@ export async function listProductCategoriesApi(): Promise<ProductCategorySetting
 export async function createProductCategoryApi(body: {
   name: string
   active?: boolean
+  parentId?: string | null
 }): Promise<ProductCategorySetting> {
   const res = await fetchJSON<ApiItemResponse<ProductCategorySetting>>(BASE, {
     method: 'POST',

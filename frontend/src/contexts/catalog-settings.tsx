@@ -214,10 +214,10 @@ export function CatalogSettingsProvider({ children }: { children: ReactNode }) {
   )
 
   const createCategoryMutation = useCallback(
-    async (name: string) => {
+    async (name: string, parentId?: string | null) => {
       if (useApi) {
         try {
-          const created = await createProductCategoryApi({ name })
+          const created = await createProductCategoryApi({ name, parentId: parentId ?? null })
           applyCatalog({
             ...catalog,
             productCategories: [...catalog.productCategories, created],
@@ -227,7 +227,7 @@ export function CatalogSettingsProvider({ children }: { children: ReactNode }) {
           throw new Error(parseApiError(err))
         }
       }
-      const created = createProductCategory(name)
+      const created = createProductCategory(name, parentId)
       saveCatalog({
         ...catalog,
         productCategories: [...catalog.productCategories, created],
@@ -264,7 +264,9 @@ export function CatalogSettingsProvider({ children }: { children: ReactNode }) {
           await deleteProductCategoryApi(id)
           applyCatalog({
             ...catalog,
-            productCategories: catalog.productCategories.filter((c) => c.id !== id),
+            productCategories: catalog.productCategories.filter(
+              (c) => c.id !== id && c.parentId !== id,
+            ),
           })
         } catch (err) {
           throw new Error(parseApiError(err))
@@ -273,7 +275,9 @@ export function CatalogSettingsProvider({ children }: { children: ReactNode }) {
       }
       saveCatalog({
         ...catalog,
-        productCategories: catalog.productCategories.filter((c) => c.id !== id),
+        productCategories: catalog.productCategories.filter(
+          (c) => c.id !== id && c.parentId !== id,
+        ),
       })
     },
     [applyCatalog, catalog, saveCatalog],

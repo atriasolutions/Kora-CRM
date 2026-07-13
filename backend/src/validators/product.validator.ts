@@ -9,6 +9,7 @@ export const createProductSchema = z.object({
   sku: z.string().min(1).max(64),
   ownerName: z.string().max(255).optional(),
   category: z.string().max(128).optional(),
+  subcategory: z.string().max(128).optional(),
   productType: z.string().max(64).optional(),
   unitOfMeasure: z.string().max(32).optional(),
   billingPeriod: z.string().max(32).optional(),

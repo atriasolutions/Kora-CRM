@@ -13,6 +13,7 @@ export type ProductCategorySetting = {
   id: string
   name: string
   active: boolean
+  parentId?: string | null
 }
 
 export type CatalogSettings = {

@@ -84,7 +84,38 @@ export function getAllWarehouseLocationNames(): string[] {
 export function activeProductCategoryNames(
   categories: ProductCategorySetting[],
 ): string[] {
-  return categories.filter((c) => c.active).map((c) => c.name)
+  return categories
+    .filter((c) => c.active && !c.parentId)
+    .map((c) => c.name)
+}
+
+export function activeProductSubcategoryNames(
+  categories: ProductCategorySetting[],
+  parentCategoryName: string,
+): string[] {
+  const parent = categories.find(
+    (c) =>
+      !c.parentId &&
+      c.active &&
+      c.name.toLowerCase() === parentCategoryName.trim().toLowerCase(),
+  )
+  if (!parent) return []
+  return categories
+    .filter((c) => c.active && c.parentId === parent.id)
+    .map((c) => c.name)
+}
+
+export function rootProductCategories(
+  categories: ProductCategorySetting[],
+): ProductCategorySetting[] {
+  return categories.filter((c) => !c.parentId)
+}
+
+export function subcategoriesForParent(
+  categories: ProductCategorySetting[],
+  parentId: string,
+): ProductCategorySetting[] {
+  return categories.filter((c) => c.parentId === parentId)
 }
 
 export function normalizeWarehouseName(value: string): string {
@@ -112,15 +143,21 @@ export function validateCategoryName(
   categories: ProductCategorySetting[],
   name: string,
   excludeId?: string,
+  parentId?: string | null,
 ): string | null {
   const normalized = normalizeWarehouseName(name)
   if (!normalized) return 'El nombre de la categoría es obligatorio.'
   if (
     categories.some(
-      (c) => c.id !== excludeId && c.name.toLowerCase() === normalized.toLowerCase(),
+      (c) =>
+        c.id !== excludeId &&
+        (c.parentId ?? null) === (parentId ?? null) &&
+        c.name.toLowerCase() === normalized.toLowerCase(),
     )
   ) {
-    return 'Ya existe una categoría con ese nombre.'
+    return parentId
+      ? 'Ya existe una subcategoría con ese nombre en esta categoría.'
+      : 'Ya existe una categoría con ese nombre.'
   }
   return null
 }
@@ -158,10 +195,14 @@ export function createWarehouse(name: string): WarehouseSetting {
   }
 }
 
-export function createProductCategory(name: string): ProductCategorySetting {
+export function createProductCategory(
+  name: string,
+  parentId?: string | null,
+): ProductCategorySetting {
   return {
     id: createId('cat'),
     name: normalizeWarehouseName(name),
     active: true,
+    parentId: parentId ?? null,
   }
 }

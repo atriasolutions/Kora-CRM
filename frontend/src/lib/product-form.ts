@@ -50,6 +50,7 @@ export type ProductFormValues = {
   name: string
   sku: string
   category: string
+  subcategory: string
   productType: ProductType
   unitOfMeasure: string
   customUnit: string
@@ -104,6 +105,7 @@ export function productDetailToFormValues(product: ProductDetail): ProductFormVa
     name: product.name,
     sku: product.sku,
     category: product.category,
+    subcategory: product.subcategory ?? '',
     productType: product.productType,
     unitOfMeasure: product.unitOfMeasure,
     customUnit: product.customUnit ?? '',
@@ -173,6 +175,7 @@ export function applyFormValuesToProduct(
     name: values.name.trim(),
     sku: values.sku.trim(),
     category: values.category.trim(),
+    subcategory: values.subcategory.trim() || undefined,
     productType: values.productType,
     unitOfMeasure: values.unitOfMeasure,
     customUnit: values.unitOfMeasure === 'otra' ? values.customUnit.trim() : undefined,
@@ -265,6 +268,7 @@ export function productFormValuesToCreateSlice(
     name: values.name,
     sku: values.sku,
     category: values.category,
+    subcategory: values.subcategory?.trim() || undefined,
     productType: values.productType,
     unitOfMeasure: values.unitOfMeasure,
     customUnit: values.customUnit,

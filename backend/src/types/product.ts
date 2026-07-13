@@ -5,6 +5,10 @@ export type ProductListItem = {
   name: string
   sku: string
   category: string
+  subcategory?: string
+  categoryId?: string
+  subcategoryId?: string
+  rootCategoryId?: string
   productType: string
   unitOfMeasure: string
   billingPeriod?: string
@@ -39,6 +43,7 @@ export type CreateProductInput = {
   sku: string
   ownerName?: string
   category?: string
+  subcategory?: string
   productType?: string
   unitOfMeasure?: string
   billingPeriod?: string

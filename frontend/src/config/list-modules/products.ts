@@ -16,6 +16,7 @@ export const productsListConfig: ModuleListConfig<ProductListItem> = {
     row.name.toLowerCase().includes(q) ||
     row.sku.toLowerCase().includes(q) ||
     row.category.toLowerCase().includes(q) ||
+    (row.subcategory?.toLowerCase().includes(q) ?? false) ||
     row.owner.toLowerCase().includes(q),
   columns: [
     {
@@ -32,6 +33,13 @@ export const productsListConfig: ModuleListConfig<ProductListItem> = {
       sortable: true,
       className: 'w-[120px]',
       cell: (r) => r.category,
+    },
+    {
+      kind: 'text',
+      header: 'Subcategoría',
+      sortable: true,
+      className: 'w-[120px]',
+      cell: (r) => r.subcategory ?? '—',
     },
     {
       kind: 'text',

@@ -45,6 +45,7 @@ export type ProductCategoryRow = {
   id: string
   name: string
   active: boolean
+  parent_id: string | null
 }
 
 export function mapOrganizationSettings(
@@ -96,5 +97,6 @@ export function mapProductCategory(row: ProductCategoryRow): ProductCategory {
     id: row.id,
     name: row.name,
     active: row.active,
+    parentId: row.parent_id ?? null,
   }
 }

@@ -44,6 +44,7 @@ function createToFormValues(
     name: values.name,
     sku: values.sku,
     category: values.category,
+    subcategory: values.subcategory ?? '',
     productType: values.productType,
     unitOfMeasure: values.unitOfMeasure,
     customUnit: values.customUnit,
