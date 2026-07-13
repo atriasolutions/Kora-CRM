@@ -5,7 +5,7 @@ import { tenantWhereParam } from '../lib/tenant-sql.js'
 import { statusCountsTowardSeat } from '../lib/tenant-quota-modules.js'
 import { enforceSeatQuota } from '../lib/tenant-quota-enforce.js'
 import { mapUserDetail, mapUserRow, type UserRow } from '../mappers/user.mapper.js'
-import { imageUrlForList } from '../utils/entity-image.js'
+import { entityImageUrlForList } from '../utils/entity-image.js'
 import {
   assertUserEmailAvailable,
   assertUserEmailNotInTenant,
@@ -366,12 +366,33 @@ export async function listTenantBirthdays(): Promise<TenantBirthdayItem[]> {
     [tenantId],
   )
 
-  return result.rows.map((row) => ({
-    id: row.id,
-    name: row.name,
-    avatarUrl: imageUrlForList(row.avatar_url),
-    birthDate: row.birth_date.slice(0, 10),
-  }))
+  return result.rows.map((row) => {
+    const avatarUrl = entityImageUrlForList(
+      `/api/v1/users/${row.id}/avatar`,
+      row.avatar_url,
+    )
+    return {
+      id: row.id,
+      name: row.name,
+      avatarUrl: avatarUrl || undefined,
+      birthDate: row.birth_date.slice(0, 10),
+    }
+  })
+}
+
+/** Avatar en BD (solo si el usuario pertenece al tenant actual). */
+export async function getUserAvatarStored(id: string): Promise<string | null> {
+  const tenantId = getTenantIdOrDefault()
+  const result = await tenantQuery<{ avatar_url: string | null }>(
+    `SELECT u.avatar_url
+     FROM crm_users u
+     ${MEMBERSHIP_JOIN}
+     WHERE u.id = $2
+       AND u.deleted_at IS NULL
+       AND mem.status IN ('active', 'invited', 'disabled')`,
+    [tenantId, id],
+  )
+  return result.rows[0]?.avatar_url?.trim() ?? null
 }
 
 export async function loadTenantScopedUserRow(

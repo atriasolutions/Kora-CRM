@@ -10,6 +10,7 @@ import {
 import { routeParam } from '../lib/route-params.js'
 import * as usersRepo from '../repositories/users.repository.js'
 import { sendAccountSetupInvite } from '../services/user-onboarding.service.js'
+import { sendStoredEntityImage } from '../utils/serve-entity-image.js'
 import {
   handleTwoFactorAdminReset,
   handleTwoFactorConfirm,
@@ -45,6 +46,19 @@ usersRouter.get(
     try {
       const items = await usersRepo.listTenantBirthdays()
       res.json({ data: items })
+    } catch (e) {
+      next(e)
+    }
+  },
+)
+
+usersRouter.get(
+  '/:id/avatar',
+  requireMentionLookup(),
+  async (req, res, next) => {
+    try {
+      const stored = await usersRepo.getUserAvatarStored(routeParam(req))
+      sendStoredEntityImage(res, stored)
     } catch (e) {
       next(e)
     }
