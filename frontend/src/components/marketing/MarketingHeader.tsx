@@ -191,13 +191,19 @@ export function MarketingHeader() {
           ))}
           <div className="mt-3 flex flex-col gap-2 border-t border-white/10 pt-3">
             {isAuthenticated ? (
-              <Button asChild variant="outline" className="rounded-xl border-white/20 text-white">
+              <Button
+                asChild
+                className="rounded-xl border-0 bg-white font-semibold text-slate-900 hover:bg-white/90"
+              >
                 <Link to={APP_HOME_PATH} onClick={() => setOpen(false)}>
                   Ir al CRM
                 </Link>
               </Button>
             ) : (
-              <Button asChild variant="outline" className="rounded-xl border-white/20 text-white">
+              <Button
+                asChild
+                className="rounded-xl border-0 bg-white font-semibold text-slate-900 hover:bg-white/90"
+              >
                 <Link to={getLoginPath()} onClick={() => setOpen(false)}>
                   Iniciar sesión
                 </Link>
