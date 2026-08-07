@@ -1,4 +1,5 @@
 import { enforceRecordQuota } from '../lib/tenant-quota-enforce.js'
+import { chilePartsFromDate } from '../lib/chile-timezone.js'
 import { tenantQuery, withTenantClient } from '../db/tenant-query.js'
 import { pushTenantCondition, tenantWhereParam } from '../lib/tenant-sql.js'
 import { getTenantIdOrDefault } from '../lib/tenant-context.js'
@@ -8,9 +9,11 @@ import {
   type BitacoraRow,
 } from '../mappers/bitacora.mapper.js'
 import { badRequest, notFound } from '../middleware/errors.js'
+import { getCompanyMonthlyAssignedHours } from '../repositories/companies.repository.js'
 import { loadTenantScopedUserRow } from '../repositories/users.repository.js'
 import type { AuditActor } from '../types/audit.js'
 import type {
+  BitacoraDashboardMonthlyQuota,
   BitacoraDashboardStats,
   BitacoraDetail,
   BitacoraListItem,
@@ -19,6 +22,7 @@ import type {
 } from '../types/bitacora.js'
 import { parseDateInput } from '../utils/format.js'
 import { paginationOffset } from '../utils/pagination.js'
+import { resolveOrderByClause } from '../lib/list-query.js'
 
 const BITACORA_COLUMNS = `
   id, solicitud_id, solicitud_code, solicitud_title,
@@ -40,6 +44,16 @@ export type ListBitacoraParams = {
   workDateTo?: string
   companyId?: string
   archivedOnly?: boolean
+  sortBy?: string
+  sortDir?: 'asc' | 'desc'
+}
+
+const BITACORA_SORT_COLUMNS: Record<string, string> = {
+  workDate: 'work_date',
+  hours: 'hours',
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
+  companyName: 'company_name',
 }
 
 async function resolveSolicitudSnapshot(
@@ -149,6 +163,12 @@ export async function listBitacora(
   params: ListBitacoraParams,
 ): Promise<{ items: BitacoraListItem[]; total: number }> {
   const { where, values } = buildListWhere(params)
+  const orderBy = resolveOrderByClause(
+    params.sortBy,
+    params.sortDir,
+    BITACORA_SORT_COLUMNS,
+    'work_date DESC, created_at DESC',
+  )
 
   return withTenantClient(async (client) => {
     const countResult = await client.query<{ count: string }>(
@@ -163,7 +183,7 @@ export async function listBitacora(
       `SELECT ${BITACORA_COLUMNS}
        FROM crm_bitacora_entries
        ${where}
-       ORDER BY work_date DESC, created_at DESC
+       ORDER BY ${orderBy}
        LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
       listValues,
     )
@@ -400,6 +420,98 @@ async function resolveDashboardCompanyName(companyId?: string): Promise<string |
   return result.rows[0]?.name?.trim() || undefined
 }
 
+function padDate(y: number, m: number, d: number): string {
+  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+}
+
+function resolveQuotaMonthBounds(params: BitacoraDashboardParams): {
+  from: string
+  to: string
+  label: string
+  monthKey: string
+} {
+  if (params.workDateFrom && params.workDateTo) {
+    const fromMonth = params.workDateFrom.slice(0, 7)
+    const toMonth = params.workDateTo.slice(0, 7)
+    if (fromMonth === toMonth && /^\d{4}-\d{2}$/.test(fromMonth)) {
+      const [year, month] = fromMonth.split('-').map(Number)
+      const lastDay = new Date(year, month, 0).getDate()
+      return {
+        from: `${fromMonth}-01`,
+        to: padDate(year, month, lastDay),
+        label: monthLabelFromKey(fromMonth),
+        monthKey: fromMonth,
+      }
+    }
+  }
+
+  const chile = chilePartsFromDate(new Date())
+  const lastDay = new Date(chile.year, chile.month, 0).getDate()
+  const monthKey = `${chile.year}-${String(chile.month).padStart(2, '0')}`
+  return {
+    from: `${monthKey}-01`,
+    to: padDate(chile.year, chile.month, lastDay),
+    label: monthLabelFromKey(monthKey),
+    monthKey,
+  }
+}
+
+/** Porcentaje de avance del mes calendario (100 % en meses pasados). */
+function resolveMonthProgressPercent(monthKey: string): number {
+  const match = /^(\d{4})-(\d{2})$/.exec(monthKey)
+  if (!match) return 100
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  if (!year || month < 1 || month > 12) return 100
+
+  const chile = chilePartsFromDate(new Date())
+  const quotaOrdinal = year * 100 + month
+  const currentOrdinal = chile.year * 100 + chile.month
+
+  if (quotaOrdinal < currentOrdinal) return 100
+  if (quotaOrdinal > currentOrdinal) return 0
+
+  const daysInMonth = new Date(year, month, 0).getDate()
+  if (daysInMonth <= 0) return 100
+  return Math.round((chile.day / daysInMonth) * 1000) / 10
+}
+
+async function resolveMonthlyQuota(
+  params: BitacoraDashboardParams,
+): Promise<BitacoraDashboardMonthlyQuota | null> {
+  if (!params.companyId) return null
+
+  const assignedHours = await getCompanyMonthlyAssignedHours(params.companyId)
+  if (assignedHours == null) return null
+
+  const monthBounds = resolveQuotaMonthBounds(params)
+  const tenantId = getTenantIdOrDefault()
+  const result = await tenantQuery<{ total_hours: string }>(
+    `SELECT coalesce(sum(hours), 0)::text AS total_hours
+     FROM crm_bitacora_entries
+     WHERE deleted_at IS NULL
+       AND company_id = $1
+       AND tenant_id = $2
+       AND work_date >= $3::date
+       AND work_date <= $4::date`,
+    [params.companyId, tenantId, monthBounds.from, monthBounds.to],
+  )
+  const usedHours = roundHours(Number(result.rows[0]?.total_hours ?? 0))
+  const utilizationPercent =
+    assignedHours > 0
+      ? Math.round((usedHours / assignedHours) * 1000) / 10
+      : 0
+
+  return {
+    assignedHours,
+    usedHours,
+    utilizationPercent,
+    monthProgressPercent: resolveMonthProgressPercent(monthBounds.monthKey),
+    monthLabel: monthBounds.label,
+  }
+}
+
 export function emptyBitacoraDashboardStats(
   periodLabel: string,
   companyName?: string,
@@ -546,6 +658,8 @@ export async function getBitacoraDashboardStats(
     (await resolveDashboardCompanyName(params.companyId)) ??
     (params.companyId ? byCompany[0]?.companyName : undefined)
 
+  const monthlyQuota = await resolveMonthlyQuota(params)
+
   return {
     billableHours,
     nonBillableHours,
@@ -553,7 +667,9 @@ export async function getBitacoraDashboardStats(
     entryCount,
     billableSharePercent,
     periodLabel: buildDashboardPeriodLabel(params),
+    companyId: params.companyId,
     companyName,
+    monthlyQuota,
     byMonth: monthResult.rows.map((row) => {
       const billable = roundHours(Number(row.billable_hours))
       const nonBillable = roundHours(Number(row.non_billable_hours))

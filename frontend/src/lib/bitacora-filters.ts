@@ -69,13 +69,7 @@ export function bitacoraRowMatchesFilters(
   return true
 }
 
-export type BitacoraServerListQuery = {
-  mine?: 'true'
-  billable?: 'true' | 'false'
-  workDateFrom?: string
-  workDateTo?: string
-  companyId?: string
-}
+export type BitacoraServerListQuery = Record<string, string>
 
 export function bitacoraFiltersToServerQuery(
   filters: BitacoraFilters,
@@ -97,12 +91,5 @@ export function bitacoraFiltersToServerQuery(
 }
 
 export function bitacoraFiltersResetKey(filters: BitacoraFilters, listScope: string): string {
-  const bounds = resolveBitacoraDateBounds(filters.date)
-  return [
-    listScope,
-    filters.billable,
-    bounds.from ?? '',
-    bounds.to ?? '',
-    filters.companyId.trim(),
-  ].join('|')
+  return `${listScope}|${JSON.stringify(bitacoraFiltersToServerQuery(filters, listScope === 'mine'))}`
 }

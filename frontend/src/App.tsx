@@ -23,11 +23,17 @@ import { ProductDetailPage } from '@/pages/ProductDetailPage'
 import { ProductsPage } from '@/pages/ProductsPage'
 import { InvoiceDetailPage } from '@/pages/InvoiceDetailPage'
 import { InvoicesPage } from '@/pages/InvoicesPage'
+import { BoletasPage } from '@/pages/BoletasPage'
+import { BoletaDetailPage } from '@/pages/BoletaDetailPage'
+import { GastosPage } from '@/pages/GastosPage'
+import { GastoDetailPage } from '@/pages/GastoDetailPage'
 import { ProjectDetailPage } from '@/pages/ProjectDetailPage'
 import { ProjectsPage } from '@/pages/ProjectsPage'
 import { SolicitudesPage } from '@/pages/SolicitudesPage'
 import { SolicitudDetailPage } from '@/pages/SolicitudDetailPage'
 import { BitacoraPage } from '@/pages/BitacoraPage'
+import { PruebasSolicitudPage } from '@/pages/PruebasSolicitudPage'
+import { PruebaSolicitudDetailPage } from '@/pages/PruebaSolicitudDetailPage'
 import { BitacoraDetailPage } from '@/pages/BitacoraDetailPage'
 import { InventoryDetailPage } from '@/pages/InventoryDetailPage'
 import { InventoryPage } from '@/pages/InventoryPage'
@@ -113,6 +119,8 @@ export default function App() {
                   <Route path="proyectos/:projectId" element={<ProjectDetailPage />} />
                   <Route path="solicitudes" element={<SolicitudesPage />} />
                   <Route path="solicitudes/:solicitudId" element={<SolicitudDetailPage />} />
+                  <Route path="pruebas-solicitud" element={<PruebasSolicitudPage />} />
+                  <Route path="pruebas-solicitud/:pruebaId" element={<PruebaSolicitudDetailPage />} />
                   <Route path="bitacora" element={<BitacoraPage />} />
                   <Route path="bitacora/:bitacoraId" element={<BitacoraDetailPage />} />
                   <Route path="compras" element={<PurchasesPage />} />
@@ -125,6 +133,10 @@ export default function App() {
                   <Route path="productos/:productId" element={<ProductDetailPage />} />
                   <Route path="facturacion" element={<InvoicesPage />} />
                   <Route path="facturacion/:invoiceId" element={<InvoiceDetailPage />} />
+                  <Route path="boletas" element={<BoletasPage />} />
+                  <Route path="boletas/:boletaId" element={<BoletaDetailPage />} />
+                  <Route path="gastos" element={<GastosPage />} />
+                  <Route path="gastos/:gastoId" element={<GastoDetailPage />} />
                   <Route path="usuarios" element={<UsersPage />} />
                   <Route path="usuarios/:userId" element={<UserDetailPage />} />
                   <Route path="perfiles" element={<ProfilesPage />} />
@@ -141,9 +153,12 @@ export default function App() {
                         slug !== 'actividades' &&
                         slug !== 'proyectos' &&
                         slug !== 'solicitudes' &&
+                        slug !== 'pruebas_solicitud' &&
                         slug !== 'bitacora' &&
                         slug !== 'productos' &&
                         slug !== 'facturacion' &&
+                        slug !== 'boletas' &&
+                        slug !== 'gastos' &&
                         slug !== 'usuarios' &&
                         slug !== 'reportes' &&
                         slug !== 'configuracion',

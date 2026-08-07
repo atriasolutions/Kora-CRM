@@ -11,10 +11,13 @@ export type EntityFilesScope =
   | 'inventario'
   | 'compra'
   | 'factura'
+  | 'boleta'
+  | 'gasto'
   | 'cotizacion'
   | 'oportunidad'
   | 'proyecto'
   | 'solicitud'
+  | 'prueba_caso'
 
 function storageKey(scope: EntityFilesScope, entityId: string): string {
   return `${scope}:${entityId.trim()}`
@@ -63,6 +66,13 @@ export function removeEntityFilesLocal(scope: EntityFilesScope, entityId: string
   if (!all[key]) return
   delete all[key]
   writeAll(all)
+}
+
+export async function listEntityFiles(
+  scope: EntityFilesScope,
+  entityId: string,
+): Promise<EntityFileRecord[]> {
+  return mergeEntityFiles(scope, entityId, [])
 }
 
 export async function mergeEntityFiles(

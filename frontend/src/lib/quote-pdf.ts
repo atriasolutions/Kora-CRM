@@ -5,6 +5,7 @@ import type { BankAccount } from '@/api/bank-accounts'
 import type { CompanyListItem } from '@/data/companies.mock'
 import type { QuoteDetail, QuoteLineItem } from '@/data/quote-detail.mock'
 import { amountInWordsSpanish } from '@/lib/amount-in-words-es'
+import { formatDocumentRateDate } from '@/lib/currency'
 import type { CompanyAddressRecord } from '@/lib/company-location'
 import { drawDocumentPdfBlueBox } from '@/lib/document-pdf-blue-box'
 import { formatOrganizationLocation } from '@/lib/organization-location'
@@ -464,6 +465,35 @@ export function buildQuotePdf(
   })
 
   y = tableFinalY(doc, y + 24) + 4
+
+  const rateLines: string[] = []
+  const rateDate = quote.exchangeRateDate ?? quote.issueDate
+  if (quote.exchangeRateUf != null) {
+    rateLines.push(
+      `Valor de la UF al día ${formatDocumentRateDate(rateDate)}: $ ${formatAmount(quote.exchangeRateUf)}`,
+    )
+  }
+  if (quote.exchangeRateUsd != null) {
+    rateLines.push(
+      `Valor del dólar al día ${formatDocumentRateDate(rateDate)}: $ ${formatAmount(quote.exchangeRateUsd)}`,
+    )
+  }
+  if (quote.exchangeRateEur != null) {
+    rateLines.push(
+      `Valor del euro al día ${formatDocumentRateDate(rateDate)}: $ ${formatAmount(quote.exchangeRateEur)}`,
+    )
+  }
+  if (rateLines.length > 0) {
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    for (const line of rateLines) {
+      y = ensurePageSpace(doc, y, 5)
+      doc.text(line, margin, y)
+      y += 4
+    }
+    y += 2
+  }
+
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(8)
   doc.setTextColor(...TEXT)

@@ -21,6 +21,7 @@ import { ContactFormInput } from '@/components/contacts/ContactFormField'
 import { Button } from '@/components/ui/button'
 import { KoraLogoMark } from '@/components/layout/KoraLogoMark'
 import { LoginTwoFactorFlow } from '@/components/auth/LoginTwoFactorFlow'
+import { PwaInstallButton } from '@/components/pwa/PwaInstallButton'
 import { useAuth } from '@/hooks/use-auth'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import { useTenantBranding } from '@/hooks/use-tenant-branding'
@@ -205,7 +206,8 @@ function LoginFormCard({
               }}
             />
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+            <>
+              <form onSubmit={handleSubmit} className="space-y-4" noValidate>
               <ContactFormInput
                 id="login-email"
                 label="Email"
@@ -256,6 +258,10 @@ function LoginFormCard({
                 {loading ? 'Ingresando…' : 'Ingresar'}
               </Button>
             </form>
+              <div className="mt-3 flex justify-center">
+                <PwaInstallButton className="w-full border-border" />
+              </div>
+            </>
           )}
         </div>
       </div>

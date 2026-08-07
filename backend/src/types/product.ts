@@ -1,3 +1,9 @@
+import type {
+  ProductVariantKind,
+  VariantAttributes,
+  VariantOption,
+} from '../lib/product-variants.js'
+
 export type ProductStatus = 'Activo' | 'Agotado' | 'Borrador'
 
 export type ProductListItem = {
@@ -30,6 +36,14 @@ export type ProductListItem = {
   brand?: string
   publishInIntegration: boolean
   publishPriceInIntegration: boolean
+  parentProductId?: string
+  parentName?: string
+  parentSku?: string
+  variantOptions?: VariantOption[]
+  variantAttributes?: VariantAttributes
+  variantKind: ProductVariantKind
+  variantsCount: number
+  variants?: ProductListItem[]
   createdAt: string
   createdById: string
   createdByName: string
@@ -61,6 +75,29 @@ export type CreateProductInput = {
   trackInventory?: boolean
   minStock?: number
   maxStock?: number
+  parentProductId?: string | null
+  variantOptions?: VariantOption[]
+  variantAttributes?: VariantAttributes
 }
 
 export type UpdateProductInput = Partial<CreateProductInput>
+
+export type CreateVariantsBatchInput = {
+  options?: VariantOption[]
+  variants?: {
+    sku?: string
+    attributes: VariantAttributes
+    priceNum?: number
+    costPriceNum?: number
+    stockNum?: number
+    status?: ProductStatus
+    trackInventory?: boolean
+  }[]
+}
+
+export type ConvertToParentInput = {
+  options: VariantOption[]
+  firstVariantAttributes: VariantAttributes
+  firstVariantSku?: string
+  firstVariantName?: string
+}

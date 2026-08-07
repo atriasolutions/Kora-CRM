@@ -42,6 +42,8 @@ export type SolicitudListItem = {
   teamMembers?: SolicitudListTeamMember[]
   companyId?: string
   companyName?: string
+  documentationUrl?: string
+  gitBranchUrl?: string
 }
 
 export type SolicitudDetail = SolicitudListItem & {
@@ -64,6 +66,8 @@ export type CreateSolicitudInput = {
   /** Usuario invitado en cuyo nombre se registra la solicitud (solo equipo interno). */
   requesterUserId?: string | null
   team?: SolicitudTeamMemberInput[]
+  documentationUrl?: string
+  gitBranchUrl?: string
 }
 
 export type UpdateSolicitudInput = Partial<CreateSolicitudInput>

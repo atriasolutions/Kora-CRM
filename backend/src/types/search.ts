@@ -4,6 +4,8 @@ export type SearchEntityType =
   | 'opportunity'
   | 'quote'
   | 'invoice'
+  | 'boleta'
+  | 'gasto'
   | 'activity'
   | 'project'
   | 'product'

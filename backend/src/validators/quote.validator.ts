@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { listSortAndDateQueryFields } from '../lib/list-query.js'
+
 const lineItemSchema = z
   .object({
     productId: z.string().uuid().nullable().optional(),
@@ -55,4 +57,5 @@ export const listQuotesQuerySchema = z.object({
     .enum(['true', 'false'])
     .optional()
     .transform((v) => v === 'true'),
+  ...listSortAndDateQueryFields,
 })

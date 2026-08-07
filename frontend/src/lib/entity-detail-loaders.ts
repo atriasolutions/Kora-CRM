@@ -6,10 +6,13 @@ import { getProductApi } from '@/api/products'
 import { getQuoteApi, listQuotesForOpportunityApi } from '@/api/quotes'
 import { normalizeQuoteDetailFromApi } from '@/lib/quote-detail-normalize'
 import { getInvoiceApi } from '@/api/invoices'
+import { getBoletaApi } from '@/api/boletas'
+import { getExpenseApi } from '@/api/expenses'
 import { getProjectApi } from '@/api/projects'
 import { getSolicitudApi } from '@/api/solicitudes'
 import { getActivityApi } from '@/api/activities'
 import { getBitacoraApi } from '@/api/bitacora'
+import { getPruebaSolicitudApi } from '@/api/pruebas-solicitud'
 import { getUserApi } from '@/api/users'
 import { getPurchaseApi } from '@/api/purchases'
 import { getInventoryApi } from '@/api/inventory'
@@ -26,11 +29,14 @@ import type { OpportunityListItem } from '@/data/opportunities.mock'
 import { buildDetailFromList } from '@/data/product-detail.mock'
 import type { QuoteDetail } from '@/data/quote-detail.mock'
 import type { InvoiceDetail } from '@/data/invoice-detail.mock'
+import type { BoletaDetail } from '@/data/boleta-detail.mock'
+import type { ExpenseDetail } from '@/data/expenses.mock'
 import type { ProjectDetail } from '@/data/project-detail.mock'
 import type { SolicitudDetail } from '@/data/solicitudes.mock'
 import type { ActivityDetail } from '@/data/activity-detail.mock'
 import { resolveBitacoraListItem } from '@/data/bitacora.mock'
 import type { BitacoraListItem } from '@/data/bitacora.mock'
+import type { PruebaSolicitudDetail } from '@/data/pruebas-solicitud.mock'
 import type { PurchaseDetail } from '@/data/purchase-detail.mock'
 import { getCompanyLocationsApi } from '@/api/companies'
 import { isApiEnabled } from '@/api/config'
@@ -74,6 +80,8 @@ import { getCompanyFiles } from '@/lib/company-files'
 import { getContactFiles } from '@/lib/contact-files'
 import { getInventoryFiles } from '@/lib/inventory-files'
 import { getInvoiceFiles } from '@/lib/invoice-files'
+import { getBoletaFiles } from '@/lib/boleta-files'
+import { getExpenseFiles } from '@/lib/expense-files'
 import { getPurchaseFiles } from '@/lib/purchase-files'
 import { getQuoteFiles } from '@/lib/quote-files'
 import { getOpportunityFiles } from '@/lib/opportunity-files'
@@ -464,6 +472,9 @@ export async function loadInvoiceDetail(id: string): Promise<InvoiceDetail> {
     discountAmount: totals.discountAmount,
     taxPercent: totals.taxPercent,
     taxAmount: totals.taxAmount,
+    // Cabecera y saldo deben nacer de las mismas líneas (evita Total ≠ Neto+IVA).
+    amount: totals.amount,
+    amountNum: totals.amountNum,
     globalDiscount,
     paidAmountNum,
     balanceDue:
@@ -481,6 +492,74 @@ export async function loadInvoiceDetail(id: string): Promise<InvoiceDetail> {
     internalNotes: '',
     description: api.description ?? '',
   } as InvoiceDetail
+}
+
+export async function loadBoletaDetail(id: string): Promise<BoletaDetail> {
+  if (isApiEnabled()) {
+    const api = await getBoletaApi(id)
+    const lineItems = api.lineItems ?? []
+    const globalDiscount = api.globalDiscount
+    const totals = computeInvoiceTotals(lineItems, {
+      globalDiscountPercent: globalDiscount,
+    })
+    const internalNotes =
+      typeof api.internalNotes === 'string'
+        ? api.internalNotes
+        : typeof api.notes === 'string'
+          ? api.notes
+          : ''
+    return {
+      ...api,
+      id: api.id,
+      lineItems,
+      subtotal: totals.subtotal,
+      taxableSubtotal: totals.taxableSubtotal,
+      exemptSubtotal: totals.exemptSubtotal,
+      taxPercent: totals.taxPercent,
+      taxAmount: totals.taxAmount,
+      amount: totals.amount,
+      amountNum: totals.amountNum,
+      globalDiscount,
+      internalNotes,
+      description: `Boleta emitida a ${api.buyerName}.`,
+      activities: [],
+      statusHistory: [],
+      notes: await mergeEntityNotes('boleta', id, Array.isArray(api.notes) ? api.notes : []),
+      files: await mergeEntityFiles('boleta', id, getBoletaFiles(id, api.owner ?? '—')),
+    }
+  }
+
+  const { getBoletaDetail } = await import('@/data/boleta-detail.mock')
+  const detail = getBoletaDetail(id)
+  detail.notes = await mergeEntityNotes('boleta', id, detail.notes ?? [])
+  detail.files = await mergeEntityFiles('boleta', id, getBoletaFiles(id, detail.owner))
+  return detail
+}
+
+export async function loadExpenseDetail(id: string): Promise<ExpenseDetail> {
+  if (isApiEnabled()) {
+    const api = await getExpenseApi(id)
+    const internalNotes =
+      typeof api.internalNotes === 'string'
+        ? api.internalNotes
+        : typeof (api as { notes?: unknown }).notes === 'string'
+          ? String((api as { notes?: string }).notes)
+          : ''
+    return {
+      ...api,
+      id: api.id,
+      internalNotes,
+      activities: api.activities ?? [],
+      notes: await mergeEntityNotes('gasto', id, Array.isArray(api.notes) ? api.notes : []),
+      files: await mergeEntityFiles('gasto', id, getExpenseFiles(id, api.owner ?? '—')),
+    }
+  }
+
+  const { getExpenseDetail } = await import('@/data/expenses.mock')
+  const detail = getExpenseDetail(id)
+  detail.notes = await mergeEntityNotes('gasto', id, detail.notes ?? [])
+  detail.files = await mergeEntityFiles('gasto', id, getExpenseFiles(id, detail.owner))
+  return detail
 }
 
 export async function loadProjectDetail(id: string): Promise<ProjectDetail> {
@@ -576,4 +655,8 @@ export async function loadBitacoraDetail(id: string): Promise<BitacoraListItem> 
     return getBitacoraApi(id)
   }
   return resolveBitacoraListItem(id)
+}
+
+export async function loadPruebaSolicitudDetail(id: string): Promise<PruebaSolicitudDetail> {
+  return getPruebaSolicitudApi(id)
 }

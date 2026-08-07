@@ -88,7 +88,7 @@ export function QuoteInternalInventorySection({
           <QuoteInternalInventorySectionDescription />
         </div>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid min-w-0 gap-3 sm:grid-cols-2">
         <WarehouseDestinationFields
           warehouseFieldId={warehouseFieldId}
           addressFieldId={addressFieldId}
@@ -96,12 +96,17 @@ export function QuoteInternalInventorySection({
           warehouseName={warehouseName}
           deliveryAddress={deliveryAddress}
           readOnlyDeliveryAddress
+          hideAddressHelper
           warehouseLabel="Dirección de origen"
           addressLabel="Dirección"
           addressHelperText="Se carga desde Configuración → Direcciones de despacho al elegir la ubicación. Solo para reservas y movimientos de stock."
           onChange={onChange ?? (() => {})}
         />
       </div>
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        Se carga desde Configuración → Direcciones de despacho al elegir la ubicación. Solo para
+        reservas y movimientos de stock.
+      </p>
     </section>
   )
 }

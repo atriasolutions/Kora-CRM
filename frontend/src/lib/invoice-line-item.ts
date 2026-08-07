@@ -1,11 +1,19 @@
 import type { InvoiceLineItem, InvoiceLineKind } from '@/data/invoice-detail.mock'
 import type { QuoteDetail } from '@/data/quote-detail.mock'
 import type { ProductListItem } from '@/data/products.mock'
+import {
+  convertAmountToClp,
+  formatForeignAmount,
+  normalizeProductCurrency,
+  type ExchangeRateSnapshot,
+  type ProductCurrency,
+} from '@/lib/currency'
 import { getDefaultVatPercent, formatVatPercentLabel } from '@/lib/default-vat'
 import {
   formatGlobalDiscountPercent,
   parseGlobalDiscountPercent,
 } from '@/lib/document-global-discount'
+import { parseProductPrice } from '@/lib/product-currency-input'
 import { formatMoneyCLP, parseMoneyNum } from '@/lib/product-pricing'
 import { findLinkedProduct, getAllKnownProducts } from '@/lib/product-lookup'
 import { isManualQuoteLine, saleAmountFromProduct } from '@/lib/quote-line-item'
@@ -30,18 +38,69 @@ export function invoiceLineSubjectToVat(line: InvoiceLineItem): boolean {
   return line.subjectToVat !== false
 }
 
-export function recalcInvoiceLine(li: InvoiceLineItem): InvoiceLineItem {
-  const unitNum = parseMoneyNum(li.unitPrice)
-  const qty = Math.max(1, li.quantity || 1)
-  const gross = unitNum * qty
+export function invoiceLineCurrency(line: InvoiceLineItem): ProductCurrency {
+  return normalizeProductCurrency(line.priceCurrency)
+}
+
+function originalAmountFromLine(line: InvoiceLineItem): number {
+  const currency = invoiceLineCurrency(line)
+  if (line.unitPriceOriginalNum != null && Number.isFinite(line.unitPriceOriginalNum)) {
+    return line.unitPriceOriginalNum
+  }
+  if (line.unitPriceOriginal?.trim()) {
+    return parseProductPrice(line.unitPriceOriginal, currency)
+  }
+  if (currency === 'CLP') return parseMoneyNum(line.unitPrice)
+  return parseProductPrice(line.unitPrice, currency)
+}
+
+function unitPriceClpNum(
+  line: InvoiceLineItem,
+  rates?: ExchangeRateSnapshot | null,
+): number {
+  const currency = invoiceLineCurrency(line)
+  const original = originalAmountFromLine(line)
+  if (currency === 'CLP') return original
+  if (!rates) return parseMoneyNum(line.unitPrice)
+  return convertAmountToClp(original, currency, rates)
+}
+
+export function recalcInvoiceLine(
+  li: InvoiceLineItem,
+  rates?: ExchangeRateSnapshot | null,
+): InvoiceLineItem {
+  const currency = invoiceLineCurrency(li)
+  const original = originalAmountFromLine(li)
+  const unitClp = unitPriceClpNum({ ...li, unitPriceOriginalNum: original }, rates)
+  // 0 permitido mientras se edita; al blur/guardar se normaliza a ≥ 1.
+  const qty = Math.max(0, Math.floor(Number(li.quantity)) || 0)
+  const gross = unitClp * qty
   const pct = parseDiscountPercent(li.discount)
   const net = Math.round(gross * (1 - pct / 100))
+  const clpDigits = String(li.unitPrice ?? '').replace(/[^\d]/g, '')
+
   return {
     ...li,
     lineKind: invoiceLineKind(li),
+    priceCurrency: currency,
+    unitPriceOriginalNum: original,
+    unitPriceOriginal:
+      currency !== 'CLP' ? formatForeignAmount(original, currency) : undefined,
     quantity: qty,
+    unitPrice: currency === 'CLP' && !clpDigits ? '' : formatMoneyCLP(unitClp),
     total: formatMoneyCLP(net),
   }
+}
+
+export function recalcInvoiceLinesWithRates(
+  items: InvoiceLineItem[],
+  rates?: ExchangeRateSnapshot | null,
+  options?: { skipWhileLoading?: boolean },
+): InvoiceLineItem[] {
+  if (options?.skipWhileLoading || !rates) return items
+  const hasForeign = items.some((line) => invoiceLineCurrency(line) !== 'CLP')
+  if (!hasForeign) return items
+  return items.map((line) => recalcInvoiceLine(line, rates))
 }
 
 export function defaultInvoiceLineItem(
@@ -55,6 +114,8 @@ export function defaultInvoiceLineItem(
     productId: kind === 'product' ? '' : undefined,
     description: '',
     quantity: 1,
+    priceCurrency: 'CLP',
+    unitPriceOriginalNum: 0,
     unitPrice: '$0',
     discount: '0%',
     total: '$0',
@@ -65,23 +126,33 @@ export function defaultInvoiceLineItem(
 export function invoiceLineFromProduct(
   product: ProductListItem,
   lineId: string,
+  rates?: ExchangeRateSnapshot | null,
 ): InvoiceLineItem {
+  const currency = normalizeProductCurrency(product.priceCurrency)
   const saleNum = saleAmountFromProduct(product)
-  return recalcInvoiceLine({
-    id: lineId,
-    lineKind: 'product',
-    productId: product.id,
-    sku: product.sku,
-    description: product.name,
-    quantity: 1,
-    unitPrice: formatMoneyCLP(saleNum),
-    discount: '0%',
-    total: '$0',
-    subjectToVat: true,
-  })
+  return recalcInvoiceLine(
+    {
+      id: lineId,
+      lineKind: 'product',
+      productId: product.id,
+      sku: product.sku,
+      description: product.name,
+      quantity: 1,
+      priceCurrency: currency,
+      unitPriceOriginalNum: saleNum,
+      unitPrice: '$0',
+      discount: '0%',
+      total: '$0',
+      subjectToVat: true,
+    },
+    rates,
+  )
 }
 
-function enrichInvoiceLineFromCatalog(line: InvoiceLineItem): InvoiceLineItem {
+function enrichInvoiceLineFromCatalog(
+  line: InvoiceLineItem,
+  rates?: ExchangeRateSnapshot | null,
+): InvoiceLineItem {
   if (isManualInvoiceLine(line)) return line
   const linked = findLinkedProduct(getAllKnownProducts(), {
     id: line.productId,
@@ -89,13 +160,16 @@ function enrichInvoiceLineFromCatalog(line: InvoiceLineItem): InvoiceLineItem {
     sku: line.sku,
   })
   if (!linked) return line
-  return recalcInvoiceLine({
-    ...line,
-    lineKind: 'product',
-    productId: linked.id,
-    sku: linked.sku,
-    description: linked.name,
-  })
+  return recalcInvoiceLine(
+    {
+      ...line,
+      lineKind: 'product',
+      productId: linked.id,
+      sku: linked.sku,
+      description: linked.name,
+    },
+    rates,
+  )
 }
 
 export function invoiceLinesFromQuote(quote: QuoteDetail): InvoiceLineItem[] {
@@ -108,6 +182,9 @@ export function invoiceLinesFromQuote(quote: QuoteDetail): InvoiceLineItem[] {
         sku: li.sku,
         description: li.description,
         quantity: li.quantity,
+        priceCurrency: li.priceCurrency,
+        unitPriceOriginal: li.unitPriceOriginal,
+        unitPriceOriginalNum: li.unitPriceOriginalNum,
         unitPrice: li.unitPrice,
         discount: li.discount,
         total: li.total,

@@ -6,6 +6,8 @@ export type ServerListFetchParams = {
   page: number
   pageSize: number
   query: string
+  sortBy?: string
+  sortDir?: 'asc' | 'desc'
 }
 
 export type ServerListFetchResult<T> = {
@@ -18,6 +20,8 @@ type UseServerListQueryOptions<T> = {
   page: number
   pageSize: number
   query: string
+  sortBy?: string
+  sortDir?: 'asc' | 'desc'
   /** Reinicia a página 1 cuando cambia (filtros externos). */
   resetKey?: unknown
   enabled?: boolean
@@ -28,6 +32,8 @@ export function useServerListQuery<T>({
   page,
   pageSize,
   query,
+  sortBy,
+  sortDir,
   resetKey,
   enabled = true,
 }: UseServerListQueryOptions<T>) {
@@ -56,7 +62,7 @@ export function useServerListQuery<T>({
     setConnectionError(false)
 
     void fetchRef
-      .current({ page, pageSize, query })
+      .current({ page, pageSize, query, sortBy, sortDir })
       .then((result) => {
         if (cancelled) return
         setRows(result.rows)
@@ -74,7 +80,7 @@ export function useServerListQuery<T>({
     return () => {
       cancelled = true
     }
-  }, [enabled, page, pageSize, query, resetKey])
+  }, [enabled, page, pageSize, query, sortBy, sortDir, resetKey])
 
   return { rows, total, loading, connectionError, reload }
 }

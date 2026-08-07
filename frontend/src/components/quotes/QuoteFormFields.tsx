@@ -4,11 +4,13 @@ import {
   ContactFormSelect,
 } from '@/components/contacts/ContactFormField'
 import { OpportunityLookupField } from '@/components/shared/OpportunityLookupField'
+import { QuoteCurrencySection } from '@/components/quotes/QuoteCurrencySection'
 import { QuoteCustomerSummary } from '@/components/quotes/QuoteCustomerSummary'
 import { QuoteInternalInventorySection } from '@/components/quotes/QuoteInternalInventorySection'
 import type { OpportunityListItem } from '@/data/opportunities.mock'
 import { UserLookupField } from '@/components/shared/UserLookupField'
 import { QUOTE_STATUS_OPTIONS, type QuoteFormValues } from '@/lib/quote-form'
+import type { ProductCurrency } from '@/lib/currency'
 
 export type QuoteFormFieldsModel = QuoteFormValues & {
   opportunityId?: string
@@ -87,6 +89,12 @@ export function QuoteFormFields({
         inputVariant="alphanumeric"
         value={form.title}
         onChange={(title) => onChange({ title })}
+      />
+      <QuoteCurrencySection
+        issueDate={form.issueDate}
+        quoteCurrency={form.quoteCurrency}
+        onIssueDateChange={(issueDate) => onChange({ issueDate })}
+        onQuoteCurrencyChange={(quoteCurrency: ProductCurrency) => onChange({ quoteCurrency })}
       />
       <QuoteInternalInventorySection
         warehouseFieldId="quote-warehouse"

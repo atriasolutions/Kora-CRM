@@ -1,4 +1,5 @@
 import { useCallback } from 'react'
+import { flushSync } from 'react-dom'
 
 import type { ContactNote } from '@/data/contact-detail.mock'
 import { apiActionErrorMessage } from '@/api/errors'
@@ -31,10 +32,13 @@ export function useEntityNotes<T extends { notes: ContactNote[] }>({
       if (!entityId) return
       void (async () => {
         let priorNotes: ContactNote[] = []
-        setRecord((prev) => {
-          if (!prev) return prev
-          priorNotes = prev.notes
-          return { ...prev, notes: [note, ...prev.notes] } as T
+        // flushSync: el snapshot debe existir antes del await (si no, priorNotes puede quedar [])
+        flushSync(() => {
+          setRecord((prev) => {
+            if (!prev) return prev
+            priorNotes = prev.notes
+            return { ...prev, notes: [note, ...prev.notes] } as T
+          })
         })
         try {
           const notes = await appendEntityNote(scope, entityId, note, priorNotes)
@@ -62,13 +66,15 @@ export function useEntityNotes<T extends { notes: ContactNote[] }>({
       if (!entityId) return
       void (async () => {
         let priorNotes: ContactNote[] = []
-        setRecord((prev) => {
-          if (!prev) return prev
-          priorNotes = prev.notes
-          return {
-            ...prev,
-            notes: prev.notes.filter((n) => n.id !== noteId),
-          } as T
+        flushSync(() => {
+          setRecord((prev) => {
+            if (!prev) return prev
+            priorNotes = prev.notes
+            return {
+              ...prev,
+              notes: prev.notes.filter((n) => n.id !== noteId),
+            } as T
+          })
         })
         try {
           const notes = await removeEntityNoteById(

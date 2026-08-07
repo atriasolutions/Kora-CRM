@@ -20,6 +20,8 @@ export type SolicitudFormValues = {
   /** Usuario invitado solicitante (creación interna a petición de). */
   requesterName: string
   requesterUserId: string
+  documentationUrl: string
+  gitBranchUrl: string
 }
 
 export { SOLICITUD_STATUS_OPTIONS, SOLICITUD_PRIORITY_OPTIONS }
@@ -36,6 +38,8 @@ export function defaultSolicitudFormValues(
     assigneeUserId: '',
     requesterName: '',
     requesterUserId: '',
+    documentationUrl: '',
+    gitBranchUrl: '',
     ...partial,
   }
 }
@@ -55,6 +59,8 @@ export function solicitudDetailToFormValues(solicitud: SolicitudDetail): Solicit
     assigneeUserId: solicitud.assigneeUserId ?? '',
     requesterName: '',
     requesterUserId: '',
+    documentationUrl: solicitud.documentationUrl ?? '',
+    gitBranchUrl: solicitud.gitBranchUrl ?? '',
   }
 }
 
@@ -70,6 +76,8 @@ export function applyFormValuesToSolicitud(
     priority: values.priority,
     assignee: values.assigneeName.trim(),
     assigneeUserId: values.assigneeUserId.trim() || undefined,
+    documentationUrl: values.documentationUrl.trim() || undefined,
+    gitBranchUrl: values.gitBranchUrl.trim() || undefined,
   }
 }
 

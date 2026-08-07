@@ -9,6 +9,7 @@ import {
   Shield,
   Target,
   FileSpreadsheet,
+  Receipt,
   UsersRound,
   ShoppingCart,
   ArrowDownToLine,
@@ -17,6 +18,7 @@ import {
   Puzzle,
   ClipboardList,
   Clock,
+  ClipboardCheck,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -65,6 +67,7 @@ export const navSections: NavSectionDef[] = [
       { label: 'Oportunidades', path: '/oportunidades', icon: Target, moduleId: 'oportunidades' },
       { label: 'Cotizaciones', path: '/cotizaciones', icon: FileSpreadsheet, moduleId: 'cotizaciones' },
       { label: 'Facturación', path: '/facturacion', icon: Wallet, moduleId: 'facturacion' },
+      { label: 'Boletas', path: '/boletas', icon: Receipt, moduleId: 'boletas' },
     ],
   },
   {
@@ -75,6 +78,7 @@ export const navSections: NavSectionDef[] = [
       { label: 'Actividades', path: '/actividades', icon: ListTodo, moduleId: 'actividades' },
       { label: 'Proyectos', path: '/proyectos', icon: Puzzle, moduleId: 'proyectos' },
       { label: 'Solicitudes', path: '/solicitudes', icon: ClipboardList, moduleId: 'solicitudes' },
+      { label: 'Pruebas de Solicitud', path: '/pruebas-solicitud', icon: ClipboardCheck, moduleId: 'pruebas_solicitud' },
       { label: 'Bitácora', path: '/bitacora', icon: Clock, moduleId: 'bitacora' },
     ],
   },
@@ -83,6 +87,7 @@ export const navSections: NavSectionDef[] = [
     heading: 'Abastecimiento',
     items: [
       { label: 'Compras', path: '/compras', icon: ShoppingCart, moduleId: 'compras' },
+      { label: 'Gastos', path: '/gastos', icon: Wallet, moduleId: 'gastos' },
       { label: 'Ingresos', path: '/ingresos', icon: ArrowDownToLine, moduleId: 'ingresos' },
       { label: 'Inventario', path: '/inventario', icon: Warehouse, moduleId: 'inventario' },
       { label: 'Productos', path: '/productos', icon: Boxes, moduleId: 'productos' },

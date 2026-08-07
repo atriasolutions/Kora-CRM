@@ -24,11 +24,14 @@ export function chilePartsFromDate(date: Date): {
   }).formatToParts(date)
   const get = (type: Intl.DateTimeFormatPartTypes) =>
     Number(parts.find((p) => p.type === type)?.value ?? '0')
+  // Algunos ICU (p. ej. Node en Linux) reportan medianoche como hour=24.
+  let hour = get('hour')
+  if (hour === 24) hour = 0
   return {
     year: get('year'),
     month: get('month'),
     day: get('day'),
-    hour: get('hour'),
+    hour,
     minute: get('minute'),
   }
 }
@@ -163,10 +166,36 @@ export function formatChileSessionWhen(iso: string | Date | null | undefined): s
   return `${dateLabel}, ${time}`
 }
 
+/** Partes Y-M-D de una fecha de calendario (sin desfase por zona horaria). */
+function calendarDateParts(value: string | Date): { year: number; month: number; day: number } | null {
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(trimmed)
+    if (match) {
+      return { year: Number(match[1]), month: Number(match[2]), day: Number(match[3]) }
+    }
+    const parsed = new Date(trimmed)
+    if (Number.isNaN(parsed.getTime())) return null
+    return {
+      year: parsed.getUTCFullYear(),
+      month: parsed.getUTCMonth() + 1,
+      day: parsed.getUTCDate(),
+    }
+  }
+  if (Number.isNaN(value.getTime())) return null
+  return {
+    year: value.getUTCFullYear(),
+    month: value.getUTCMonth() + 1,
+    day: value.getUTCDate(),
+  }
+}
+
 /** Fecha corta en calendario Chile (ej. `30 jun 2024`). */
 export function formatChileDateLabel(iso: string | Date | null | undefined): string {
   if (!iso) return '—'
-  const date = typeof iso === 'string' ? new Date(iso) : iso
+  const parts = calendarDateParts(iso)
+  if (!parts) return '—'
+  const date = new Date(Date.UTC(parts.year, parts.month - 1, parts.day, 12, 0, 0))
   if (Number.isNaN(date.getTime())) return '—'
   return date.toLocaleDateString('es-CL', {
     day: 'numeric',

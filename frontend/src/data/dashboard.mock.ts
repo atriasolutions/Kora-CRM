@@ -233,7 +233,7 @@ function defaultDashboardPeriodFromMock(): DashboardPeriod {
 function chartDescriptionForMock(period: DashboardPeriod): string {
   if (period.mode === 'years') return 'Comparación anual'
   if (period.mode === 'year') return 'Desglose mensual del año'
-  return 'Últimos 6 meses'
+  return 'Desglose diario del mes'
 }
 
 export function getDashboardMock(

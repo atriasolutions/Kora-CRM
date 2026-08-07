@@ -35,6 +35,10 @@ solicitudesRouter.get(
           hasElevatedTenantScope(profile) || actor.isPlatformOperator
             ? undefined
             : { userId: actor.userId, userName: actor.userName },
+        sortBy: query.sortBy,
+        sortDir: query.sortDir,
+        dateFrom: query.dateFrom,
+        dateTo: query.dateTo,
       })
       res.json({
         data: result.items,

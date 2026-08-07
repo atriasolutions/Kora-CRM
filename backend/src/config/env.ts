@@ -78,4 +78,14 @@ export const env = {
     'kora-dev-sii-key-change-in-production',
   /** Ambiente SII por defecto: certification | production */
   siiDefaultEnv: (process.env.SII_ENV ?? 'certification') as 'certification' | 'production',
+  /**
+   * Web Push (VAPID). Sin estas claves el envío push se omite (notificaciones in-app siguen OK).
+   * Generar con: npx web-push generate-vapid-keys
+   */
+  webPushVapidPublicKey: (process.env.WEB_PUSH_VAPID_PUBLIC_KEY ?? '').trim(),
+  webPushVapidPrivateKey: (process.env.WEB_PUSH_VAPID_PRIVATE_KEY ?? '').trim(),
+  webPushVapidSubject: (
+    process.env.WEB_PUSH_VAPID_SUBJECT ??
+    `mailto:noreply@${(process.env.PLATFORM_DOMAIN ?? 'koracrm.cl').trim()}`
+  ).trim(),
 }

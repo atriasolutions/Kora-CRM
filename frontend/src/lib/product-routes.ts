@@ -1,5 +1,6 @@
 export type ProductDetailTab =
   | 'detalle'
+  | 'variedades'
   | 'actividad'
   | 'inventario'
   | 'ingresos'
@@ -9,6 +10,7 @@ export type ProductDetailTab =
 
 const PRODUCT_DETAIL_TABS: ProductDetailTab[] = [
   'detalle',
+  'variedades',
   'actividad',
   'inventario',
   'ingresos',

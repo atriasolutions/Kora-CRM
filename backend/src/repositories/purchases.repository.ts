@@ -19,7 +19,7 @@ import {
   type PurchaseLineRow,
   type PurchaseRow,
 } from '../mappers/purchase.mapper.js'
-import { maybeNotifyRecordOwnerChange } from '../lib/owner-assignment.js'
+import { maybeNotifyRecordOwnerChange, maybeNotifyRecordOwnerOnCreate } from '../lib/owner-assignment.js'
 import { badRequest, notFound } from '../middleware/errors.js'
 import type { AuditActor } from '../types/audit.js'
 import type {
@@ -31,6 +31,12 @@ import type {
 import { parseDateInput } from '../utils/format.js'
 import { parseMoneyToCents } from '../utils/money.js'
 import { paginationOffset } from '../utils/pagination.js'
+
+import {
+  parseCommaSeparatedList,
+  pushDateRangeCondition,
+  resolveOrderByClause,
+} from '../lib/list-query.js'
 import { purgeEntityNotesAndFiles } from '../services/entity-purge.service.js'
 
 const PURCHASE_COLUMNS = `
@@ -72,6 +78,10 @@ export type ListPurchasesParams = {
   q?: string
   status?: string
   archivedOnly?: boolean
+  sortBy?: string
+  sortDir?: 'asc' | 'desc'
+  dateFrom?: string
+  dateTo?: string
 }
 
 async function loadPurchaseLines(purchaseId: string): Promise<PurchaseLineRow[]> {
@@ -206,6 +216,10 @@ async function preparePurchaseLines(
   }
 
   const rates = await getExchangeRatesForDocumentDate(orderDate)
+  const { assertDocumentLineProductsAreSellable } = await import(
+    '../lib/assert-sellable-line-products.js'
+  )
+  await assertDocumentLineProductsAreSellable(items)
   const productPrices = await loadProductPricesByIds(
     collectProductIdsFromPurchaseItems(items),
   )
@@ -215,6 +229,17 @@ async function preparePurchaseLines(
     productPrices,
   )
   return { lines, exchangeRates }
+}
+
+
+const PURCHASE_SORT_COLUMNS: Record<string, string> = {
+  reference: 'reference',
+  supplierName: 'supplier_name',
+  amount: 'amount_cents',
+  status: 'status',
+  orderDate: 'order_date',
+  updatedAt: 'updated_at',
+  createdAt: 'created_at',
 }
 
 export async function listPurchases(
@@ -230,9 +255,15 @@ export async function listPurchases(
     conditions.push('archived_at IS NULL')
   }
   idx = pushTenantCondition(conditions, values, idx)
-  if (params.status) {
-    conditions.push(`status = $${idx++}`)
-    values.push(params.status)
+  if (params.status?.trim()) {
+    const statuses = parseCommaSeparatedList(params.status)
+    if (statuses.length === 1) {
+      conditions.push(`status = $${idx++}`)
+      values.push(statuses[0])
+    } else if (statuses.length > 1) {
+      conditions.push(`status = ANY($${idx++}::text[])`)
+      values.push(statuses)
+    }
   }
   if (params.q) {
     conditions.push(
@@ -241,6 +272,22 @@ export async function listPurchases(
     values.push(`%${params.q}%`)
     idx++
   }
+
+  idx = pushDateRangeCondition(
+    conditions,
+    values,
+    idx,
+    'order_date',
+    params.dateFrom,
+    params.dateTo,
+  )
+
+  const orderBy = resolveOrderByClause(
+    params.sortBy,
+    params.sortDir,
+    PURCHASE_SORT_COLUMNS,
+    'updated_at DESC',
+  )
 
   const where = `WHERE ${conditions.join(' AND ')}`
 
@@ -257,7 +304,7 @@ export async function listPurchases(
       `SELECT ${PURCHASE_COLUMNS}
        FROM crm_purchases
        ${where}
-       ORDER BY updated_at DESC
+       ORDER BY ${orderBy}
        LIMIT $${idx++} OFFSET $${idx}`,
       listValues,
     )
@@ -358,7 +405,17 @@ export async function createPurchase(
     const row = result.rows[0]!
     if (lines.length > 0) await insertPurchaseLines(client, row.id, lines)
     await client.query('COMMIT')
-    return mapPurchaseDetail(row, await loadPurchaseLines(row.id))
+    const created = mapPurchaseDetail(row, await loadPurchaseLines(row.id))
+    maybeNotifyRecordOwnerOnCreate({
+      actor,
+      nextOwner: created.owner ?? '',
+      moduleLabel: 'la orden de compra',
+      recordTitle: created.reference || created.id,
+      href: `/compras/${created.id}`,
+      entityType: 'compra',
+      entityId: created.id,
+    })
+    return created
   } catch (e) {
     await client.query('ROLLBACK')
     throw e

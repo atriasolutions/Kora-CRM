@@ -134,9 +134,18 @@ export function PrivacyRequestsPanel() {
         <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
           <div>
             <CardTitle className="text-base font-semibold">Solicitudes ARSOPB</CardTitle>
-            <CardDescription>
-              Registro y seguimiento de derechos del titular (acceso, rectificación, supresión,
-              oposición, portabilidad, bloqueo). Plazo legal de respuesta: 30 días corridos.
+            <CardDescription className="space-y-1.5">
+              <span className="block">
+                <strong className="font-medium text-foreground/90">Qué es:</strong> bitácora interna
+                cuando alguien pide acceso, rectificación, supresión, oposición, portabilidad o
+                bloqueo de sus datos. No es el Art. 14 ter (transparencia pública); es evidencia de
+                que respondiste a tiempo (accountability).
+              </span>
+              <span className="block text-xs">
+                Plazo habitual de respuesta: 30 días corridos. Registrar aquí no borra ni exporta
+                datos automáticamente: debes ejecutar la acción en el CRM (o fuera) y dejar
+                constancia del resultado.
+              </span>
             </CardDescription>
           </div>
           {canEdit ? (
@@ -154,8 +163,9 @@ export function PrivacyRequestsPanel() {
             </div>
           ) : items.length === 0 ? (
             <p className="py-6 text-sm text-muted-foreground">
-              No hay solicitudes registradas. Cuando un titular ejerza sus derechos, regístralas aquí
-              para cumplir el plazo y dejar evidencia de accountability.
+              Vacío por ahora. Cuando un cliente, empleado u otro titular te escriba pidiendo ver,
+              corregir o borrar sus datos, créalo aquí el mismo día: así no se te pasa el plazo de
+              30 días y dejas evidencia de que gestionaste el derecho.
             </p>
           ) : (
             <div className="overflow-x-auto">

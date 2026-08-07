@@ -10,10 +10,14 @@ import {
 } from 'recharts'
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  formatChartMoneyTooltip,
+  formatCompactChartMoney,
+} from '@/lib/dashboard-money-format'
 import type { DashboardTimeSeriesLine, DashboardTimeSeriesPoint } from '@/types/dashboard'
 import { cn } from '@/lib/utils'
 
-const CHART_MARGIN = { top: 8, right: 8, left: 0, bottom: 0 }
+const CHART_MARGIN = { top: 8, right: 8, left: 4, bottom: 0 }
 
 type DashboardTimeSeriesChartCardProps = {
   title: string
@@ -32,16 +36,17 @@ export function DashboardTimeSeriesChartCard({
   valueFormatter,
   className,
 }: DashboardTimeSeriesChartCardProps) {
-  const formatValue =
-    valueFormatter ??
-    ((value: number) => {
-      if (Math.abs(value) >= 1000) return `${Math.round(value / 1000)}k`
-      return value.toLocaleString('es-CL')
-    })
-
   const currencyLike = lines.some((line) =>
     ['ingresos', 'gastos', 'compras'].includes(line.key),
   )
+
+  const formatValue =
+    valueFormatter ??
+    ((value: number) => {
+      if (currencyLike) return formatCompactChartMoney(value)
+      if (Math.abs(value) >= 1000) return formatCompactChartMoney(value)
+      return value.toLocaleString('es-CL')
+    })
 
   return (
     <Card className={cn('h-full min-w-0 border-border shadow-sm', className)}>
@@ -67,8 +72,8 @@ export function DashboardTimeSeriesChartCard({
               <YAxis
                 tickLine={false}
                 axisLine={false}
-                width={36}
-                tickMargin={4}
+                width={44}
+                tickMargin={6}
                 tick={{ fill: 'hsl(215 16% 47%)', fontSize: 10 }}
                 tickFormatter={(v) =>
                   typeof v === 'number' ? formatValue(v) : String(v)
@@ -77,7 +82,9 @@ export function DashboardTimeSeriesChartCard({
               <Tooltip
                 formatter={(value) => {
                   if (typeof value !== 'number') return value
-                  return currencyLike ? `$${formatValue(value)}` : `${formatValue(value)} h`
+                  return currencyLike
+                    ? formatChartMoneyTooltip(value)
+                    : `${formatValue(value)} h`
                 }}
                 contentStyle={{
                   borderRadius: 10,

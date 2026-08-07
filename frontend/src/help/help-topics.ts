@@ -534,6 +534,50 @@ export const HELP_CONTENT: Record<string, HelpTopic> = {
     actionsIfEdit: ['Actualizar estado de la compra.'],
   }),
 
+  ...listDetail('gastos', {
+    titleList: 'Gastos · listado',
+    summary:
+      'Egresos operativos de la empresa: arriendo, sueldos, impuestos, software y otros conceptos.',
+    actions: [
+      'Filtrar por categoría, estado o proveedor.',
+      'Abrir un gasto para ver comprobantes, notas y archivos.',
+    ],
+    actionsIfCreate: ['Registrar un gasto nuevo con concepto, monto y fecha.'],
+    actionsIfEdit: ['Editar montos, proveedor o marcar préstamos de socios.'],
+    concepts: [
+      'Los gastos con estado Registrado alimentan el dashboard de Ingresos vs. gastos.',
+      'Si el egreso es un préstamo de socio, marca el check para indicar a quién devolver y si ya se devolvió.',
+      'Puedes adjuntar URLs de comprobantes (Drive u otros repositorios) además de archivos locales.',
+    ],
+    tips: [
+      'Usa categorías consistentes para que el dashboard y los reportes agrupen bien los egresos.',
+    ],
+    keywords: [
+      'gasto',
+      'egreso',
+      'arriendo',
+      'impuestos',
+      'préstamo',
+      'socio',
+      'comprobante',
+    ],
+  }, {
+    titleDetail: 'Gastos · ficha',
+    summary:
+      'Detalle del egreso: concepto, proveedor, comprobantes, notas y si aplica préstamo de socio.',
+    actions: [
+      'Revisar monto, fecha y medio de pago.',
+      'Abrir enlaces de comprobantes o adjuntar archivos.',
+    ],
+    actionsIfEdit: [
+      'Editar el gasto, marcar préstamo de socio y su devolución.',
+      'Agregar o quitar URLs de comprobantes.',
+    ],
+    concepts: [
+      'El check «Es préstamo de un socio» habilita el lookup del socio y el estado de devolución.',
+    ],
+  }),
+
   ...listDetail('ingresos', {
     titleList: 'Ingresos (stock) · listado',
     summary:
@@ -713,6 +757,7 @@ const MODULE_LABEL: Record<string, string> = {
   solicitudes: 'Solicitudes',
   bitacora: 'Bitácora',
   compras: 'Compras',
+  gastos: 'Gastos',
   ingresos: 'Ingresos',
   inventario: 'Inventario',
   productos: 'Productos',

@@ -4,6 +4,7 @@ import {
   DollarSign,
   Target,
   Users,
+  Wallet,
   Zap,
 } from 'lucide-react'
 
@@ -41,11 +42,16 @@ const accentStyles: Record<
     icon: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
     Icon: Zap,
   },
+  rose: {
+    card: 'border-rose-500/20 bg-gradient-to-br from-rose-500/12 via-card to-card',
+    icon: 'bg-rose-500/15 text-rose-600 dark:text-rose-400',
+    Icon: Wallet,
+  },
 }
 
 export function KpiGrid({ items }: { items: KpiDatum[] }) {
   return (
-    <div className="grid w-full min-w-0 grid-cols-2 gap-2 sm:gap-4 xl:grid-cols-4">
+    <div className="grid w-full min-w-0 grid-cols-2 gap-2 sm:gap-4 xl:grid-cols-5">
       {items.map((kpi) => {
         const improving = kpi.changePercent >= 0
         const { card, icon, Icon } = accentStyles[kpi.accent]

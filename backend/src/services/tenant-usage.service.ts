@@ -103,6 +103,19 @@ const RECORD_MODULE_QUERIES: ModuleQuery[] = [
      INNER JOIN crm_invoices i ON i.id = li.invoice_id AND i.tenant_id = $1 AND i.deleted_at IS NULL`,
   },
   {
+    module: 'boletas',
+    sql: `SELECT coalesce(sum(
+      octet_length(coalesce(number,'')) + octet_length(coalesce(buyer_name,'')) +
+      octet_length(coalesce(notes,''))
+    ), 0)::text AS bytes FROM crm_boletas WHERE tenant_id = $1 AND deleted_at IS NULL`,
+  },
+  {
+    module: 'boletas',
+    sql: `SELECT coalesce(sum(octet_length(coalesce(description,''))) , 0)::text AS bytes
+     FROM crm_boleta_line_items li
+     INNER JOIN crm_boletas b ON b.id = li.boleta_id AND b.tenant_id = $1 AND b.deleted_at IS NULL`,
+  },
+  {
     module: 'compras',
     sql: `SELECT coalesce(sum(
       octet_length(coalesce(code,'')) + octet_length(coalesce(supplier_name,'')) +

@@ -1,4 +1,10 @@
 import type { ProductListItem } from '../types/product.js'
+import {
+  formatVariantLabel,
+  normalizeVariantAttributes,
+  normalizeVariantOptions,
+  resolveVariantKind,
+} from '../lib/product-variants.js'
 import { formatProductPriceLabel } from '../lib/product-price-display.js'
 import { imageUrlForList } from '../utils/entity-image.js'
 import { normalizeProductCurrency } from '../types/currency.js'
@@ -32,6 +38,12 @@ export type ProductRow = {
   brand: string | null
   publish_in_integration: boolean
   publish_price_in_integration: boolean
+  parent_product_id: string | null
+  parent_name: string | null
+  parent_sku: string | null
+  variant_options: unknown
+  variant_attributes: unknown
+  variants_count: string | number | null
   created_at: Date
   created_by_id: string | null
   created_by_name: string | null
@@ -68,9 +80,21 @@ function formatStock(
 }
 
 export function mapProductRow(row: ProductRow): ProductListItem {
+  const variantsCount = Number(row.variants_count ?? 0) || 0
+  const parentProductId = row.parent_product_id ?? undefined
+  const variantKind = resolveVariantKind({
+    parentProductId,
+    variantsCount,
+  })
+  const variantOptions = normalizeVariantOptions(row.variant_options)
+  const variantAttributes = normalizeVariantAttributes(row.variant_attributes)
+  const optionOrder = variantOptions.map((o) => o.name)
+
+  // Padres muestran stock agregado (stock_qty ya viene sumado en SQL).
+  const showStock = variantKind === 'parent' || row.track_inventory
   const { stock, stockNum } = formatStock(
     row.stock_qty,
-    row.track_inventory,
+    showStock,
     row.unit_of_measure,
   )
   const priceCurrency = normalizeProductCurrency(row.price_currency)
@@ -85,11 +109,20 @@ export function mapProductRow(row: ProductRow): ProductListItem {
     priceCurrency === 'CLP'
       ? formatClp(row.price_cents)
       : formatForeignAmount(priceNum, priceCurrency)
-  const showPriceSuffix = !row.track_inventory || stockNum < 0
+  const showPriceSuffix = variantKind === 'parent' || !row.track_inventory || stockNum < 0
+
+  const displayName =
+    variantKind === 'variant' && row.parent_name?.trim()
+      ? formatVariantLabel(
+          row.parent_name,
+          variantAttributes,
+          optionOrder.length > 0 ? optionOrder : undefined,
+        )
+      : row.name
 
   return {
     id: row.id,
-    name: row.name,
+    name: displayName,
     sku: row.sku,
     category: row.category_name ?? 'Sin categoría',
     subcategory: row.subcategory_name?.trim() || undefined,
@@ -112,7 +145,7 @@ export function mapProductRow(row: ProductRow): ProductListItem {
     stock,
     stockNum,
     status: row.status,
-    trackInventory: row.track_inventory,
+    trackInventory: variantKind === 'parent' ? false : row.track_inventory,
     minStockNum: row.min_stock ?? 0,
     maxStockNum: row.max_stock ?? 0,
     owner: row.owner_name?.trim() || row.created_by_name?.trim() || '—',
@@ -123,6 +156,14 @@ export function mapProductRow(row: ProductRow): ProductListItem {
     publishInIntegration: row.publish_in_integration,
     publishPriceInIntegration:
       row.publish_in_integration && row.publish_price_in_integration,
+    parentProductId,
+    parentName: row.parent_name?.trim() || undefined,
+    parentSku: row.parent_sku?.trim() || undefined,
+    variantOptions: variantOptions.length > 0 ? variantOptions : undefined,
+    variantAttributes:
+      Object.keys(variantAttributes).length > 0 ? variantAttributes : undefined,
+    variantKind,
+    variantsCount,
     createdAt: toIsoString(row.created_at),
     createdById: row.created_by_id ?? '',
     createdByName: row.created_by_name ?? '',

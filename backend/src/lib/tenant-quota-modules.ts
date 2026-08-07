@@ -7,10 +7,13 @@ export const ENTITY_FILE_TYPE_TO_MODULE: Record<string, MenuModuleId> = {
   inventario: 'inventario',
   compra: 'compras',
   factura: 'facturacion',
+  boleta: 'boletas',
+  gasto: 'gastos',
   cotizacion: 'cotizaciones',
   oportunidad: 'oportunidades',
   proyecto: 'proyectos',
   solicitud: 'solicitudes',
+  prueba_caso: 'pruebas_solicitud',
 }
 
 export const MODULE_LABELS_ES: Record<string, string> = {
@@ -22,6 +25,8 @@ export const MODULE_LABELS_ES: Record<string, string> = {
   solicitudes: 'Solicitudes',
   actividades: 'Actividades',
   facturacion: 'Facturación',
+  boletas: 'Boletas',
+  gastos: 'Gastos',
   compras: 'Compras',
   productos: 'Productos',
   inventario: 'Inventario',

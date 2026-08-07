@@ -125,6 +125,11 @@ const useApi = isApiEnabled()
 
 const apiMentionCache = new Map<string, MentionItem>()
 
+/** Limpia caché de menciones al cambiar de tenant (evita datos stale cross-tenant). */
+export function clearMentionApiCache(): void {
+  apiMentionCache.clear()
+}
+
 function cacheMentionItems(items: MentionItem[]): void {
   for (const item of items) {
     apiMentionCache.set(item.id, item)

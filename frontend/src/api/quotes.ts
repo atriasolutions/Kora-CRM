@@ -87,6 +87,7 @@ export function quoteFormToApiBody(values: CreateQuoteFormValues): QuoteApiBody 
     amount: values.amount?.trim() || undefined,
     status: values.status,
     validUntil: values.validUntil?.trim() || undefined,
+    issueDate: values.issueDate?.trim() || undefined,
     owner: values.ownerName?.trim() || undefined,
     customerKind: values.customerKind,
     paymentTerms: values.paymentTerms?.trim() || undefined,

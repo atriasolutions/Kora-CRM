@@ -174,6 +174,14 @@ export function formatBitacoraHours(hours: number): string {
   return Number.isInteger(hours) ? String(hours) : hours.toFixed(1).replace('.', ',')
 }
 
+export function parseBitacoraHoursInput(value: string): number | null {
+  const normalized = value.trim().replace(',', '.')
+  if (!normalized) return null
+  const parsed = Number(normalized)
+  if (!Number.isFinite(parsed)) return null
+  return parsed
+}
+
 export function formatBitacoraWorkDate(isoDate: string): string {
   if (!isoDate) return '—'
   const [y, m, d] = isoDate.slice(0, 10).split('-').map(Number)

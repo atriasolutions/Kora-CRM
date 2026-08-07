@@ -5,6 +5,8 @@ export const ENTITY_NOTE_TYPES = [
   'oportunidad',
   'cotizacion',
   'factura',
+  'boleta',
+  'gasto',
   'compra',
   'producto',
   'inventario',

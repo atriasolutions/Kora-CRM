@@ -6,6 +6,8 @@ import {
   broadcastNotification,
   broadcastToUser,
 } from '../realtime/notifications-ws.js'
+import { getTenantIdOrDefault, runWithTenantAsync } from '../lib/tenant-context.js'
+import { sendWebPushToUser } from './web-push.service.js'
 
 async function resolveActiveUserIdByName(name: string): Promise<string | null> {
   const normalized = name.trim()
@@ -40,6 +42,13 @@ export async function notifyByUserId(userId: string, input: {
     entityId: input.entityId,
   })
   broadcastNotification(userId, created)
+  // Capturar tenant: el fire-and-forget puede salir del AsyncLocalStorage de Express
+  const tenantId = getTenantIdOrDefault()
+  void runWithTenantAsync({ tenantId }, () => sendWebPushToUser(userId, created)).catch(
+    (err) => {
+      console.warn('[web-push] notifyByUserId', userId, err)
+    },
+  )
 }
 
 export async function broadcastActivitiesRefreshForUserName(

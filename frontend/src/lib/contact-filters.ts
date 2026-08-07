@@ -4,6 +4,13 @@ import {
   resolveOutreachFilterStatus,
   type ContactOutreachFilterStatus,
 } from '@/lib/contact-outreach'
+import {
+  createDefaultListDateFilter,
+  isListDateFilterActive,
+  listDateFilterToServerQuery,
+  listRowMatchesDateFilter,
+  type ListDateFilter,
+} from '@/lib/list-date-filter'
 
 export type ContactLastContactFilter = 'all' | 'today' | 'week' | 'stale'
 
@@ -13,6 +20,7 @@ export type ContactFilters = {
   statuses: ContactLifecycleStatus[]
   lastContact: ContactLastContactFilter
   outreach: ContactOutreachFilter
+  date: ListDateFilter
 }
 
 export const CONTACT_LAST_CONTACT_OPTIONS: {
@@ -38,7 +46,12 @@ export const CONTACT_OUTREACH_FILTER_OPTIONS: {
 ]
 
 export function createDefaultContactFilters(): ContactFilters {
-  return { statuses: [], lastContact: 'all', outreach: 'all' }
+  return {
+    statuses: [],
+    lastContact: 'all',
+    outreach: 'all',
+    date: createDefaultListDateFilter(),
+  }
 }
 
 export function countActiveContactFilters(filters: ContactFilters): number {
@@ -46,6 +59,7 @@ export function countActiveContactFilters(filters: ContactFilters): number {
   if (filters.statuses.length > 0) n += 1
   if (filters.lastContact !== 'all') n += 1
   if (filters.outreach !== 'all') n += 1
+  if (isListDateFilterActive(filters.date)) n += 1
   return n
 }
 
@@ -99,7 +113,30 @@ export function matchesContactFilters(
   if (!matchesOutreach(contact, filters.outreach)) {
     return false
   }
+  if (!listRowMatchesDateFilter(contact.createdAt, filters.date)) return false
   return true
+}
+
+export function contactFiltersToServerQuery(
+  filters: ContactFilters,
+  options?: { mine?: boolean; ownerName?: string },
+): Record<string, string> {
+  const query: Record<string, string> = {
+    ...listDateFilterToServerQuery(filters.date),
+  }
+  if (filters.statuses.length > 0) {
+    query.status = filters.statuses.join(',')
+  }
+  if (filters.lastContact !== 'all') {
+    query.lastContact = filters.lastContact
+  }
+  if (filters.outreach !== 'all') {
+    query.outreach = filters.outreach
+  }
+  if (options?.mine && options.ownerName?.trim()) {
+    query.ownerName = options.ownerName.trim()
+  }
+  return query
 }
 
 export function toggleContactStatus(

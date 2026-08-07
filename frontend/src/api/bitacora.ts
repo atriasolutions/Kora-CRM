@@ -136,3 +136,17 @@ export async function fetchBitacoraDashboardApi(
   )
   return res.data
 }
+
+export async function updateCompanyMonthlyQuotaApi(
+  companyId: string,
+  monthlyAssignedHours: number | null,
+): Promise<{ companyId: string; monthlyAssignedHours: number | null }> {
+  const res = await fetchJSON<
+    ApiItemResponse<{ companyId: string; monthlyAssignedHours: number | null }>
+  >(`${BASE}/monthly-quota/${companyId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ monthlyAssignedHours }),
+  })
+  return res.data
+}

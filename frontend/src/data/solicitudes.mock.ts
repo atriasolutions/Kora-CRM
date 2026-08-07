@@ -35,6 +35,8 @@ export type SolicitudListItem = {
   teamMembers?: SolicitudListTeamMember[]
   companyId?: string
   companyName?: string
+  documentationUrl?: string
+  gitBranchUrl?: string
 } & RecordAuditFields
 
 export type SolicitudTeamMember = {

@@ -1,5 +1,6 @@
 import { Check, Filter } from 'lucide-react'
 
+import { CompactPeriodFilter } from '@/components/shared/CompactPeriodFilter'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -18,6 +19,11 @@ import {
   toggleCompanyLifecycle,
   type CompanyFilters,
 } from '@/lib/company-filters'
+import {
+  labelForListDateFilter,
+  listDateToCompact,
+  compactToListDate,
+} from '@/lib/list-date-filter'
 import { cn } from '@/lib/utils'
 
 type CompaniesFiltersMenuProps = {
@@ -51,7 +57,24 @@ export function CompaniesFiltersMenu({
           ) : null}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64">
+      <DropdownMenuContent
+        align="end"
+        className="max-h-[70vh] w-80 overflow-y-auto p-3"
+        onCloseAutoFocus={(e) => e.preventDefault()}
+      >
+        <DropdownMenuLabel>Fecha</DropdownMenuLabel>
+        <p className="mb-2 px-0.5 text-xs text-muted-foreground">
+          {labelForListDateFilter(filters.date)}
+        </p>
+        <CompactPeriodFilter
+          idPrefix="companies-filter"
+          modes={['all', 'month', 'year', 'custom']}
+          value={listDateToCompact(filters.date)}
+          onChange={(next) =>
+            onFiltersChange({ ...filters, date: compactToListDate(next) })
+          }
+        />
+        <DropdownMenuSeparator className="my-3" />
         <DropdownMenuLabel>Etapa del ciclo</DropdownMenuLabel>
         {COMPANY_LIFECYCLE_OPTIONS.map((lifecycle) => {
           const checked = filters.lifecycles.includes(lifecycle)

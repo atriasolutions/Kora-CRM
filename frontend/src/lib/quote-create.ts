@@ -27,6 +27,8 @@ import {
   DEFAULT_QUOTE_DELIVERY_TERMS,
   DEFAULT_QUOTE_PAYMENT_TERMS,
 } from '@/lib/quote-defaults'
+import { formatPurchaseDisplayDate } from '@/lib/purchase-dates'
+import type { ProductCurrency } from '@/lib/currency'
 
 export type CreateQuoteFormValues = SaleCustomerValues & {
   code: string
@@ -48,6 +50,8 @@ export type CreateQuoteFormValues = SaleCustomerValues & {
   globalDiscountPercent: string
   includeBankDetails: boolean
   bankAccountId: string
+  issueDate: string
+  quoteCurrency: ProductCurrency
 }
 
 export function createDefaultQuoteFormValues(
@@ -89,6 +93,8 @@ export function createDefaultQuoteFormValues(
     globalDiscountPercent: partial?.globalDiscountPercent ?? DEFAULT_GLOBAL_DISCOUNT,
     includeBankDetails: partial?.includeBankDetails ?? false,
     bankAccountId: partial?.bankAccountId ?? '',
+    issueDate: partial?.issueDate ?? formatPurchaseDisplayDate(new Date()),
+    quoteCurrency: partial?.quoteCurrency ?? 'CLP',
     amount:
       partial?.amount ??
       computeQuoteTotals(lineItems, {

@@ -28,7 +28,7 @@ import {
   type InvoicePaymentRow,
   type InvoiceRow,
 } from '../mappers/invoice.mapper.js'
-import { maybeNotifyRecordOwnerChange } from '../lib/owner-assignment.js'
+import { maybeNotifyRecordOwnerChange, maybeNotifyRecordOwnerOnCreate } from '../lib/owner-assignment.js'
 import { badRequest, notFound } from '../middleware/errors.js'
 import * as orgSettingsRepo from './organization-settings.repository.js'
 import type { AuditActor } from '../types/audit.js'
@@ -45,6 +45,12 @@ import type {
 import { parseDateInput } from '../utils/format.js'
 import { parseMoneyToCents, parsePercentToInt } from '../utils/money.js'
 import { paginationOffset } from '../utils/pagination.js'
+
+import {
+  parseCommaSeparatedList,
+  pushDateRangeCondition,
+  resolveOrderByClause,
+} from '../lib/list-query.js'
 import { purgeEntityNotesAndFiles } from '../services/entity-purge.service.js'
 import { broadcastInventoryUpdated } from '../services/notifications.service.js'
 import {
@@ -304,6 +310,10 @@ async function prepareInvoiceLines(
     : null
   const rates =
     quoteRates ?? (await getExchangeRatesForDocumentDate(issueDate))
+  const { assertDocumentLineProductsAreSellable } = await import(
+    '../lib/assert-sellable-line-products.js'
+  )
+  await assertDocumentLineProductsAreSellable(items)
   const productPrices = await loadProductPricesByIds(
     collectProductIdsFromQuoteItems(items),
   )
@@ -344,6 +354,19 @@ async function loadCustomerFromQuote(quoteId: string): Promise<{
   }
 }
 
+
+const INVOICE_SORT_COLUMNS: Record<string, string> = {
+  number: 'number',
+  amount: 'amount_cents',
+  status: 'status',
+  issueDate: 'issue_date',
+  dueDate: 'due_date',
+  companyName: 'company_name',
+  owner: 'owner_name',
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
+}
+
 export async function listInvoices(
   params: ListInvoicesParams,
 ): Promise<{ items: InvoiceListItem[]; total: number }> {
@@ -357,9 +380,15 @@ export async function listInvoices(
     conditions.push('archived_at IS NULL')
   }
   idx = pushTenantCondition(conditions, values, idx)
-  if (params.status) {
-    conditions.push(`status = $${idx++}`)
-    values.push(params.status)
+  if (params.status?.trim()) {
+    const statuses = parseCommaSeparatedList(params.status)
+    if (statuses.length === 1) {
+      conditions.push(`status = $${idx++}`)
+      values.push(statuses[0])
+    } else if (statuses.length > 1) {
+      conditions.push(`status = ANY($${idx++}::text[])`)
+      values.push(statuses)
+    }
   }
   if (params.quoteId) {
     conditions.push(`quote_id = $${idx++}`)
@@ -397,6 +426,22 @@ export async function listInvoices(
     values.push(params.documentKind)
   }
 
+  idx = pushDateRangeCondition(
+    conditions,
+    values,
+    idx,
+    'issue_date',
+    params.dateFrom,
+    params.dateTo,
+  )
+
+  const orderBy = resolveOrderByClause(
+    params.sortBy,
+    params.sortDir,
+    INVOICE_SORT_COLUMNS,
+    'updated_at DESC',
+  )
+
   const where = `WHERE ${conditions.join(' AND ')}`
 
   return withTenantClient(async (client) => {
@@ -412,7 +457,7 @@ export async function listInvoices(
       `SELECT ${INVOICE_COLUMNS}
        FROM crm_invoices
        ${where}
-       ORDER BY updated_at DESC
+       ORDER BY ${orderBy}
        LIMIT $${idx++} OFFSET $${idx}`,
       listValues,
     )
@@ -486,10 +531,28 @@ export async function createInvoice(
   const lines = linesResult.lines
   if (lines.length === 0) throw badRequest('Agrega al menos una línea de factura')
   const exchangeRates = linesResult.exchangeRates
-  const lineTotal = sumLineTotals(lines)
-  const amountCents = resolveAmountCents(input, lineTotal)
-  const number = input.number?.trim() || (await nextDocumentNumber('invoice'))
   const globalDiscountPct = resolveGlobalDiscountPct(input)
+  const org = await orgSettingsRepo.getOrganizationSettings()
+  const dteAmounts = computeInvoiceDteAmounts(
+    lines.map((line) =>
+      dteLineFromComputed({
+        totalCents: line.totalCents,
+        subjectToVat: line.subjectToVat,
+        description: line.description ?? line.productName,
+        quantity: line.quantity,
+        unitPriceCents: line.unitPriceCents,
+      }),
+    ),
+    globalDiscountPct,
+    org.defaultVatPercent,
+  )
+  const lineTotal = sumLineTotals(lines)
+  // Total autoritativo desde líneas (+ IVA); evita desfase cabecera vs detalle.
+  const amountCents =
+    dteAmounts.totalCents > 0
+      ? dteAmounts.totalCents
+      : resolveAmountCents(input, lineTotal)
+  const number = input.number?.trim() || (await nextDocumentNumber('invoice'))
   const clientName = clientNameFromCustomer(
     customerKind,
     customer.companyName,
@@ -567,6 +630,15 @@ export async function createInvoice(
   if (inventoryChanged) {
     broadcastInventoryUpdated(actor.userId)
   }
+  maybeNotifyRecordOwnerOnCreate({
+    actor,
+    nextOwner: detail.owner ?? '',
+    moduleLabel: 'la factura',
+    recordTitle: detail.number || detail.id,
+    href: `/facturacion/${detail.id}`,
+    entityType: 'factura',
+    entityId: detail.id,
+  })
   return detail
 }
 
@@ -646,15 +718,36 @@ export async function updateInvoice(
       : null
   const lines = linesResult?.lines ?? null
   const exchangeRates = linesResult?.exchangeRates
-  const lineTotal = lines ? sumLineTotals(lines) : null
-  const amountCents = resolveAmountCents(
-    input,
-    lineTotal ?? parseMoneyToCents(existing.amount),
-  )
   const globalDiscountPct =
     input.globalDiscount !== undefined
       ? resolveGlobalDiscountPct(input)
       : parsePercentToInt(existingRow.global_discount_pct) ?? 0
+  let amountCents: number
+  if (lines) {
+    const org = await orgSettingsRepo.getOrganizationSettings()
+    const dteAmounts = computeInvoiceDteAmounts(
+      lines.map((line) =>
+        dteLineFromComputed({
+          totalCents: line.totalCents,
+          subjectToVat: line.subjectToVat,
+          description: line.description ?? line.productName,
+          quantity: line.quantity,
+          unitPriceCents: line.unitPriceCents,
+        }),
+      ),
+      globalDiscountPct,
+      org.defaultVatPercent,
+    )
+    amountCents =
+      dteAmounts.totalCents > 0
+        ? dteAmounts.totalCents
+        : resolveAmountCents(input, sumLineTotals(lines))
+  } else {
+    amountCents = resolveAmountCents(
+      input,
+      parseMoneyToCents(existing.amount),
+    )
+  }
 
   const clientName = clientNameFromCustomer(customerKind, companyName, contactName)
 

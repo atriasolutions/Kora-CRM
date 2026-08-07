@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { listSortAndDateQueryFields } from '../lib/list-query.js'
+
 const customerKind = z.enum(['empresa', 'contacto'])
 const outcome = z.enum(['Abierta', 'Ganada', 'Perdida'])
 
@@ -50,7 +52,7 @@ export const listOpportunitiesQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
   q: z.string().trim().optional(),
-  stage: z.string().max(64).optional(),
+  stage: z.string().optional(),
   outcome: outcome.optional(),
   companyId: z.string().uuid().optional(),
   contactId: z.string().uuid().optional(),
@@ -58,4 +60,5 @@ export const listOpportunitiesQuerySchema = z.object({
     .enum(['true', 'false'])
     .optional()
     .transform((v) => v === 'true'),
+  ...listSortAndDateQueryFields,
 })

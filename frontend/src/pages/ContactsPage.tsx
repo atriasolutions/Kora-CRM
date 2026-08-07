@@ -1,8 +1,9 @@
-import { Archive } from 'lucide-react'
+import { Archive, Pencil } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from '@/lib/toast'
 
+import { updateContactApi } from '@/api/contacts'
 import { CreateContactDialog } from '@/components/contacts/CreateContactDialog'
 import { DuplicateContactDialog } from '@/components/contacts/DuplicateContactDialog'
 import { EditContactDialog } from '@/components/contacts/EditContactDialog'
@@ -14,6 +15,7 @@ import {
 } from '@/components/contacts/ContactsModuleHeader'
 import { ContactsArchivedView } from '@/components/contacts/ContactsArchivedView'
 import { ContactsSegmentsView } from '@/components/contacts/ContactsSegmentsView'
+import { BulkEditDialog } from '@/components/list/BulkEditDialog'
 import { ListPageLayout } from '@/components/list/ListPageLayout'
 import { ModuleListPage, type ListSelectionAction } from '@/components/list/ModuleListPage'
 import { Button } from '@/components/ui/button'
@@ -40,7 +42,9 @@ import { useModulePermissions } from '@/hooks/use-module-permissions'
 import { duplicateContactFormValues } from '@/lib/contact-create'
 import type { CreateContactFormValues } from '@/lib/contact-create'
 import {
+  contactFiltersToServerQuery,
   contactRowMatchesFilters,
+  CONTACT_STATUS_OPTIONS,
   createDefaultContactFilters,
   type ContactFilters,
 } from '@/lib/contact-filters'
@@ -51,6 +55,7 @@ import {
 } from '@/lib/contact-list-scope'
 import { CONTACT_ARCHIVE_RETENTION_DAYS } from '@/lib/contact-archive'
 import { loadRecentlyViewedContactIds } from '@/lib/contact-recently-viewed'
+import { getCurrentUser } from '@/lib/current-user'
 import { mergeOutreachIntoContact } from '@/lib/contact-outreach-storage'
 import { mergeContactListAvatar } from '@/lib/entity-list-image-cache'
 
@@ -83,6 +88,17 @@ export function ContactsPage() {
     () => loadRecentlyViewedContactIds(),
     [listRefreshKey, location.key, listScope],
   )
+
+  const serverListQuery = useMemo(
+    () =>
+      contactFiltersToServerQuery(filters, {
+        mine: listScope === 'mine',
+        ownerName: getCurrentUser().name,
+      }),
+    [filters, listScope],
+  )
+
+  const filtersOnServer = listScope !== 'recent' && isApiEnabled()
 
   const rowPredicate = useMemo(
     () => (row: ContactListItem) =>
@@ -119,6 +135,8 @@ export function ContactsPage() {
   const [archiveTarget, setArchiveTarget] = useState<ContactListItem | null>(null)
   const [outreachTarget, setOutreachTarget] = useState<ContactListItem | null>(null)
   const [bulkArchiveIds, setBulkArchiveIds] = useState<string[] | null>(null)
+  const [bulkEditIds, setBulkEditIds] = useState<string[] | null>(null)
+  const [bulkEditSaving, setBulkEditSaving] = useState(false)
 
   const openCreateNew = useCallback(() => {
     setCreateInitial(undefined)
@@ -209,20 +227,58 @@ export function ContactsPage() {
     }
   }, [archiveContacts, bulkArchiveIds])
 
-  const listSelectionActions = useMemo<ListSelectionAction[]>(
-    () =>
-      canDeleteContacts
-        ? [
-            {
-              label: 'Archivar',
-              icon: Archive,
-              variant: 'destructive',
-              onClick: (ids) => setBulkArchiveIds(ids),
-            },
-          ]
-        : [],
-    [canDeleteContacts],
+  const handleBulkEdit = useCallback(
+    async (patch: Record<string, string>) => {
+      if (!bulkEditIds?.length) return
+      setBulkEditSaving(true)
+      let ok = 0
+      let fail = 0
+      try {
+        for (const id of bulkEditIds) {
+          try {
+            await updateContactApi(id, {
+              status: patch.status,
+              ownerName: patch.ownerName,
+            })
+            ok += 1
+          } catch {
+            fail += 1
+          }
+        }
+        setBulkEditIds(null)
+        setListRefreshKey((k) => k + 1)
+        void reloadFromApi().catch(() => {})
+        if (fail === 0) {
+          toast.success(`${ok} contacto${ok === 1 ? '' : 's'} actualizado${ok === 1 ? '' : 's'}.`)
+        } else {
+          toast.warning(`${ok} actualizados, ${fail} con error.`)
+        }
+      } finally {
+        setBulkEditSaving(false)
+      }
+    },
+    [bulkEditIds, reloadFromApi],
   )
+
+  const listSelectionActions = useMemo<ListSelectionAction[]>(() => {
+    const actions: ListSelectionAction[] = []
+    if (canEditContacts) {
+      actions.push({
+        label: 'Editar',
+        icon: Pencil,
+        onClick: (ids) => setBulkEditIds(ids),
+      })
+    }
+    if (canDeleteContacts) {
+      actions.push({
+        label: 'Archivar',
+        icon: Archive,
+        variant: 'destructive',
+        onClick: (ids) => setBulkArchiveIds(ids),
+      })
+    }
+    return actions
+  }, [canDeleteContacts, canEditContacts])
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -255,8 +311,10 @@ export function ContactsPage() {
             listScope === 'recent'
               ? undefined
               : {
-                  fetchPage: (params) => fetchContactsServerPage(params, false),
-                  resetKey: `${listRefreshKey}-${listScope}-${filters.statuses.join(',')}-${filters.outreach}`,
+                  fetchPage: (params) =>
+                    fetchContactsServerPage(params, false, serverListQuery),
+                  resetKey: `${listRefreshKey}-${listScope}-${JSON.stringify(serverListQuery)}`,
+                  filtersOnServer,
                 }
           }
           rowPredicate={rowPredicate}
@@ -390,6 +448,29 @@ export function ContactsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <BulkEditDialog
+        open={bulkEditIds !== null && bulkEditIds.length > 0}
+        onOpenChange={(open) => {
+          if (!open) setBulkEditIds(null)
+        }}
+        selectedCount={bulkEditIds?.length ?? 0}
+        saving={bulkEditSaving}
+        title="Editar contactos seleccionados"
+        fields={[
+          {
+            key: 'status',
+            label: 'Estado',
+            options: CONTACT_STATUS_OPTIONS.map((s) => ({ value: s, label: s })),
+          },
+          {
+            key: 'ownerName',
+            label: 'Responsable',
+            placeholder: 'Nombre del responsable',
+          },
+        ]}
+        onSubmit={handleBulkEdit}
+      />
     </div>
   )
 }

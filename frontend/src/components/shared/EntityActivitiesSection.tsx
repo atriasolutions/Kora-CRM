@@ -11,6 +11,8 @@ export type EntityActivityKind =
   | 'oportunidad'
   | 'cotizacion'
   | 'factura'
+  | 'boleta'
+  | 'gasto'
   | 'proyecto'
   | 'solicitud'
   | 'ingreso'

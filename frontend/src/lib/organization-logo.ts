@@ -4,7 +4,8 @@ import type { OrganizationSettings } from '@/types/organization-settings'
 export const KORA_DEFAULT_LOGO_URL = '/logo_kora_limpio.png'
 
 export function resolveOrganizationLogoUrl(logoUrl?: string | null): string {
-  const trimmed = logoUrl?.trim()
+  const trimmed =
+    typeof logoUrl === 'string' ? logoUrl.trim() : logoUrl == null ? '' : String(logoUrl).trim()
   return trimmed || KORA_DEFAULT_LOGO_URL
 }
 

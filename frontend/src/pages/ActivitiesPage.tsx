@@ -1,8 +1,9 @@
-import { Archive } from 'lucide-react'
+import { Archive, Pencil } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from '@/lib/toast'
 
+import { updateActivityApi } from '@/api/activities'
 import { ActivitiesArchivedView } from '@/components/activities/ActivitiesArchivedView'
 import { ActivitiesKanbanView } from '@/components/activities/ActivitiesKanbanView'
 import {
@@ -13,6 +14,7 @@ import { ActivitiesSegmentsView } from '@/components/activities/ActivitiesSegmen
 import { CreateActivityDialog } from '@/components/activities/CreateActivityDialog'
 import { DuplicateActivityDialog } from '@/components/activities/DuplicateActivityDialog'
 import { EditActivityDialog } from '@/components/activities/EditActivityDialog'
+import { BulkEditDialog } from '@/components/list/BulkEditDialog'
 import { ListPageLayout } from '@/components/list/ListPageLayout'
 import { ModuleListPage, type ListSelectionAction } from '@/components/list/ModuleListPage'
 import { useEmbeddedListToolbarSlot } from '@/hooks/use-embedded-list-toolbar-slot'
@@ -41,11 +43,16 @@ import {
   type CreateActivityFormValues,
 } from '@/lib/activity-create'
 import {
+  activityFiltersToServerQuery,
+  activityHasClientOnlyFilters,
   activityRowMatchesFilters,
+  ACTIVITY_PRIORITY_FILTER_OPTIONS,
+  ACTIVITY_STATUS_OPTIONS,
   createDefaultActivityFilters,
   type ActivityFilters,
 } from '@/lib/activity-filters'
 import { ACTIVITY_ARCHIVE_RETENTION_DAYS } from '@/lib/activity-archive'
+import { getCurrentUser } from '@/lib/current-user'
 import {
   activityMatchesListScope,
   loadActivityRecentIds,
@@ -82,6 +89,20 @@ export function ActivitiesPage() {
     [listRefreshKey, location.key, listScope],
   )
 
+  const serverListQuery = useMemo(
+    () =>
+      activityFiltersToServerQuery(filters, {
+        mine: listScope === 'mine',
+        ownerName: getCurrentUser().name,
+      }),
+    [filters, listScope],
+  )
+
+  const filtersOnServer =
+    listScope !== 'recent' &&
+    isApiEnabled() &&
+    !activityHasClientOnlyFilters(filters)
+
   const rowPredicate = useMemo(
     () => (row: ActivityListItem) =>
       activityRowMatchesFilters(row, filters) &&
@@ -116,6 +137,8 @@ export function ActivitiesPage() {
   const [editingActivity, setEditingActivity] = useState<ActivityDetail | null>(null)
   const [archiveTarget, setArchiveTarget] = useState<ActivityListItem | null>(null)
   const [bulkArchiveIds, setBulkArchiveIds] = useState<string[] | null>(null)
+  const [bulkEditIds, setBulkEditIds] = useState<string[] | null>(null)
+  const [bulkEditSaving, setBulkEditSaving] = useState(false)
 
   const handleCreateSubmit = useCallback(
     async (values: CreateActivityFormValues) => {
@@ -201,20 +224,61 @@ export function ActivitiesPage() {
     }
   }, [archiveActivities, bulkArchiveIds])
 
-  const listSelectionActions = useMemo<ListSelectionAction[]>(
-    () =>
-      canDelete
-        ? [
-            {
-              label: 'Archivar',
-              icon: Archive,
-              variant: 'destructive',
-              onClick: (ids) => setBulkArchiveIds(ids),
-            },
-          ]
-        : [],
-    [canDelete],
+  const handleBulkEdit = useCallback(
+    async (patch: Record<string, string>) => {
+      if (!bulkEditIds?.length) return
+      setBulkEditSaving(true)
+      let ok = 0
+      let fail = 0
+      try {
+        for (const id of bulkEditIds) {
+          try {
+            await updateActivityApi(id, {
+              status: patch.status,
+              priority: patch.priority,
+              assigneeName: patch.assigneeName,
+            })
+            ok += 1
+          } catch {
+            fail += 1
+          }
+        }
+        setBulkEditIds(null)
+        setListRefreshKey((k) => k + 1)
+        void reloadFromApi().catch(() => {})
+        if (fail === 0) {
+          toast.success(
+            `${ok} actividad${ok === 1 ? '' : 'es'} actualizada${ok === 1 ? '' : 's'}.`,
+          )
+        } else {
+          toast.warning(`${ok} actualizadas, ${fail} con error.`)
+        }
+      } finally {
+        setBulkEditSaving(false)
+      }
+    },
+    [bulkEditIds, reloadFromApi],
   )
+
+  const listSelectionActions = useMemo<ListSelectionAction[]>(() => {
+    const actions: ListSelectionAction[] = []
+    if (canEdit) {
+      actions.push({
+        label: 'Editar',
+        icon: Pencil,
+        onClick: (ids) => setBulkEditIds(ids),
+      })
+    }
+    if (canDelete) {
+      actions.push({
+        label: 'Archivar',
+        icon: Archive,
+        variant: 'destructive',
+        onClick: (ids) => setBulkArchiveIds(ids),
+      })
+    }
+    return actions
+  }, [canDelete, canEdit])
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -253,8 +317,10 @@ export function ActivitiesPage() {
             listScope === 'recent'
               ? undefined
               : {
-                  fetchPage: (params) => fetchActivitiesServerPage(params, false),
-                  resetKey: `${listRefreshKey}-${listScope}`,
+                  fetchPage: (params) =>
+                    fetchActivitiesServerPage(params, false, serverListQuery),
+                  resetKey: `${listRefreshKey}-${listScope}-${JSON.stringify(serverListQuery)}`,
+                  filtersOnServer,
                 }
           }
           rowPredicate={rowPredicate}
@@ -376,6 +442,34 @@ export function ActivitiesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <BulkEditDialog
+        open={bulkEditIds !== null && bulkEditIds.length > 0}
+        onOpenChange={(open) => {
+          if (!open) setBulkEditIds(null)
+        }}
+        selectedCount={bulkEditIds?.length ?? 0}
+        saving={bulkEditSaving}
+        title="Editar actividades seleccionadas"
+        fields={[
+          {
+            key: 'status',
+            label: 'Estado',
+            options: ACTIVITY_STATUS_OPTIONS.map((s) => ({ value: s, label: s })),
+          },
+          {
+            key: 'priority',
+            label: 'Prioridad',
+            options: ACTIVITY_PRIORITY_FILTER_OPTIONS.map((p) => ({ value: p, label: p })),
+          },
+          {
+            key: 'assigneeName',
+            label: 'Asignado',
+            placeholder: 'Nombre del asignado',
+          },
+        ]}
+        onSubmit={handleBulkEdit}
+      />
     </div>
   )
 }

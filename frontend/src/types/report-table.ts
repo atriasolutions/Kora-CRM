@@ -11,6 +11,9 @@ export type ReportDataSourceId =
   | 'compras'
   | 'ingresos'
   | 'inventario'
+  | 'gastos'
+  | 'solicitudes'
+  | 'bitacora'
 
 export type ReportFieldType = 'text' | 'number' | 'date' | 'picklist' | 'lookup' | 'boolean'
 
@@ -85,6 +88,9 @@ export const REPORT_DATA_SOURCE_LABELS: Record<ReportDataSourceId, string> = {
   compras: 'Compras',
   ingresos: 'Ingresos',
   inventario: 'Inventario',
+  gastos: 'Gastos',
+  solicitudes: 'Solicitudes',
+  bitacora: 'Bitácora',
 }
 
 export function createDefaultReportTableConfig(

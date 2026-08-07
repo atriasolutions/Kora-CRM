@@ -7,16 +7,31 @@ import { pushTenantCondition, tenantWhereParam } from '../lib/tenant-sql.js'
 import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import { deriveInventoryStatus } from '../mappers/inventory.mapper.js'
 import { mapProductDetail, mapProductRow, type ProductRow } from '../mappers/product.mapper.js'
-import { maybeNotifyRecordOwnerChange } from '../lib/owner-assignment.js'
+import { maybeNotifyRecordOwnerChange, maybeNotifyRecordOwnerOnCreate } from '../lib/owner-assignment.js'
 import { badRequest, notFound } from '../middleware/errors.js'
 import type { AuditActor } from '../types/audit.js'
 import type {
+  ConvertToParentInput,
   CreateProductInput,
+  CreateVariantsBatchInput,
   ProductListItem,
   UpdateProductInput,
 } from '../types/product.js'
+import {
+  formatVariantLabel,
+  generateVariantCombinations,
+  normalizeVariantAttributes,
+  normalizeVariantOptions,
+  suggestVariantSku,
+} from '../lib/product-variants.js'
 import { normalizeProductCurrency } from '../types/currency.js'
 import { paginationOffset } from '../utils/pagination.js'
+
+import {
+  parseCommaSeparatedList,
+  pushDateRangeCondition,
+  resolveOrderByClause,
+} from '../lib/list-query.js'
 import { purgeEntityNotesAndFiles } from '../services/entity-purge.service.js'
 import {
   getProductCategoryScopeIds,
@@ -34,12 +49,19 @@ const SELECT_COLUMNS = `
   p.billing_period,
   p.price_cents, p.price_currency, p.price_amount, p.cost_price_cents,
   CASE
+    WHEN vc.variants_count > 0 THEN COALESCE(FLOOR(child_inv.total_on_hand), 0)::int
     WHEN p.track_inventory THEN COALESCE(FLOOR(inv.total_on_hand), 0)::int
     ELSE p.stock_qty
   END AS stock_qty,
   p.status, p.track_inventory, p.min_stock, p.max_stock,
   p.barcode, p.image_url, p.description, p.brand,
   p.publish_in_integration, p.publish_price_in_integration,
+  p.parent_product_id,
+  pp.name AS parent_name,
+  pp.sku AS parent_sku,
+  p.variant_options,
+  p.variant_attributes,
+  COALESCE(vc.variants_count, 0) AS variants_count,
   p.created_at, p.created_by_id, p.created_by_name, p.owner_name,
   p.updated_at, p.updated_by_id, p.updated_by_name
 `
@@ -50,6 +72,16 @@ const FROM_JOIN = `
     ON c.id = p.category_id AND c.tenant_id = p.tenant_id AND c.deleted_at IS NULL
   LEFT JOIN crm_product_categories parent
     ON parent.id = c.parent_id AND parent.tenant_id = p.tenant_id AND parent.deleted_at IS NULL
+  LEFT JOIN crm_products pp
+    ON pp.id = p.parent_product_id AND pp.tenant_id = p.tenant_id AND pp.deleted_at IS NULL
+  LEFT JOIN LATERAL (
+    SELECT count(*)::int AS variants_count
+    FROM crm_products v
+    WHERE v.parent_product_id = p.id
+      AND v.deleted_at IS NULL
+      AND v.archived_at IS NULL
+      AND v.tenant_id = p.tenant_id
+  ) vc ON true
   LEFT JOIN LATERAL (
     SELECT COALESCE(SUM(ip.quantity_on_hand), 0) AS total_on_hand
     FROM crm_inventory_positions ip
@@ -57,6 +89,17 @@ const FROM_JOIN = `
       AND (ip.product_id = p.id
         OR lower(trim(ip.sku)) = lower(trim(p.sku)))
   ) inv ON true
+  LEFT JOIN LATERAL (
+    SELECT COALESCE(SUM(ip.quantity_on_hand), 0) AS total_on_hand
+    FROM crm_products v
+    JOIN crm_inventory_positions ip
+      ON ip.tenant_id = v.tenant_id
+     AND (ip.product_id = v.id OR lower(trim(ip.sku)) = lower(trim(v.sku)))
+    WHERE v.parent_product_id = p.id
+      AND v.deleted_at IS NULL
+      AND v.archived_at IS NULL
+      AND v.tenant_id = p.tenant_id
+  ) child_inv ON true
 `
 
 const FROM_COUNT = `
@@ -65,6 +108,8 @@ const FROM_COUNT = `
     ON c.id = p.category_id AND c.tenant_id = p.tenant_id AND c.deleted_at IS NULL
   LEFT JOIN crm_product_categories parent
     ON parent.id = c.parent_id AND parent.tenant_id = p.tenant_id AND parent.deleted_at IS NULL
+  LEFT JOIN crm_products pp
+    ON pp.id = p.parent_product_id AND pp.tenant_id = p.tenant_id AND pp.deleted_at IS NULL
 `
 
 export type ListProductsParams = {
@@ -76,6 +121,16 @@ export type ListProductsParams = {
   archivedOnly?: boolean
   /** Solo productos visibles en API de integración externa */
   integrationPublishedOnly?: boolean
+  /** Solo simples + variedades (excluye agrupadores) */
+  sellableOnly?: boolean
+  /** Solo padres + simples (oculta variedades hijas) */
+  groupVariants?: boolean
+  /** Listar solo hijos de un padre */
+  parentId?: string
+  sortBy?: string
+  sortDir?: 'asc' | 'desc'
+  dateFrom?: string
+  dateTo?: string
 }
 
 function toCents(amount?: number): number {
@@ -366,6 +421,17 @@ export async function listProducts(
   return { items: result.items.map(mapProductRow), total: result.total }
 }
 
+
+const PRODUCT_SORT_COLUMNS: Record<string, string> = {
+  name: 'p.name',
+  sku: 'p.sku',
+  status: 'p.status',
+  price: 'p.price_amount',
+  stock: 'p.stock_qty',
+  updatedAt: 'p.updated_at',
+  createdAt: 'p.created_at',
+}
+
 export async function listProductRows(
   params: ListProductsParams,
 ): Promise<{ items: ProductRow[]; total: number }> {
@@ -379,9 +445,15 @@ export async function listProductRows(
   } else {
     conditions.push('p.archived_at IS NULL')
   }
-  if (params.status) {
-    conditions.push(`p.status = $${idx++}`)
-    values.push(params.status)
+  if (params.status?.trim()) {
+    const statuses = parseCommaSeparatedList(params.status)
+    if (statuses.length === 1) {
+      conditions.push(`p.status = $${idx++}`)
+      values.push(statuses[0])
+    } else if (statuses.length > 1) {
+      conditions.push(`p.status = ANY($${idx++}::text[])`)
+      values.push(statuses)
+    }
   }
   if (params.categoryId) {
     const scopeIds = await getProductCategoryScopeIds(params.categoryId)
@@ -390,7 +462,9 @@ export async function listProductRows(
   }
   if (params.q) {
     conditions.push(
-      `(p.name ILIKE $${idx} OR p.sku ILIKE $${idx} OR c.name ILIKE $${idx} OR parent.name ILIKE $${idx})`,
+      `(p.name ILIKE $${idx} OR p.sku ILIKE $${idx} OR c.name ILIKE $${idx} OR parent.name ILIKE $${idx}
+        OR pp.name ILIKE $${idx} OR pp.sku ILIKE $${idx}
+        OR p.variant_attributes::text ILIKE $${idx})`,
     )
     values.push(`%${params.q}%`)
     idx++
@@ -398,6 +472,40 @@ export async function listProductRows(
   if (params.integrationPublishedOnly) {
     conditions.push('p.publish_in_integration = true')
   }
+  if (params.parentId) {
+    conditions.push(`p.parent_product_id = $${idx++}`)
+    values.push(params.parentId)
+  } else if (params.sellableOnly) {
+    // Simples + variedades: no padres (productos con hijos activos).
+    conditions.push(
+      `NOT EXISTS (
+        SELECT 1 FROM crm_products v
+        WHERE v.parent_product_id = p.id
+          AND v.deleted_at IS NULL
+          AND v.archived_at IS NULL
+          AND v.tenant_id = p.tenant_id
+      )`,
+    )
+  } else if (params.groupVariants) {
+    // Padres + simples: ocultar variedades hijas.
+    conditions.push('p.parent_product_id IS NULL')
+  }
+
+  idx = pushDateRangeCondition(
+    conditions,
+    values,
+    idx,
+    'p.updated_at',
+    params.dateFrom,
+    params.dateTo,
+  )
+
+  const orderBy = resolveOrderByClause(
+    params.sortBy,
+    params.sortDir,
+    PRODUCT_SORT_COLUMNS,
+    'p.updated_at DESC',
+  )
 
   const where = `WHERE ${conditions.join(' AND ')}`
 
@@ -415,7 +523,7 @@ export async function listProductRows(
       `SELECT ${SELECT_COLUMNS}
        ${FROM_JOIN}
        ${where}
-       ORDER BY p.updated_at DESC
+       ORDER BY ${orderBy}
        LIMIT $${idx++} OFFSET $${idx}`,
       listValues,
     )
@@ -506,7 +614,28 @@ export async function createProduct(
     input.category,
     input.subcategory,
   )
-  const trackInventory = input.trackInventory ?? true
+
+  let parentProductId: string | null = input.parentProductId?.trim() || null
+  let variantAttributes = normalizeVariantAttributes(input.variantAttributes)
+  let variantOptions = normalizeVariantOptions(input.variantOptions)
+
+  if (parentProductId) {
+    const parent = await getProductById(parentProductId)
+    if (parent.parentProductId) {
+      throw badRequest('No se puede crear una variedad bajo otra variedad')
+    }
+    if (Object.keys(variantAttributes).length === 0) {
+      throw badRequest('Las variedades requieren atributos (ej. Color, Talla)')
+    }
+    variantOptions = []
+  } else {
+    variantAttributes = {}
+  }
+
+  const willBeParentShell = !parentProductId && variantOptions.length > 0
+  const trackInventory = willBeParentShell
+    ? false
+    : (input.trackInventory ?? true)
   const stockQty =
     trackInventory && input.stockNum != null ? input.stockNum : null
   const onHand = trackInventory ? Math.max(0, stockQty ?? 0) : 0
@@ -537,13 +666,15 @@ export async function createProduct(
         price_cents, price_currency, price_amount, cost_price_cents, stock_qty, status, track_inventory,
         min_stock, max_stock, barcode, image_url, description,
         created_by_id, created_by_name, owner_name, updated_by_id, updated_by_name, tenant_id, brand,
-        publish_in_integration, publish_price_in_integration
+        publish_in_integration, publish_price_in_integration,
+        parent_product_id, variant_options, variant_attributes
       ) VALUES (
         $1, $2, $3, $4, $5, $6,
         $7, $8, $9, $10, $11, $12, $13,
         $14, $15, $16, $17, $18,
         $19, $20, $21, $19, $20, $22, $23,
-        $24, $25
+        $24, $25,
+        $26, $27, $28
       ) RETURNING id`,
       [
         input.name.trim(),
@@ -571,6 +702,11 @@ export async function createProduct(
         input.brand?.trim() || null,
         publishFlags.publishInIntegration,
         publishFlags.publishPriceInIntegration,
+        parentProductId,
+        variantOptions.length > 0 ? JSON.stringify(variantOptions) : null,
+        Object.keys(variantAttributes).length > 0
+          ? JSON.stringify(variantAttributes)
+          : null,
       ],
     )
     const productId = result.rows[0]!.id
@@ -587,7 +723,17 @@ export async function createProduct(
     }
 
     await client.query('COMMIT')
-    return getProductById(productId)
+    const detail = await getProductById(productId)
+    maybeNotifyRecordOwnerOnCreate({
+      actor,
+      nextOwner: detail.owner ?? '',
+      moduleLabel: 'el producto',
+      recordTitle: detail.name,
+      href: `/productos/${detail.id}`,
+      entityType: 'producto',
+      entityId: detail.id,
+    })
+    return detail
   } catch (err) {
     await client.query('ROLLBACK')
     // Si el SKU ya existe en un producto "activo" (deleted_at IS NULL),
@@ -710,6 +856,22 @@ export async function updateProduct(
     sets.push(`brand = $${idx++}`)
     values.push(input.brand.trim() || null)
   }
+  if (input.variantOptions !== undefined) {
+    if (existing.parentProductId) {
+      throw badRequest('Las variedades no definen opciones; edita el producto padre')
+    }
+    const opts = normalizeVariantOptions(input.variantOptions)
+    sets.push(`variant_options = $${idx++}`)
+    values.push(opts.length > 0 ? JSON.stringify(opts) : null)
+  }
+  if (input.variantAttributes !== undefined) {
+    if (!existing.parentProductId) {
+      throw badRequest('Solo las variedades tienen atributos de variación')
+    }
+    const attrs = normalizeVariantAttributes(input.variantAttributes)
+    sets.push(`variant_attributes = $${idx++}`)
+    values.push(Object.keys(attrs).length > 0 ? JSON.stringify(attrs) : null)
+  }
   if (input.publishInIntegration !== undefined || input.publishPriceInIntegration !== undefined) {
     const publishFlags = normalizeIntegrationPublishFlags({
       publishInIntegration:
@@ -820,7 +982,8 @@ export async function archiveProduct(
   const result = await tenantQuery(
     `UPDATE crm_products
      SET archived_at = now(), updated_by_id = $2, updated_by_name = $3, updated_at = now()
-     WHERE id = $1 AND deleted_at IS NULL AND archived_at IS NULL AND ${tenantWhereParam(4)}
+     WHERE deleted_at IS NULL AND archived_at IS NULL AND ${tenantWhereParam(4)}
+       AND (id = $1 OR parent_product_id = $1)
      RETURNING id`,
     [id, actor.userId, actor.userName, getTenantIdOrDefault()],
   )
@@ -835,7 +998,8 @@ export async function restoreProduct(
   const result = await tenantQuery(
     `UPDATE crm_products
      SET archived_at = NULL, updated_by_id = $2, updated_by_name = $3, updated_at = now()
-     WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(4)}
+     WHERE deleted_at IS NULL AND ${tenantWhereParam(4)}
+       AND (id = $1 OR parent_product_id = $1)
      RETURNING id`,
     [id, actor.userId, actor.userName, getTenantIdOrDefault()],
   )
@@ -968,4 +1132,303 @@ export async function permanentlyDeleteProduct(id: string): Promise<void> {
   } finally {
     client.release()
   }
+}
+
+/** Rechaza productos agrupadores (no vendibles / no stockeables). */
+export async function assertProductIsSellable(
+  productId: string | null | undefined,
+): Promise<void> {
+  const id = productId?.trim()
+  if (!id) return
+  const result = await tenantQuery<{ has_children: boolean }>(
+    `SELECT EXISTS (
+       SELECT 1 FROM crm_products v
+       WHERE v.parent_product_id = $1
+         AND v.deleted_at IS NULL
+         AND v.archived_at IS NULL
+         AND ${tenantWhereParam(2, 'v')}
+     ) AS has_children`,
+    [id, getTenantIdOrDefault()],
+  )
+  if (result.rows[0]?.has_children) {
+    throw badRequest(
+      'Selecciona una variedad concreta; el producto agrupador no se puede vender ni ingresar a stock',
+    )
+  }
+}
+
+export async function listProductVariants(
+  parentId: string,
+): Promise<ProductListItem[]> {
+  const result = await listProducts({
+    page: 1,
+    pageSize: 100,
+    parentId,
+  })
+  return result.items
+}
+
+export async function createProductVariantsBatch(
+  parentId: string,
+  input: CreateVariantsBatchInput,
+  actor: AuditActor,
+): Promise<ProductListItem[]> {
+  const parent = await getProductById(parentId)
+  if (parent.parentProductId) {
+    throw badRequest('No se pueden crear variedades bajo otra variedad')
+  }
+
+  const options =
+    normalizeVariantOptions(input.options).length > 0
+      ? normalizeVariantOptions(input.options)
+      : (parent.variantOptions ?? [])
+  if (options.length === 0 && (!input.variants || input.variants.length === 0)) {
+    throw badRequest('Define opciones (Color, Talla, …) o una lista de variedades')
+  }
+
+  const optionOrder = options.map((o) => o.name)
+  const specs =
+    input.variants && input.variants.length > 0
+      ? input.variants.map((v) => ({
+          attributes: normalizeVariantAttributes(v.attributes),
+          sku: v.sku?.trim(),
+          priceNum: v.priceNum,
+          costPriceNum: v.costPriceNum,
+          stockNum: v.stockNum,
+          status: v.status,
+          trackInventory: v.trackInventory,
+        }))
+      : generateVariantCombinations(options).map((attributes) => ({
+          attributes,
+          sku: suggestVariantSku(parent.sku, attributes, optionOrder),
+          priceNum: undefined as number | undefined,
+          costPriceNum: undefined as number | undefined,
+          stockNum: undefined as number | undefined,
+          status: undefined as ProductListItem['status'] | undefined,
+          trackInventory: true as boolean | undefined,
+        }))
+
+  if (specs.length === 0) {
+    throw badRequest('No hay combinaciones de variedades para crear')
+  }
+
+  // Asegura que el padre no trackee inventario.
+  await tenantQuery(
+    `UPDATE crm_products
+     SET track_inventory = false,
+         stock_qty = NULL,
+         variant_options = $2::jsonb,
+         updated_at = now(),
+         updated_by_id = $3,
+         updated_by_name = $4
+     WHERE id = $1 AND ${tenantWhereParam(5)}`,
+    [
+      parentId,
+      JSON.stringify(options),
+      actor.userId,
+      actor.userName,
+      getTenantIdOrDefault(),
+    ],
+  )
+
+  // Quita posiciones de inventario del SKU familia si existían.
+  await withTenantClient(async (client) => {
+    const ids = await findInventoryPositionIds(client, {
+      productId: parentId,
+      sku: parent.sku,
+    })
+    if (ids.length === 0) return
+    await client.query(
+      `DELETE FROM crm_stock_reservations WHERE inventory_position_id = ANY($1::uuid[])`,
+      [ids],
+    )
+    await client.query(
+      `DELETE FROM crm_stock_movements WHERE inventory_position_id = ANY($1::uuid[])`,
+      [ids],
+    )
+    await client.query(
+      `DELETE FROM crm_inventory_positions WHERE id = ANY($1::uuid[])`,
+      [ids],
+    )
+  })
+
+  const created: ProductListItem[] = []
+  for (const spec of specs) {
+    if (Object.keys(spec.attributes).length === 0) continue
+    const sku =
+      spec.sku ||
+      suggestVariantSku(parent.sku, spec.attributes, optionOrder)
+    const name = formatVariantLabel(parent.name, spec.attributes, optionOrder)
+    const item = await createProduct(
+      {
+        name,
+        sku,
+        ownerName: parent.owner,
+        category: parent.category !== 'Sin categoría' ? parent.category : undefined,
+        subcategory: parent.subcategory,
+        productType: parent.productType,
+        unitOfMeasure: parent.unitOfMeasure,
+        billingPeriod: parent.billingPeriod,
+        priceNum: spec.priceNum ?? parent.priceNum,
+        priceCurrency: parent.priceCurrency,
+        costPriceNum:
+          spec.costPriceNum ??
+          (parent.costPriceNum > 0 ? parent.costPriceNum : undefined),
+        stockNum: spec.stockNum ?? 0,
+        status: spec.status ?? parent.status,
+        imageUrl: parent.imageUrl,
+        brand: parent.brand,
+        publishInIntegration: parent.publishInIntegration,
+        publishPriceInIntegration: parent.publishPriceInIntegration,
+        trackInventory: spec.trackInventory ?? true,
+        parentProductId: parentId,
+        variantAttributes: spec.attributes,
+      },
+      actor,
+    )
+    created.push(item)
+  }
+
+  return created
+}
+
+/**
+ * Convierte un producto simple en padre: mueve SKU/stock a la primera variedad.
+ */
+export async function convertProductToParent(
+  id: string,
+  input: ConvertToParentInput,
+  actor: AuditActor,
+): Promise<ProductListItem> {
+  const existing = await getProductById(id)
+  if (existing.parentProductId) {
+    throw badRequest('Esta variedad ya pertenece a un producto padre')
+  }
+  if (existing.variantsCount > 0) {
+    throw badRequest('Este producto ya es un agrupador con variedades')
+  }
+
+  const options = normalizeVariantOptions(input.options)
+  if (options.length === 0) {
+    throw badRequest('Define al menos una opción (ej. Color, Talla)')
+  }
+  const attrs = normalizeVariantAttributes(input.firstVariantAttributes)
+  if (Object.keys(attrs).length === 0) {
+    throw badRequest('Indica los atributos de la primera variedad')
+  }
+
+  const optionOrder = options.map((o) => o.name)
+  const firstSku =
+    input.firstVariantSku?.trim() ||
+    suggestVariantSku(existing.sku, attrs, optionOrder)
+  const firstName =
+    input.firstVariantName?.trim() ||
+    formatVariantLabel(existing.name, attrs, optionOrder)
+
+  if (firstSku.toLowerCase() === existing.sku.trim().toLowerCase()) {
+    throw badRequest(
+      'El SKU de la primera variedad debe ser distinto al código de familia',
+    )
+  }
+
+  await assertSkuAvailable(firstSku, id)
+
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    await setTenantLocal(client)
+
+    // Crear variedad heredando datos comerciales; reasignar inventario al nuevo SKU.
+    const priceFields = priceFieldsFromInput({
+      priceNum: existing.priceNum,
+      priceCurrency: existing.priceCurrency,
+    })
+
+    const inserted = await client.query<{ id: string }>(
+      `INSERT INTO crm_products (
+        name, sku, category_id, product_type, unit_of_measure, billing_period,
+        price_cents, price_currency, price_amount, cost_price_cents, stock_qty, status, track_inventory,
+        min_stock, max_stock, barcode, image_url, description,
+        created_by_id, created_by_name, owner_name, updated_by_id, updated_by_name, tenant_id, brand,
+        publish_in_integration, publish_price_in_integration,
+        parent_product_id, variant_attributes
+      )
+      SELECT
+        $2, $3, category_id, product_type, unit_of_measure, billing_period,
+        $4, $5, $6, cost_price_cents, stock_qty, status, track_inventory,
+        min_stock, max_stock, barcode, image_url, description,
+        $7, $8, owner_name, $7, $8, tenant_id, brand,
+        publish_in_integration, publish_price_in_integration,
+        $1, $9::jsonb
+      FROM crm_products
+      WHERE id = $1
+      RETURNING id`,
+      [
+        id,
+        firstName,
+        firstSku,
+        priceFields.priceCents,
+        priceFields.priceCurrency,
+        priceFields.priceAmount,
+        actor.userId,
+        actor.userName,
+        JSON.stringify(attrs),
+      ],
+    )
+    const variantId = inserted.rows[0]!.id
+
+    // Mover posiciones de inventario del SKU antiguo al nuevo.
+    await client.query(
+      `UPDATE crm_inventory_positions
+       SET product_id = $1,
+           product_name = $2,
+           sku = $3,
+           updated_at = now()
+       WHERE tenant_id = $4
+         AND (product_id = $5 OR lower(trim(sku)) = lower($6))`,
+      [
+        variantId,
+        firstName,
+        firstSku,
+        getTenantIdOrDefault(),
+        id,
+        existing.sku.trim(),
+      ],
+    )
+    await client.query(
+      `UPDATE crm_stock_movements
+       SET product_id = $1, product_name = $2, sku = $3
+       WHERE product_id = $4 OR lower(trim(sku)) = lower($5)`,
+      [variantId, firstName, firstSku, id, existing.sku.trim()],
+    )
+    await client.query(
+      `UPDATE crm_stock_reservations
+       SET product_id = $1, product_name = $2, sku = $3
+       WHERE product_id = $4 OR lower(trim(sku)) = lower($5)`,
+      [variantId, firstName, firstSku, id, existing.sku.trim()],
+    )
+
+    await client.query(
+      `UPDATE crm_products
+       SET track_inventory = false,
+           stock_qty = NULL,
+           variant_options = $2::jsonb,
+           variant_attributes = NULL,
+           parent_product_id = NULL,
+           updated_at = now(),
+           updated_by_id = $3,
+           updated_by_name = $4
+       WHERE id = $1`,
+      [id, JSON.stringify(options), actor.userId, actor.userName],
+    )
+
+    await client.query('COMMIT')
+  } catch (e) {
+    await client.query('ROLLBACK')
+    throw e
+  } finally {
+    client.release()
+  }
+
+  return getProductById(id)
 }

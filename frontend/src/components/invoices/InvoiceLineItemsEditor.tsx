@@ -4,13 +4,21 @@ import { InvoiceLineItemFields } from '@/components/invoices/InvoiceLineItemFiel
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { InvoiceLineItem } from '@/data/invoice-detail.mock'
-import { defaultInvoiceLineItem, invoiceLineSubjectToVat } from '@/lib/invoice-line-item'
+import {
+  defaultInvoiceLineItem,
+  invoiceLineSubjectToVat,
+  recalcInvoiceLine,
+} from '@/lib/invoice-line-item'
+import type { ExchangeRateSnapshot, ProductCurrency } from '@/lib/currency'
 
 type InvoiceLineItemsEditorProps = {
   lineItems: InvoiceLineItem[]
   onChange: (lineItems: InvoiceLineItem[]) => void
   idPrefix?: string
   readOnly?: boolean
+  title?: string
+  exchangeRates?: ExchangeRateSnapshot | null
+  defaultCurrency?: ProductCurrency
 }
 
 export function InvoiceLineItemsEditor({
@@ -18,12 +26,15 @@ export function InvoiceLineItemsEditor({
   onChange,
   idPrefix = 'invoice-lines',
   readOnly = false,
+  title = 'Líneas de factura',
+  exchangeRates = null,
+  defaultCurrency = 'CLP',
 }: InvoiceLineItemsEditorProps) {
   if (readOnly) {
     return (
       <Card className="border-border shadow-sm">
         <CardHeader>
-          <CardTitle className="text-sm font-semibold">Líneas de factura</CardTitle>
+          <CardTitle className="text-sm font-semibold">{title}</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -62,7 +73,16 @@ export function InvoiceLineItemsEditor({
   }
 
   const addLine = () => {
-    onChange([...lineItems, defaultInvoiceLineItem()])
+    const line = defaultInvoiceLineItem()
+    onChange([
+      ...lineItems,
+      defaultCurrency !== 'CLP'
+        ? recalcInvoiceLine(
+            { ...line, lineKind: 'manual', priceCurrency: defaultCurrency },
+            exchangeRates,
+          )
+        : line,
+    ])
   }
 
   const removeLine = (id: string) => {
@@ -72,7 +92,7 @@ export function InvoiceLineItemsEditor({
   return (
     <Card className="border-border shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-semibold">Líneas de factura</CardTitle>
+        <CardTitle className="text-sm font-semibold">{title}</CardTitle>
         <Button type="button" size="sm" variant="outline" onClick={addLine}>
           <Plus aria-hidden className="size-4" />
           Línea
@@ -91,6 +111,8 @@ export function InvoiceLineItemsEditor({
               index={index}
               idPrefix={idPrefix}
               canRemove={lineItems.length > 1}
+              exchangeRates={exchangeRates}
+              defaultCurrency={defaultCurrency}
               onPatch={(line) => patchLine(line.id, line)}
               onRemove={() => removeLine(line.id)}
             />

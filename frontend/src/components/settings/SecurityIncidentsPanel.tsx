@@ -116,10 +116,17 @@ export function SecurityIncidentsPanel() {
         <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
           <div>
             <CardTitle className="text-base font-semibold">Incidentes de seguridad</CardTitle>
-            <CardDescription>
-              Registro interno de brechas o incidentes que afecten datos personales (Ley 21.719,
-              Art. 14 sexies). Documenta medidas y notificaciones a la APDP y titulares cuando
-              corresponda.
+            <CardDescription className="space-y-1.5">
+              <span className="block">
+                <strong className="font-medium text-foreground/90">Qué es:</strong> Art. 14 sexies
+                (otro artículo, no el 14 ter). Bitácora de brechas: acceso no autorizado, pérdida o
+                filtración de datos personales.
+              </span>
+              <span className="block text-xs">
+                Sirve para documentar hechos, medidas y si notificaste a la APDP / titulares. Marcar
+                «notificado» en Kora no envía el aviso legal: debes hacerlo por los canales oficiales
+                y dejar aquí la evidencia.
+              </span>
             </CardDescription>
           </div>
           {canEdit ? (

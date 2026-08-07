@@ -14,6 +14,8 @@ export type ActivityRelatedType =
   | 'cotizacion'
   | 'compra'
   | 'factura'
+  | 'boleta'
+  | 'gasto'
   | 'proyecto'
   | 'solicitud'
   | 'ingreso'

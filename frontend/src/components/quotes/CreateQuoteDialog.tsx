@@ -26,10 +26,12 @@ import {
   validateCreateQuoteForm,
   type CreateQuoteFormValues,
 } from '@/lib/quote-create'
-import { computeQuoteTotals } from '@/lib/quote-line-item'
+import { computeQuoteTotals, isManualQuoteLine, recalcQuoteLine, recalcQuoteLinesWithRates } from '@/lib/quote-line-item'
 import { useProductsRegistry } from '@/hooks/use-products-registry'
 import { useCatalogSettings } from '@/hooks/use-catalog-settings'
+import { useExchangeRatesForDate } from '@/hooks/use-exchange-rates-for-date'
 import { defaultSaleCustomerValues } from '@/lib/sale-customer'
+import type { QuoteFormValues } from '@/lib/quote-form'
 
 type CreateQuoteDialogProps = {
   open: boolean
@@ -66,6 +68,9 @@ function toQuoteFormFieldsModel(form: CreateQuoteFormValues): QuoteFormFieldsMod
     internalNotes: '',
     includeBankDetails: form.includeBankDetails,
     bankAccountId: form.bankAccountId,
+    globalDiscountPercent: form.globalDiscountPercent,
+    issueDate: form.issueDate,
+    quoteCurrency: form.quoteCurrency,
   }
 }
 
@@ -80,13 +85,19 @@ export function CreateQuoteDialog({
   const [form, setForm] = useState(() => createDefaultQuoteFormValues(initialValues))
   const { reloadFromApi: reloadProducts } = useProductsRegistry()
   const { reloadCatalog } = useCatalogSettings()
+  const { rates: exchangeRates, loading: ratesLoading } = useExchangeRatesForDate(form.issueDate)
+
+  const displayLineItems = useMemo(
+    () => recalcQuoteLinesWithRates(form.lineItems, exchangeRates, { skipWhileLoading: ratesLoading }),
+    [form.lineItems, exchangeRates, ratesLoading],
+  )
 
   const totals = useMemo(
     () =>
-      computeQuoteTotals(form.lineItems, {
+      computeQuoteTotals(displayLineItems, {
         globalDiscountPercent: form.globalDiscountPercent,
       }),
-    [form.lineItems, form.globalDiscountPercent],
+    [displayLineItems, form.globalDiscountPercent],
   )
 
   useEffect(() => {
@@ -97,6 +108,29 @@ export function CreateQuoteDialog({
       setForm(createDefaultQuoteFormValues(initialValues))
     })
   }, [open, initialValues, reloadProducts, reloadCatalog])
+
+  const handleFormChange = useCallback((patch: Partial<QuoteFormValues>) => {
+    setForm((current) => {
+      const next = { ...current, ...patch }
+      if (patch.quoteCurrency) {
+        next.lineItems = current.lineItems.map((line) =>
+          isManualQuoteLine(line)
+            ? recalcQuoteLine(
+                {
+                  ...line,
+                  priceCurrency: patch.quoteCurrency!,
+                  unitPriceOriginalNum: 0,
+                  unitPriceOriginal: undefined,
+                  unitPrice: '$0',
+                },
+                exchangeRates,
+              )
+            : line,
+        )
+      }
+      return next
+    })
+  }, [exchangeRates])
 
   const handleOpportunityChange = useCallback(
     (_opportunityId: string, opportunity?: OpportunityListItem) => {
@@ -123,6 +157,7 @@ export function CreateQuoteDialog({
     e.preventDefault()
     const payload: CreateQuoteFormValues = {
       ...form,
+      lineItems: displayLineItems,
       amount: totals.amount,
     }
     const validation = validateCreateQuoteForm(payload)
@@ -136,74 +171,78 @@ export function CreateQuoteDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-2xl">
-        <DialogHeader>
+      <DialogContent className="!flex max-h-[min(92dvh,calc(100vh-2rem))] w-[calc(100vw-1.5rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl sm:w-full top-[4dvh] translate-y-0">
+        <DialogHeader className="shrink-0 space-y-1 border-b border-border px-4 py-4 sm:px-6">
           <DialogTitle>{title}</DialogTitle>
           {description ? <DialogDescription>{description}</DialogDescription> : null}
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <QuoteFormFields
-            form={toQuoteFormFieldsModel(form)}
-            readOnlyOpportunity={form.lockOpportunity}
-            onOpportunityChange={form.lockOpportunity ? undefined : handleOpportunityChange}
-            onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
-          />
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden px-4 py-4 sm:px-6">
+            <QuoteFormFields
+              form={toQuoteFormFieldsModel(form)}
+              readOnlyOpportunity={form.lockOpportunity}
+              onOpportunityChange={form.lockOpportunity ? undefined : handleOpportunityChange}
+              onChange={handleFormChange}
+            />
 
-          <QuoteLineItemsEditor
-            lineItems={form.lineItems}
-            onChange={(lineItems) =>
-              setForm((f) => ({
-                ...f,
-                lineItems,
-                amount: computeQuoteTotals(lineItems, {
-                  globalDiscountPercent: f.globalDiscountPercent,
-                }).amount,
-              }))
-            }
-          />
+            <QuoteLineItemsEditor
+              lineItems={displayLineItems}
+              exchangeRates={exchangeRates}
+              defaultCurrency={form.quoteCurrency}
+              onChange={(lineItems) =>
+                setForm((f) => ({
+                  ...f,
+                  lineItems,
+                  amount: computeQuoteTotals(lineItems, {
+                    globalDiscountPercent: f.globalDiscountPercent,
+                  }).amount,
+                }))
+              }
+            />
 
-          <DocumentGlobalDiscountField
-            id="create-qt-global-discount"
-            value={form.globalDiscountPercent}
-            onChange={(globalDiscountPercent) =>
-              setForm((f) => ({
-                ...f,
-                globalDiscountPercent,
-                amount: computeQuoteTotals(f.lineItems, { globalDiscountPercent }).amount,
-              }))
-            }
-          />
+            <DocumentGlobalDiscountField
+              id="create-qt-global-discount"
+              value={form.globalDiscountPercent}
+              onChange={(globalDiscountPercent) =>
+                setForm((f) => ({
+                  ...f,
+                  globalDiscountPercent,
+                  amount: computeQuoteTotals(f.lineItems, { globalDiscountPercent }).amount,
+                }))
+              }
+            />
 
-          <DocumentTotalsBreakdown
-            subtotal={totals.subtotal}
-            discountPercent={totals.discountPercent}
-            discountAmount={totals.discountAmount}
-            taxLabel={`IVA (${totals.taxPercent})`}
-            taxAmount={totals.taxAmount}
-            total={totals.amount}
-            totalLabel="Total cotización (IVA incl.)"
-          />
+            <DocumentTotalsBreakdown
+              subtotal={totals.subtotal}
+              discountPercent={totals.discountPercent}
+              discountAmount={totals.discountAmount}
+              taxLabel={`IVA (${totals.taxPercent})`}
+              taxAmount={totals.taxAmount}
+              total={totals.amount}
+              totalLabel="Total cotización (IVA incl.)"
+            />
 
-          <QuoteCommercialTermsFields
-            idPrefix="create-qt"
-            values={{
-              paymentTerms: form.paymentTerms,
-              deliveryTerms: form.deliveryTerms,
-              terms: form.terms,
-            }}
-            onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
-          />
+            <QuoteCommercialTermsFields
+              idPrefix="create-qt"
+              values={{
+                paymentTerms: form.paymentTerms,
+                deliveryTerms: form.deliveryTerms,
+                terms: form.terms,
+              }}
+              onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
+            />
 
-          <QuoteBankPdfFields
-            idPrefix="create-qt-bank"
-            values={{
-              includeBankDetails: form.includeBankDetails,
-              bankAccountId: form.bankAccountId,
-            }}
-            onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
-          />
+            <QuoteBankPdfFields
+              idPrefix="create-qt-bank"
+              values={{
+                includeBankDetails: form.includeBankDetails,
+                bankAccountId: form.bankAccountId,
+              }}
+              onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
+            />
+          </div>
 
-          <DialogFooter className="gap-2 border-t border-border pt-4 sm:gap-0">
+          <DialogFooter className="shrink-0 gap-2 border-t border-border bg-muted/20 px-4 py-4 sm:px-6 sm:gap-0">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>

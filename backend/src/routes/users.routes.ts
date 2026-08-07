@@ -75,6 +75,10 @@ usersRouter.get(
         page: query.page,
         pageSize: query.pageSize,
         q: query.q,
+        sortBy: query.sortBy,
+        sortDir: query.sortDir,
+        dateFrom: query.dateFrom,
+        dateTo: query.dateTo,
         status: query.status,
       })
       res.json({

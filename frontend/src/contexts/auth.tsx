@@ -21,6 +21,7 @@ import {
   type AuthSession,
 } from '@/lib/auth-session'
 import { resolveLoginRedirectUrl, resolveLogoutRedirectUrl } from '@/lib/auth-routes'
+import { clearMentionApiCache } from '@/lib/mentions'
 import { resolveTenantSlugFromHostname } from '@/lib/tenant-host'
 import type { UserDetail } from '@/data/user-detail.mock'
 import type { AccessProfile } from '@/types/access-profile'
@@ -145,6 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ) => {
       bootstrapTokenRef.current = token
       const next = sessionFromLogin(token, user, tenantId, tenantSlug, isPlatformOperator)
+      clearMentionApiCache()
       saveAuthSession(next)
       setSession(next)
       setProfile(meProfile)

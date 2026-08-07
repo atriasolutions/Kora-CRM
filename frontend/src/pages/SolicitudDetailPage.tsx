@@ -1,6 +1,7 @@
 import {
   ArrowLeft,
   ChevronRight,
+  ClipboardCheck,
   Clock,
   FolderOpen,
   LayoutList,
@@ -19,6 +20,8 @@ import { SolicitudDescriptionContent } from '@/components/solicitudes/SolicitudD
 import { SolicitudFilesPanel } from '@/components/solicitudes/SolicitudFilesPanel'
 import { SolicitudProjectsPanel } from '@/components/solicitudes/SolicitudProjectsPanel'
 import { SolicitudBitacoraPanel } from '@/components/solicitudes/SolicitudBitacoraPanel'
+import { SolicitudPruebasPanel } from '@/components/solicitudes/SolicitudPruebasPanel'
+import { SolicitudResourceLinksCard } from '@/components/solicitudes/SolicitudResourceLinksCard'
 import { SolicitudSuccessPath } from '@/components/solicitudes/SolicitudSuccessPath'
 import { SolicitudTeamMembersPanel } from '@/components/solicitudes/SolicitudTeamMembersPanel'
 import { RegisterActivityDialog } from '@/components/contacts/RegisterActivityDialog'
@@ -62,13 +65,14 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 
-type DetailTab = 'detalle' | 'equipo' | 'notas' | 'archivos' | 'actividad' | 'proyectos' | 'bitacora'
+type DetailTab = 'detalle' | 'equipo' | 'notas' | 'archivos' | 'actividad' | 'proyectos' | 'bitacora' | 'pruebas'
 
 const tabs: { id: DetailTab; label: string; Icon: typeof LayoutList }[] = [
   { id: 'detalle', label: 'Detalle', Icon: LayoutList },
   { id: 'equipo', label: 'Equipo', Icon: Users },
   { id: 'notas', label: 'Notas', Icon: StickyNote },
   { id: 'proyectos', label: 'Proyectos', Icon: Puzzle },
+  { id: 'pruebas', label: 'Pruebas', Icon: ClipboardCheck },
   { id: 'bitacora', label: 'Bitácora', Icon: Clock },
   { id: 'archivos', label: 'Archivos', Icon: FolderOpen },
   { id: 'actividad', label: 'Actividad', Icon: Zap },
@@ -82,6 +86,8 @@ export function SolicitudDetailPage() {
     useModulePermissions('proyectos')
   const { canView: canViewBitacora, canCreate: canCreateBitacora } =
     useModulePermissions('bitacora')
+  const { canView: canViewPruebas, canCreate: canCreatePrueba } =
+    useModulePermissions('pruebas_solicitud')
   const { canCreate: canCreateActivity } = useModulePermissions('actividades')
   const canRegisterActivity = canCreateActivity || canEdit
   const { archiveSolicitud, isArchived, updateSolicitudFromDetail } = useSolicitudesRegistry()
@@ -100,6 +106,7 @@ export function SolicitudDetailPage() {
   const [tab, setTab] = useState<DetailTab>('detalle')
   const [projectCount, setProjectCount] = useState(0)
   const [bitacoraCount, setBitacoraCount] = useState(0)
+  const [pruebasCount, setPruebasCount] = useState(0)
   const [activityDialogOpen, setActivityDialogOpen] = useState(false)
   const [activityPresetType, setActivityPresetType] =
     useState<ContactActivityType>('llamada')
@@ -361,6 +368,11 @@ export function SolicitudDetailPage() {
                   {projectCount}
                 </Badge>
               ) : null}
+              {id === 'pruebas' && pruebasCount > 0 ? (
+                <Badge variant="secondary" className="ms-0.5 font-normal">
+                  {pruebasCount}
+                </Badge>
+              ) : null}
               {id === 'bitacora' && bitacoraCount > 0 ? (
                 <Badge variant="secondary" className="ms-0.5 font-normal">
                   {bitacoraCount}
@@ -383,6 +395,10 @@ export function SolicitudDetailPage() {
                 />
               </CardContent>
             </Card>
+            <SolicitudResourceLinksCard
+              documentationUrl={solicitud.documentationUrl}
+              gitBranchUrl={solicitud.gitBranchUrl}
+            />
             <RecordAuditMeta record={solicitud} />
           </div>
         ) : null}
@@ -438,6 +454,15 @@ export function SolicitudDetailPage() {
             canViewProjects={canViewProjects}
             canCreateProject={canCreateProject}
             onCountChange={setProjectCount}
+          />
+        ) : null}
+
+        {tab === 'pruebas' ? (
+          <SolicitudPruebasPanel
+            solicitud={solicitud}
+            canView={canViewPruebas}
+            canCreate={canCreatePrueba}
+            onCountChange={setPruebasCount}
           />
         ) : null}
 

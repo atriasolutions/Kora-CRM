@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { listSortAndDateQueryFields } from '../lib/list-query.js'
+
 const stockReceiptLineSchema = z.object({
   id: z.string().optional(),
   productId: z.string().uuid().optional(),
@@ -17,6 +19,7 @@ export const listStockReceiptsQuerySchema = z.object({
     .union([z.literal('true'), z.literal('false')])
     .optional()
     .transform((v) => v === 'true'),
+  ...listSortAndDateQueryFields,
 })
 
 export const createStockReceiptSchema = z.object({

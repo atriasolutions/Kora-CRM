@@ -24,6 +24,8 @@ export type SolicitudRow = {
   updated_by_name: string | null
   company_id: string | null
   company_name: string | null
+  documentation_url: string | null
+  git_branch_url: string | null
 }
 
 export type SolicitudTeamRow = {
@@ -61,6 +63,8 @@ export function mapSolicitudRow(row: SolicitudRow): SolicitudListItem {
     updatedByName: row.updated_by_name ?? '',
     companyId: row.company_id ?? undefined,
     companyName: row.company_name?.trim() || undefined,
+    documentationUrl: row.documentation_url?.trim() || undefined,
+    gitBranchUrl: row.git_branch_url?.trim() || undefined,
   }
 }
 

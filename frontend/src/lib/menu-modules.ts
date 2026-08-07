@@ -6,11 +6,14 @@ export type MenuModuleId =
   | 'oportunidades'
   | 'cotizaciones'
   | 'facturacion'
+  | 'boletas'
   | 'actividades'
   | 'proyectos'
   | 'solicitudes'
   | 'bitacora'
+  | 'pruebas_solicitud'
   | 'compras'
+  | 'gastos'
   | 'ingresos'
   | 'inventario'
   | 'productos'
@@ -33,11 +36,14 @@ export const MENU_MODULE_DEFINITIONS: MenuModuleDef[] = [
   { id: 'oportunidades', label: 'Oportunidades', pathSegment: 'oportunidades' },
   { id: 'cotizaciones', label: 'Cotizaciones', pathSegment: 'cotizaciones' },
   { id: 'facturacion', label: 'Facturación', pathSegment: 'facturacion' },
+  { id: 'boletas', label: 'Boletas', pathSegment: 'boletas' },
   { id: 'actividades', label: 'Actividades', pathSegment: 'actividades' },
   { id: 'proyectos', label: 'Proyectos', pathSegment: 'proyectos' },
   { id: 'solicitudes', label: 'Solicitudes', pathSegment: 'solicitudes' },
   { id: 'bitacora', label: 'Bitácora', pathSegment: 'bitacora' },
+  { id: 'pruebas_solicitud', label: 'Pruebas de Solicitud', pathSegment: 'pruebas-solicitud' },
   { id: 'compras', label: 'Compras', pathSegment: 'compras' },
+  { id: 'gastos', label: 'Gastos', pathSegment: 'gastos' },
   { id: 'ingresos', label: 'Ingresos', pathSegment: 'ingresos' },
   { id: 'inventario', label: 'Inventario', pathSegment: 'inventario' },
   { id: 'productos', label: 'Productos', pathSegment: 'productos' },

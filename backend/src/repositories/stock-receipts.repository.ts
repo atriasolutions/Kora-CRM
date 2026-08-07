@@ -21,7 +21,7 @@ import {
   type StockReceiptLineRow,
   type StockReceiptRow,
 } from '../mappers/stock-receipt.mapper.js'
-import { maybeNotifyRecordOwnerChange } from '../lib/owner-assignment.js'
+import { maybeNotifyRecordOwnerChange, maybeNotifyRecordOwnerOnCreate } from '../lib/owner-assignment.js'
 import { badRequest, notFound } from '../middleware/errors.js'
 import { maybeNotifyInventoryStatusChange } from '../services/notifications.service.js'
 import type { AuditActor } from '../types/audit.js'
@@ -32,6 +32,12 @@ import type {
   UpdateStockReceiptInput,
 } from '../types/stock-receipt.js'
 import { paginationOffset } from '../utils/pagination.js'
+
+import {
+  parseCommaSeparatedList,
+  pushDateRangeCondition,
+  resolveOrderByClause,
+} from '../lib/list-query.js'
 import { purgeEntityNotesAndFiles } from '../services/entity-purge.service.js'
 
 const RECEIPT_COLUMNS = `
@@ -50,6 +56,10 @@ export type ListStockReceiptsParams = {
   q?: string
   status?: string
   archivedOnly?: boolean
+  sortBy?: string
+  sortDir?: 'asc' | 'desc'
+  dateFrom?: string
+  dateTo?: string
 }
 
 async function loadReceiptLines(receiptId: string): Promise<StockReceiptLineRow[]> {
@@ -153,6 +163,16 @@ async function insertReceiptLines(
   }
 }
 
+
+const STOCK_RECEIPT_SORT_COLUMNS: Record<string, string> = {
+  number: 'number',
+  supplierName: 'supplier_name',
+  status: 'status',
+  confirmedAt: 'confirmed_at',
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
+}
+
 export async function listStockReceipts(
   params: ListStockReceiptsParams,
 ): Promise<{ items: StockReceiptListItem[]; total: number }> {
@@ -166,9 +186,15 @@ export async function listStockReceipts(
     conditions.push('deleted_at IS NULL')
   }
   idx = pushTenantCondition(conditions, values, idx)
-  if (params.status) {
-    conditions.push(`status = $${idx++}`)
-    values.push(params.status)
+  if (params.status?.trim()) {
+    const statuses = parseCommaSeparatedList(params.status)
+    if (statuses.length === 1) {
+      conditions.push(`status = $${idx++}`)
+      values.push(statuses[0])
+    } else if (statuses.length > 1) {
+      conditions.push(`status = ANY($${idx++}::text[])`)
+      values.push(statuses)
+    }
   }
   if (params.q) {
     conditions.push(
@@ -177,6 +203,22 @@ export async function listStockReceipts(
     values.push(`%${params.q}%`)
     idx++
   }
+
+  idx = pushDateRangeCondition(
+    conditions,
+    values,
+    idx,
+    'COALESCE(confirmed_at, created_at)',
+    params.dateFrom,
+    params.dateTo,
+  )
+
+  const orderBy = resolveOrderByClause(
+    params.sortBy,
+    params.sortDir,
+    STOCK_RECEIPT_SORT_COLUMNS,
+    'updated_at DESC',
+  )
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
 
@@ -193,7 +235,7 @@ export async function listStockReceipts(
       `SELECT ${RECEIPT_COLUMNS}
        FROM crm_stock_receipts
        ${where}
-       ORDER BY updated_at DESC
+       ORDER BY ${orderBy}
        LIMIT $${idx++} OFFSET $${idx}`,
       listValues,
     )
@@ -221,6 +263,10 @@ export async function createStockReceipt(
   await enforceRecordQuota(actor)
   const warehouse = await resolveWarehouse(input.warehouseId, input.warehouse)
   const purchase = await resolvePurchaseSnapshot(input.purchaseId)
+  const { assertDocumentLineProductsAreSellable } = await import(
+    '../lib/assert-sellable-line-products.js'
+  )
+  await assertDocumentLineProductsAreSellable(input.lineItems)
   const lines = computeStockReceiptLines(input.lineItems)
 
   const client = await pool.connect()
@@ -261,7 +307,17 @@ export async function createStockReceipt(
         const row = result.rows[0]!
         if (lines.length > 0) await insertReceiptLines(client, row.id, lines)
         await client.query('COMMIT')
-        return mapStockReceiptDetail(row, await loadReceiptLines(row.id))
+        const detail = mapStockReceiptDetail(row, await loadReceiptLines(row.id))
+        maybeNotifyRecordOwnerOnCreate({
+          actor,
+          nextOwner: detail.owner ?? '',
+          moduleLabel: 'el ingreso de stock',
+          recordTitle: detail.number || detail.externalReference || detail.id,
+          href: `/ingresos/${detail.id}`,
+          entityType: 'ingreso',
+          entityId: detail.id,
+        })
+        return detail
       } catch (e) {
         await client.query('ROLLBACK')
         if (isUniqueViolation(e) && attempt < MAX_ATTEMPTS) continue

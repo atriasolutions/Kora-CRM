@@ -1,8 +1,9 @@
-import { Archive } from 'lucide-react'
+import { Archive, Pencil } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from '@/lib/toast'
 
+import { updateInvoiceApi } from '@/api/invoices'
 import { InvoicesArchivedView } from '@/components/invoices/InvoicesArchivedView'
 import { InvoicesKanbanView } from '@/components/invoices/InvoicesKanbanView'
 import {
@@ -13,6 +14,7 @@ import { InvoicesSegmentsView } from '@/components/invoices/InvoicesSegmentsView
 import { CreateInvoiceDialog } from '@/components/invoices/CreateInvoiceDialog'
 import { DuplicateInvoiceDialog } from '@/components/invoices/DuplicateInvoiceDialog'
 import { EditInvoiceDialog } from '@/components/invoices/EditInvoiceDialog'
+import { BulkEditDialog } from '@/components/list/BulkEditDialog'
 import { ListPageLayout } from '@/components/list/ListPageLayout'
 import { ModuleListPage, type ListSelectionAction } from '@/components/list/ModuleListPage'
 import { useEmbeddedListToolbarSlot } from '@/hooks/use-embedded-list-toolbar-slot'
@@ -41,7 +43,10 @@ import {
 } from '@/lib/invoice-create'
 import {
   createDefaultInvoiceFilters,
+  invoiceFiltersToServerQuery,
   invoiceRowMatchesFilters,
+  INVOICE_PAYMENT_METHOD_OPTIONS,
+  INVOICE_STATUS_OPTIONS,
   type InvoiceFilters,
 } from '@/lib/invoice-filters'
 import { INVOICE_ARCHIVE_RETENTION_DAYS } from '@/lib/invoice-archive'
@@ -52,6 +57,7 @@ import {
   sortInvoicesByRecentlyViewed,
   type InvoiceListScope,
 } from '@/lib/invoice-list-scope'
+import { getCurrentUser } from '@/lib/current-user'
 import { SiiDocumentsPanel } from '@/components/invoices/SiiDocumentsPanel'
 import { useOrganizationSettings } from '@/hooks/use-organization-settings'
 
@@ -84,6 +90,17 @@ export function InvoicesPage() {
     () => loadInvoiceRecentIds(),
     [listRefreshKey, location.key, listScope],
   )
+
+  const serverListQuery = useMemo(
+    () =>
+      invoiceFiltersToServerQuery(filters, {
+        mine: listScope === 'mine',
+        ownerName: getCurrentUser().name,
+      }),
+    [filters, listScope],
+  )
+
+  const filtersOnServer = listScope !== 'recent' && isApiEnabled()
 
   const rowPredicate = useMemo(
     () => (row: InvoiceListItem) =>
@@ -119,6 +136,8 @@ export function InvoicesPage() {
   const [editingInvoice, setEditingInvoice] = useState<InvoiceDetail | null>(null)
   const [archiveTarget, setArchiveTarget] = useState<InvoiceListItem | null>(null)
   const [bulkArchiveIds, setBulkArchiveIds] = useState<string[] | null>(null)
+  const [bulkEditIds, setBulkEditIds] = useState<string[] | null>(null)
+  const [bulkEditSaving, setBulkEditSaving] = useState(false)
 
   const handleCreateSubmit = useCallback(
     async (values: CreateInvoiceFormValues) => {
@@ -217,20 +236,59 @@ export function InvoicesPage() {
     }
   }, [archiveInvoices, bulkArchiveIds])
 
-  const listSelectionActions = useMemo<ListSelectionAction[]>(
-    () =>
-      canDelete
-        ? [
-            {
-              label: 'Archivar',
-              icon: Archive,
-              variant: 'destructive',
-              onClick: (ids) => setBulkArchiveIds(ids),
-            },
-          ]
-        : [],
-    [canDelete],
+  const handleBulkEdit = useCallback(
+    async (patch: Record<string, string>) => {
+      if (!bulkEditIds?.length) return
+      setBulkEditSaving(true)
+      let ok = 0
+      let fail = 0
+      try {
+        for (const id of bulkEditIds) {
+          try {
+            await updateInvoiceApi(id, {
+              status: patch.status,
+              ownerName: patch.ownerName,
+              paymentMethod: patch.paymentMethod,
+            })
+            ok += 1
+          } catch {
+            fail += 1
+          }
+        }
+        setBulkEditIds(null)
+        setListRefreshKey((k) => k + 1)
+        void reloadFromApi().catch(() => {})
+        if (fail === 0) {
+          toast.success(`${ok} factura${ok === 1 ? '' : 's'} actualizada${ok === 1 ? '' : 's'}.`)
+        } else {
+          toast.warning(`${ok} actualizadas, ${fail} con error.`)
+        }
+      } finally {
+        setBulkEditSaving(false)
+      }
+    },
+    [bulkEditIds, reloadFromApi],
   )
+
+  const listSelectionActions = useMemo<ListSelectionAction[]>(() => {
+    const actions: ListSelectionAction[] = []
+    if (canEdit) {
+      actions.push({
+        label: 'Editar',
+        icon: Pencil,
+        onClick: (ids) => setBulkEditIds(ids),
+      })
+    }
+    if (canDelete) {
+      actions.push({
+        label: 'Archivar',
+        icon: Archive,
+        variant: 'destructive',
+        onClick: (ids) => setBulkArchiveIds(ids),
+      })
+    }
+    return actions
+  }, [canDelete, canEdit])
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -275,8 +333,9 @@ export function InvoicesPage() {
               ? undefined
               : {
                   fetchPage: (params) =>
-                    fetchInvoicesServerPage(params, false, filters.documentKind),
-                  resetKey: `${listRefreshKey}-${listScope}-${filters.documentKind}`,
+                    fetchInvoicesServerPage(params, false, serverListQuery),
+                  resetKey: `${listRefreshKey}-${listScope}-${JSON.stringify(serverListQuery)}`,
+                  filtersOnServer,
                 }
           }
           rowPredicate={rowPredicate}
@@ -398,6 +457,34 @@ export function InvoicesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <BulkEditDialog
+        open={bulkEditIds !== null && bulkEditIds.length > 0}
+        onOpenChange={(open) => {
+          if (!open) setBulkEditIds(null)
+        }}
+        selectedCount={bulkEditIds?.length ?? 0}
+        saving={bulkEditSaving}
+        title="Editar facturas seleccionadas"
+        fields={[
+          {
+            key: 'status',
+            label: 'Estado',
+            options: INVOICE_STATUS_OPTIONS.map((s) => ({ value: s, label: s })),
+          },
+          {
+            key: 'paymentMethod',
+            label: 'Método de pago',
+            options: INVOICE_PAYMENT_METHOD_OPTIONS.map((m) => ({ value: m, label: m })),
+          },
+          {
+            key: 'ownerName',
+            label: 'Responsable',
+            placeholder: 'Nombre del responsable',
+          },
+        ]}
+        onSubmit={handleBulkEdit}
+      />
     </div>
   )
 }

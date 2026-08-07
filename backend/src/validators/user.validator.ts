@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { listSortAndDateQueryFields } from '../lib/list-query.js'
+
 import { entityImageUrlSchema } from './image-url.schema.js'
 
 const userStatus = z.enum(['Activo', 'Invitado', 'Inactivo', 'Por verificar'])
@@ -43,5 +45,6 @@ export const listUsersQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(50),
   q: z.string().trim().optional(),
-  status: userStatus.optional(),
+  status: z.string().optional(),
+  ...listSortAndDateQueryFields,
 })

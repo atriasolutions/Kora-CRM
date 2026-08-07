@@ -1,8 +1,9 @@
-import { Archive } from 'lucide-react'
+import { Archive, Pencil } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from '@/lib/toast'
 
+import { updateCompanyApi } from '@/api/companies'
 import { CompaniesArchivedView } from '@/components/companies/CompaniesArchivedView'
 import { CompaniesKanbanView } from '@/components/companies/CompaniesKanbanView'
 import {
@@ -13,6 +14,7 @@ import { CompaniesSegmentsView } from '@/components/companies/CompaniesSegmentsV
 import { CreateCompanyDialog } from '@/components/companies/CreateCompanyDialog'
 import { DuplicateCompanyDialog } from '@/components/companies/DuplicateCompanyDialog'
 import { EditCompanyDialog } from '@/components/companies/EditCompanyDialog'
+import { BulkEditDialog } from '@/components/list/BulkEditDialog'
 import { ListPageLayout } from '@/components/list/ListPageLayout'
 import { ModuleListPage, type ListSelectionAction } from '@/components/list/ModuleListPage'
 import { Button } from '@/components/ui/button'
@@ -38,6 +40,9 @@ import { useEmbeddedListToolbarSlot } from '@/hooks/use-embedded-list-toolbar-sl
 import { fetchCompaniesServerPage } from '@/lib/module-server-list'
 import { useModulePermissions } from '@/hooks/use-module-permissions'
 import {
+  COMPANY_LIFECYCLE_OPTIONS,
+  COMPANY_OPERATIONAL_OPTIONS,
+  companyFiltersToServerQuery,
   companyRowMatchesFilters,
   createDefaultCompanyFilters,
   type CompanyFilters,
@@ -47,6 +52,7 @@ import {
   type CreateCompanyFormValues,
 } from '@/lib/company-create'
 import { COMPANY_ARCHIVE_RETENTION_DAYS } from '@/lib/company-archive'
+import { getCurrentUser } from '@/lib/current-user'
 import {
   companyMatchesListScope,
   loadCompanyRecentIds,
@@ -83,6 +89,17 @@ export function CompaniesPage() {
     [listRefreshKey, location.key, listScope],
   )
 
+  const serverListQuery = useMemo(
+    () =>
+      companyFiltersToServerQuery(filters, {
+        mine: listScope === 'mine',
+        ownerName: getCurrentUser().name,
+      }),
+    [filters, listScope],
+  )
+
+  const filtersOnServer = listScope !== 'recent' && isApiEnabled()
+
   const rowPredicate = useMemo(
     () => (row: CompanyListItem) =>
       companyRowMatchesFilters(row, filters) &&
@@ -117,6 +134,8 @@ export function CompaniesPage() {
   const [editingCompany, setEditingCompany] = useState<CompanyDetail | null>(null)
   const [archiveTarget, setArchiveTarget] = useState<CompanyListItem | null>(null)
   const [bulkArchiveIds, setBulkArchiveIds] = useState<string[] | null>(null)
+  const [bulkEditIds, setBulkEditIds] = useState<string[] | null>(null)
+  const [bulkEditSaving, setBulkEditSaving] = useState(false)
 
   const handleCreateSubmit = useCallback(
     async (values: CreateCompanyFormValues) => {
@@ -193,20 +212,59 @@ export function CompaniesPage() {
     }
   }, [archiveCompanies, bulkArchiveIds])
 
-  const listSelectionActions = useMemo<ListSelectionAction[]>(
-    () =>
-      canDelete
-        ? [
-            {
-              label: 'Archivar',
-              icon: Archive,
-              variant: 'destructive',
-              onClick: (ids) => setBulkArchiveIds(ids),
-            },
-          ]
-        : [],
-    [canDelete],
+  const handleBulkEdit = useCallback(
+    async (patch: Record<string, string>) => {
+      if (!bulkEditIds?.length) return
+      setBulkEditSaving(true)
+      let ok = 0
+      let fail = 0
+      try {
+        for (const id of bulkEditIds) {
+          try {
+            await updateCompanyApi(id, {
+              lifecycle: patch.lifecycle,
+              operationalStatus: patch.operationalStatus,
+              ownerName: patch.ownerName,
+            })
+            ok += 1
+          } catch {
+            fail += 1
+          }
+        }
+        setBulkEditIds(null)
+        setListRefreshKey((k) => k + 1)
+        void reloadFromApi().catch(() => {})
+        if (fail === 0) {
+          toast.success(`${ok} empresa${ok === 1 ? '' : 's'} actualizada${ok === 1 ? '' : 's'}.`)
+        } else {
+          toast.warning(`${ok} actualizadas, ${fail} con error.`)
+        }
+      } finally {
+        setBulkEditSaving(false)
+      }
+    },
+    [bulkEditIds, reloadFromApi],
   )
+
+  const listSelectionActions = useMemo<ListSelectionAction[]>(() => {
+    const actions: ListSelectionAction[] = []
+    if (canEdit) {
+      actions.push({
+        label: 'Editar',
+        icon: Pencil,
+        onClick: (ids) => setBulkEditIds(ids),
+      })
+    }
+    if (canDelete) {
+      actions.push({
+        label: 'Archivar',
+        icon: Archive,
+        variant: 'destructive',
+        onClick: (ids) => setBulkArchiveIds(ids),
+      })
+    }
+    return actions
+  }, [canDelete, canEdit])
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -245,8 +303,10 @@ export function CompaniesPage() {
             listScope === 'recent'
               ? undefined
               : {
-                  fetchPage: (params) => fetchCompaniesServerPage(params, false),
-                  resetKey: `${listRefreshKey}-${listScope}`,
+                  fetchPage: (params) =>
+                    fetchCompaniesServerPage(params, false, serverListQuery),
+                  resetKey: `${listRefreshKey}-${listScope}-${JSON.stringify(serverListQuery)}`,
+                  filtersOnServer,
                 }
           }
           rowPredicate={rowPredicate}
@@ -370,6 +430,37 @@ export function CompaniesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <BulkEditDialog
+        open={bulkEditIds !== null && bulkEditIds.length > 0}
+        onOpenChange={(open) => {
+          if (!open) setBulkEditIds(null)
+        }}
+        selectedCount={bulkEditIds?.length ?? 0}
+        saving={bulkEditSaving}
+        title="Editar empresas seleccionadas"
+        fields={[
+          {
+            key: 'lifecycle',
+            label: 'Ciclo de vida',
+            options: COMPANY_LIFECYCLE_OPTIONS.map((s) => ({ value: s, label: s })),
+          },
+          {
+            key: 'operationalStatus',
+            label: 'Estado operacional',
+            options: COMPANY_OPERATIONAL_OPTIONS.map((o) => ({
+              value: o.value,
+              label: o.label,
+            })),
+          },
+          {
+            key: 'ownerName',
+            label: 'Responsable',
+            placeholder: 'Nombre del responsable',
+          },
+        ]}
+        onSubmit={handleBulkEdit}
+      />
     </div>
   )
 }

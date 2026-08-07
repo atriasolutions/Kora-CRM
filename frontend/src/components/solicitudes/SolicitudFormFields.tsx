@@ -1,4 +1,4 @@
-import { ClipboardList, UserRound } from 'lucide-react'
+import { ClipboardList, Link2, UserRound } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
 import { getUserApi } from '@/api/users'
@@ -211,6 +211,33 @@ export function SolicitudFormFields({
           disabled={disabled}
           helperText="Persona a cargo de la solicitud. Aparece en Mis solicitudes."
         />
+      </ContactFormSection>
+      <ContactFormSection
+        title="Enlaces"
+        description="Referencias técnicas opcionales"
+        icon={Link2}
+      >
+        <ContactFormInput
+          id={`${idPrefix}-documentation-url`}
+          label="URL documentación"
+          inputVariant="alphanumeric"
+          value={values.documentationUrl}
+          onChange={(documentationUrl) => patch({ documentationUrl })}
+          disabled={disabled}
+          placeholder="https://docs.ejemplo.com/proyecto"
+        />
+        <ContactFormInput
+          id={`${idPrefix}-git-branch-url`}
+          label="Rama Git"
+          inputVariant="alphanumeric"
+          value={values.gitBranchUrl}
+          onChange={(gitBranchUrl) => patch({ gitBranchUrl })}
+          disabled={disabled}
+          placeholder="https://github.com/org/repo/tree/feature/rama"
+        />
+        <p className="text-xs text-muted-foreground">
+          URL del branch o repositorio en Git (opcional).
+        </p>
       </ContactFormSection>
     </div>
   )

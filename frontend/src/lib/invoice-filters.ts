@@ -12,6 +12,13 @@ import {
   INVOICE_PAYMENT_METHOD_OPTIONS,
   INVOICE_STATUS_OPTIONS,
 } from '@/data/invoices.mock'
+import {
+  createDefaultListDateFilter,
+  isListDateFilterActive,
+  listDateFilterToServerQuery,
+  listRowMatchesDateFilter,
+  type ListDateFilter,
+} from '@/lib/list-date-filter'
 
 export { INVOICE_DOCUMENT_KIND_OPTIONS, type InvoiceDocumentKindFilter }
 
@@ -22,6 +29,7 @@ export type InvoiceFilters = {
   paymentMethods: InvoicePaymentMethod[]
   due: InvoiceDueFilter
   documentKind: InvoiceDocumentKindFilter
+  date: ListDateFilter
 }
 
 export { INVOICE_STATUS_OPTIONS, INVOICE_PAYMENT_METHOD_OPTIONS }
@@ -36,7 +44,13 @@ export const INVOICE_DUE_OPTIONS: {
 ]
 
 export function createDefaultInvoiceFilters(): InvoiceFilters {
-  return { statuses: [], paymentMethods: [], due: 'all', documentKind: 'all' }
+  return {
+    statuses: [],
+    paymentMethods: [],
+    due: 'all',
+    documentKind: 'all',
+    date: createDefaultListDateFilter(),
+  }
 }
 
 export function countActiveInvoiceFilters(filters: InvoiceFilters): number {
@@ -45,6 +59,7 @@ export function countActiveInvoiceFilters(filters: InvoiceFilters): number {
   if (filters.paymentMethods.length > 0) n += 1
   if (filters.due !== 'all') n += 1
   if (filters.documentKind !== 'all') n += 1
+  if (isListDateFilterActive(filters.date)) n += 1
   return n
 }
 
@@ -86,5 +101,32 @@ export function invoiceRowMatchesFilters(
   ) {
     return false
   }
+  const dateKey = row.createdAt || row.issueDate
+  if (!listRowMatchesDateFilter(dateKey, filters.date)) return false
   return true
+}
+
+export function invoiceFiltersToServerQuery(
+  filters: InvoiceFilters,
+  options?: { mine?: boolean; ownerName?: string },
+): Record<string, string> {
+  const query: Record<string, string> = {
+    ...listDateFilterToServerQuery(filters.date),
+  }
+  if (filters.statuses.length > 0) {
+    query.status = filters.statuses.join(',')
+  }
+  if (filters.paymentMethods.length > 0) {
+    query.paymentMethod = filters.paymentMethods.join(',')
+  }
+  if (filters.due !== 'all') {
+    query.due = filters.due
+  }
+  if (filters.documentKind !== 'all') {
+    query.documentKind = filters.documentKind
+  }
+  if (options?.mine && options.ownerName?.trim()) {
+    query.ownerName = options.ownerName.trim()
+  }
+  return query
 }

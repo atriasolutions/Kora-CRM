@@ -1,0 +1,7 @@
+BEGIN;
+
+ALTER TABLE crm_solicitudes
+  ADD COLUMN IF NOT EXISTS documentation_url TEXT NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS git_branch_url TEXT NOT NULL DEFAULT '';
+
+COMMIT;

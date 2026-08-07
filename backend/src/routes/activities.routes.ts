@@ -30,6 +30,10 @@ activitiesRouter.get(
         relatedType: query.relatedType,
         relatedId: query.relatedId,
         assigneeName: query.assigneeName,
+        sortBy: query.sortBy,
+        sortDir: query.sortDir,
+        dateFrom: query.dateFrom,
+        dateTo: query.dateTo,
         archivedOnly: query.archived === true,
       })
       res.json({

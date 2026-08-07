@@ -556,6 +556,40 @@ function isStockReceiptSku(sku: string): boolean {
   return !NON_STOCK_SKU_PREFIXES.some((prefix) => trimmed.startsWith(prefix))
 }
 
+export function handleBoletaStatusStockChange(
+  boletaId: string,
+  boletaNumber: string,
+  previousStatus: string,
+  nextStatus: string,
+): StockOperationResult {
+  if (isApiEnabled()) {
+    return { ok: true }
+  }
+
+  const wasDraft = previousStatus === 'Borrador'
+  const isDraft = nextStatus === 'Borrador'
+  const isVoid = nextStatus === 'Anulada'
+  const wasVoid = previousStatus === 'Anulada'
+
+  if (isVoid) {
+    return voidInvoiceStock(boletaId, boletaNumber)
+  }
+
+  if (wasVoid && !isDraft && nextStatus === 'Emitida') {
+    return commitStockForInvoice(boletaId, boletaNumber)
+  }
+
+  if (wasDraft && nextStatus === 'Emitida') {
+    return commitStockForInvoice(boletaId, boletaNumber)
+  }
+
+  if (!wasDraft && isDraft) {
+    return voidInvoiceStock(boletaId, boletaNumber)
+  }
+
+  return { ok: true }
+}
+
 export function receiveStockForReceipt(
   receiptNumber: string,
   lines: StockLineInput[],

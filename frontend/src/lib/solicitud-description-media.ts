@@ -5,6 +5,8 @@ export const SOLICITUD_INLINE_IMAGE_CLICKABLE_CLASS = 'solicitud-inline-image-cl
 export const SOLICITUD_FILE_ID_ATTR = 'data-file-id'
 
 const FILE_ID_PATTERN = /data-file-id="([^"]+)"/g
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 export function extractFileIdsFromDescription(html: string): string[] {
   const ids = new Set<string>()
@@ -13,6 +15,15 @@ export function extractFileIdsFromDescription(html: string): string[] {
     if (id) ids.add(id)
   }
   return Array.from(ids)
+}
+
+export function hasUnresolvedDescriptionFileIds(html: string): boolean {
+  return hasPendingDescriptionFileIds(html)
+}
+
+/** Referencias en HTML que aún no son UUID persistidos en el servidor. */
+export function hasPendingDescriptionFileIds(html: string): boolean {
+  return extractFileIdsFromDescription(html).some((id) => !UUID_RE.test(id))
 }
 
 /** Empareja archivos antes/después del sync (p. ej. ids temporales → UUID del servidor). */
@@ -75,9 +86,30 @@ export async function persistSolicitudDescriptionMedia(
   ) => Promise<SolicitudFile[]>,
 ): Promise<{ description: string; files: SolicitudFile[] }> {
   const serialized = serializeDescriptionHtml(descriptionHtml)
-  const savedFiles = await persistFiles(solicitudId, solicitudLabel, files)
+  const persistable = files.filter((f) => f.dataUrl?.trim())
+
+  if (hasUnresolvedDescriptionFileIds(serialized)) {
+    if (persistable.length === 0) {
+      throw new Error(
+        'Las imágenes de la evidencia no están guardadas. Pulsa «Guardar evidencias» antes de cerrar.',
+      )
+    }
+  }
+
+  if (persistable.length === 0) {
+    return { description: serialized, files }
+  }
+
+  const savedFiles = await persistFiles(solicitudId, solicitudLabel, persistable)
   const idMap = buildDescriptionFileIdMap(files, savedFiles)
   const description = remapDescriptionFileIds(serialized, idMap)
+
+  if (hasUnresolvedDescriptionFileIds(description)) {
+    throw new Error(
+      'No se pudieron vincular todas las imágenes de la evidencia. Vuelve a guardar las evidencias.',
+    )
+  }
+
   return { description, files: savedFiles }
 }
 

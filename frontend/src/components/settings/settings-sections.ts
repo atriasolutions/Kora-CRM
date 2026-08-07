@@ -77,7 +77,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     id: 'privacidad',
     label: 'Privacidad y datos',
     description:
-      'Política de tratamiento, solicitudes ARSOPB e incidentes de seguridad (Ley 21.719).',
+      'Guía Art. 14 ter, canal ARSOPB, bitácora de derechos e incidentes (Ley 21.719). No certifica cumplimiento por sí sola.',
     Icon: Shield,
   },
   {

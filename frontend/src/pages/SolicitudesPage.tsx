@@ -1,14 +1,16 @@
-import { Archive } from 'lucide-react'
+import { Archive, Pencil } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from '@/lib/toast'
 
+import { updateSolicitudApi } from '@/api/solicitudes'
 import { SolicitudesArchivedView } from '@/components/solicitudes/SolicitudesArchivedView'
 import { SolicitudesKanbanView } from '@/components/solicitudes/SolicitudesKanbanView'
 import { SolicitudesModuleHeader } from '@/components/solicitudes/SolicitudesModuleHeader'
 import { SolicitudesSegmentsView } from '@/components/solicitudes/SolicitudesSegmentsView'
 import { CreateSolicitudDialog } from '@/components/solicitudes/CreateSolicitudDialog'
 import { EditSolicitudDialog } from '@/components/solicitudes/EditSolicitudDialog'
+import { BulkEditDialog } from '@/components/list/BulkEditDialog'
 import { ListPageLayout } from '@/components/list/ListPageLayout'
 import { ModuleListPage, type ListSelectionAction } from '@/components/list/ModuleListPage'
 import { useEmbeddedListToolbarSlot } from '@/hooks/use-embedded-list-toolbar-slot'
@@ -43,9 +45,13 @@ import {
 } from '@/lib/solicitud-list-scope'
 import {
   createDefaultSolicitudFilters,
+  SOLICITUD_PRIORITY_OPTIONS,
+  SOLICITUD_STATUS_OPTIONS,
+  solicitudFiltersToServerQuery,
   solicitudRowMatchesFilters,
   type SolicitudFilters,
 } from '@/lib/solicitud-filters'
+import { getCurrentUser } from '@/lib/current-user'
 import type { StandardModuleViewId } from '@/lib/module-list-views'
 
 export function SolicitudesPage() {
@@ -79,6 +85,17 @@ export function SolicitudesPage() {
     () => loadSolicitudRecentIds(),
     [listRefreshKey, location.key, listScope],
   )
+
+  const serverListQuery = useMemo(
+    () =>
+      solicitudFiltersToServerQuery(filters, {
+        mine: listScope === 'mine',
+        ownerName: getCurrentUser().name,
+      }),
+    [filters, listScope],
+  )
+
+  const filtersOnServer = listScope !== 'recent' && isApiEnabled()
 
   const serverFiltersMineScope =
     isApiEnabled() && listScope === 'mine' && view === 'lista'
@@ -126,6 +143,8 @@ export function SolicitudesPage() {
   const [editingSolicitud, setEditingSolicitud] = useState<SolicitudDetail | null>(null)
   const [archiveTarget, setArchiveTarget] = useState<SolicitudListItem | null>(null)
   const [bulkArchiveIds, setBulkArchiveIds] = useState<string[] | null>(null)
+  const [bulkEditIds, setBulkEditIds] = useState<string[] | null>(null)
+  const [bulkEditSaving, setBulkEditSaving] = useState(false)
 
   const handleCreateSubmit = useCallback(
     async (payload: CreateSolicitudPayload) => {
@@ -200,20 +219,61 @@ export function SolicitudesPage() {
     }
   }, [archiveSolicitudes, bulkArchiveIds])
 
-  const listSelectionActions = useMemo<ListSelectionAction[]>(
-    () =>
-      canDelete
-        ? [
-            {
-              label: 'Archivar',
-              icon: Archive,
-              variant: 'destructive',
-              onClick: (ids) => setBulkArchiveIds(ids),
-            },
-          ]
-        : [],
-    [canDelete],
+  const handleBulkEdit = useCallback(
+    async (patch: Record<string, string>) => {
+      if (!bulkEditIds?.length) return
+      setBulkEditSaving(true)
+      let ok = 0
+      let fail = 0
+      try {
+        for (const id of bulkEditIds) {
+          try {
+            await updateSolicitudApi(id, {
+              status: patch.status,
+              priority: patch.priority,
+              assigneeName: patch.assigneeName,
+            })
+            ok += 1
+          } catch {
+            fail += 1
+          }
+        }
+        setBulkEditIds(null)
+        setListRefreshKey((k) => k + 1)
+        void reloadFromApi().catch(() => {})
+        if (fail === 0) {
+          toast.success(
+            `${ok} solicitud${ok === 1 ? '' : 'es'} actualizada${ok === 1 ? '' : 's'}.`,
+          )
+        } else {
+          toast.warning(`${ok} actualizadas, ${fail} con error.`)
+        }
+      } finally {
+        setBulkEditSaving(false)
+      }
+    },
+    [bulkEditIds, reloadFromApi],
   )
+
+  const listSelectionActions = useMemo<ListSelectionAction[]>(() => {
+    const actions: ListSelectionAction[] = []
+    if (canEdit) {
+      actions.push({
+        label: 'Editar',
+        icon: Pencil,
+        onClick: (ids) => setBulkEditIds(ids),
+      })
+    }
+    if (canDelete) {
+      actions.push({
+        label: 'Archivar',
+        icon: Archive,
+        variant: 'destructive',
+        onClick: (ids) => setBulkArchiveIds(ids),
+      })
+    }
+    return actions
+  }, [canDelete, canEdit])
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -245,8 +305,10 @@ export function SolicitudesPage() {
               listScope === 'recent'
                 ? undefined
                 : {
-                    fetchPage: (params) => fetchSolicitudesServerPage(params, false),
-                    resetKey: `${listRefreshKey}-${listScope}`,
+                    fetchPage: (params) =>
+                      fetchSolicitudesServerPage(params, false, serverListQuery),
+                    resetKey: `${listRefreshKey}-${listScope}-${JSON.stringify(serverListQuery)}`,
+                    filtersOnServer,
                   }
             }
             rowPredicate={rowPredicate}
@@ -352,6 +414,34 @@ export function SolicitudesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <BulkEditDialog
+        open={bulkEditIds !== null && bulkEditIds.length > 0}
+        onOpenChange={(open) => {
+          if (!open) setBulkEditIds(null)
+        }}
+        selectedCount={bulkEditIds?.length ?? 0}
+        saving={bulkEditSaving}
+        title="Editar solicitudes seleccionadas"
+        fields={[
+          {
+            key: 'status',
+            label: 'Estado',
+            options: SOLICITUD_STATUS_OPTIONS.map((s) => ({ value: s, label: s })),
+          },
+          {
+            key: 'priority',
+            label: 'Prioridad',
+            options: SOLICITUD_PRIORITY_OPTIONS.map((p) => ({ value: p, label: p })),
+          },
+          {
+            key: 'assigneeName',
+            label: 'Responsable',
+            placeholder: 'Nombre del responsable',
+          },
+        ]}
+        onSubmit={handleBulkEdit}
+      />
     </div>
   )
 }

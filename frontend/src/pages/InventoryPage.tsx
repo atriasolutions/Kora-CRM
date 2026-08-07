@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom'
 import { toast } from '@/lib/toast'
 
 import { AdjustInventoryStockDialog } from '@/components/inventory/AdjustInventoryStockDialog'
+import { InventoryFamilyGroupedView } from '@/components/inventory/InventoryFamilyGroupedView'
 import { InventoryKanbanView } from '@/components/inventory/InventoryKanbanView'
 import {
   InventoryModuleHeader,
@@ -11,6 +12,7 @@ import {
 import { InventorySegmentsView } from '@/components/inventory/InventorySegmentsView'
 import { ListPageLayout } from '@/components/list/ListPageLayout'
 import { InventoryProductList } from '@/components/inventory/InventoryProductList'
+import { Button } from '@/components/ui/button'
 import type { InventoryDetail } from '@/data/inventory-detail.mock'
 import type { InventoryListItem } from '@/data/inventory.mock'
 import { PURCHASE_LINES_SYNC_EVENT } from '@/data/purchases-registry-store'
@@ -39,6 +41,7 @@ export function InventoryPage() {
   const { allInventory, updateInventoryFromDetail, reloadFromApi } = useInventoryRegistry()
 
   const [view, setView] = useState<InventoryViewId>('lista')
+  const [groupByFamily, setGroupByFamily] = useState(true)
   const [listScope, setListScope] = useState<InventoryListScope>('all')
   const [query, setQuery] = useState('')
   const [filters, setFilters] = useState<InventoryFilters>(() =>
@@ -146,11 +149,37 @@ export function InventoryPage() {
             onFiltersChange={setFilters}
             listScope={listScope}
             onListScopeChange={setListScope}
-            toolbarEnd={view === 'lista' ? listToolbar : undefined}
+            toolbarEnd={
+              view === 'lista' ? (
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={groupByFamily ? 'default' : 'outline'}
+                    onClick={() => setGroupByFamily(true)}
+                  >
+                    Agrupar por producto
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={!groupByFamily ? 'default' : 'outline'}
+                    onClick={() => setGroupByFamily(false)}
+                  >
+                    Ver por SKU
+                  </Button>
+                  {listToolbar}
+                </div>
+              ) : undefined
+            }
           />
         }
       >
-        {view === 'lista' ? (
+        {view === 'lista' && groupByFamily ? (
+          <InventoryFamilyGroupedView rows={activeInventory} query={query} />
+        ) : null}
+
+        {view === 'lista' && !groupByFamily ? (
           <InventoryProductList
             key={purchaseLinesKey}
             rows={activeInventory}

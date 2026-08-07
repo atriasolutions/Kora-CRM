@@ -42,6 +42,8 @@ export function formValuesToListItem(
     priority: values.priority,
     assignee: values.assigneeName.trim(),
     assigneeUserId: values.assigneeUserId?.trim() || undefined,
+    documentationUrl: values.documentationUrl.trim() || undefined,
+    gitBranchUrl: values.gitBranchUrl.trim() || undefined,
   })
 }
 

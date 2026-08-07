@@ -29,10 +29,13 @@ const MODULE_BY_ENTITY: Record<EntityFileType, MenuModuleId> = {
   inventario: 'inventario',
   compra: 'compras',
   factura: 'facturacion',
+  boleta: 'boletas',
+  gasto: 'gastos',
   cotizacion: 'cotizaciones',
   oportunidad: 'oportunidades',
   proyecto: 'proyectos',
   solicitud: 'solicitudes',
+  prueba_caso: 'pruebas_solicitud',
 }
 
 function assertModuleAccess(

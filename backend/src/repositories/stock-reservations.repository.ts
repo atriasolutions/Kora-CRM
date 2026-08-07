@@ -1666,3 +1666,346 @@ export async function syncInvoiceStockOnStatusChange(
 
   return false
 }
+
+// --- Boletas (comprobante interno, sin cotización) ---
+
+async function loadBoletaLinesForStock(
+  client: PoolClient,
+  boletaId: string,
+): Promise<{ sku: string; product_name: string; quantity: number }[]> {
+  const result = await client.query<{
+    sku: string
+    product_name: string
+    quantity: string | number
+  }>(
+    `SELECT sku, product_name, quantity
+     FROM crm_boleta_line_items
+     WHERE boleta_id = $1 AND trim(sku) <> ''`,
+    [boletaId],
+  )
+  return result.rows
+    .map((row) => ({
+      sku: row.sku.trim(),
+      product_name: row.product_name,
+      quantity: Number(row.quantity),
+    }))
+    .filter((row) => row.quantity > 0)
+}
+
+async function loadBoletaSalidaQtyBySku(
+  client: PoolClient,
+  boletaId: string,
+): Promise<Map<string, number>> {
+  const result = await client.query<{ sku: string; qty: string }>(
+    `SELECT lower(trim(sku)) AS sku, COALESCE(SUM(ABS(quantity_delta)), 0) AS qty
+     FROM crm_stock_movements
+     WHERE source_kind = 'boleta'
+       AND source_id = $1
+       AND movement_type = 'Salida'
+     GROUP BY lower(trim(sku))`,
+    [boletaId],
+  )
+  const map = new Map<string, number>()
+  for (const row of result.rows) {
+    map.set(row.sku, Number(row.qty))
+  }
+  return map
+}
+
+function boletaLinesFullyDeducted(
+  lines: { sku: string; quantity: number }[],
+  salidaBySku: Map<string, number>,
+): boolean {
+  return lines.every((line) => {
+    const deducted = salidaBySku.get(line.sku.trim().toLowerCase()) ?? 0
+    return deducted >= line.quantity
+  })
+}
+
+async function assertBoletaStockAvailableForCommit(
+  client: PoolClient,
+  boletaId: string,
+): Promise<void> {
+  const lines = await filterLinesRequiringStockControl(
+    client,
+    await loadBoletaLinesForStock(client, boletaId),
+  )
+  if (lines.length === 0) return
+
+  await acquireSkuStockLocksOrdered(
+    client,
+    lines.map((line) => line.sku),
+  )
+
+  for (const line of lines) {
+    const pos = await lockInventoryBySku(client, line.sku)
+    if (!pos) {
+      throw badRequest(
+        `No hay inventario para SKU ${line.sku} al emitir la boleta.`,
+      )
+    }
+    const onHand = Number(pos.quantity_on_hand)
+    if (onHand < line.quantity) {
+      throw badRequest(
+        `Stock insuficiente para emitir la boleta: ${line.product_name} (${line.sku}) requiere ${line.quantity} u. y hay ${onHand} en bodega.`,
+      )
+    }
+  }
+}
+
+async function commitStockFromBoletaLines(
+  client: PoolClient,
+  boletaId: string,
+  boletaNumber: string,
+  actor: AuditActor,
+): Promise<void> {
+  let lines = await loadBoletaLinesForStock(client, boletaId)
+  lines = await filterLinesRequiringStockControl(client, lines)
+  if (lines.length === 0) return
+
+  for (const line of lines) {
+    const pos = await lockInventoryBySku(client, line.sku)
+    if (!pos) {
+      throw badRequest(
+        `No hay inventario para SKU ${line.sku} al emitir la boleta.`,
+      )
+    }
+
+    const qty = line.quantity
+    const onHand = Math.max(0, Number(pos.quantity_on_hand) - qty)
+    const reserved = Math.max(0, Number(pos.quantity_reserved) - qty)
+    const available = computeAvailableQuantity(onHand)
+    const minStock = Number(pos.min_stock ?? 0)
+    const previousStatus = pos.status ?? 'En stock'
+    const status = deriveOperationalInventoryStatus(
+      onHand,
+      reserved,
+      minStock,
+      pos.status,
+    )
+
+    await client.query(
+      `UPDATE crm_inventory_positions SET
+        quantity_on_hand = $2,
+        quantity_reserved = $3,
+        quantity_available = $4,
+        status = $5,
+        last_movement_at = now(),
+        updated_at = now()
+      WHERE id = $1`,
+      [pos.id, onHand, reserved, available, status],
+    )
+
+    void maybeNotifyInventoryStatusChange({
+      actor,
+      inventoryPositionId: pos.id,
+      productName: pos.product_name,
+      warehouseName: pos.warehouse_name ?? '',
+      sku: pos.sku,
+      previousStatus,
+      nextStatus: status,
+    }).catch(() => {
+      /* ignore realtime errors */
+    })
+
+    await client.query(
+      `INSERT INTO crm_stock_movements (
+        inventory_position_id, product_id, product_name, sku,
+        movement_type, reference, quantity_delta, reserved_delta,
+        author_user_id, author_name, source_kind, source_id
+      ) VALUES ($1, $2, $3, $4, 'Salida', $5, $6, $7, $8, $9, 'boleta', $10)`,
+      [
+        pos.id,
+        pos.product_id,
+        line.product_name,
+        line.sku,
+        `BOL ${boletaNumber}`,
+        -qty,
+        -qty,
+        actor.userId,
+        actor.userName,
+        boletaId,
+      ],
+    )
+  }
+}
+
+export async function commitStockForBoleta(
+  client: PoolClient,
+  boletaId: string,
+  boletaNumber: string,
+  actor: AuditActor,
+): Promise<boolean> {
+  const lines = await loadBoletaLinesForStock(client, boletaId)
+  await acquireSkuStockLocksOrdered(
+    client,
+    lines.map((line) => line.sku),
+  )
+  const salidaBySku = await loadBoletaSalidaQtyBySku(client, boletaId)
+  const stockLines = await filterLinesRequiringStockControl(client, lines)
+
+  if (boletaLinesFullyDeducted(stockLines, salidaBySku)) {
+    await reconcileInventoryForSkus(
+      client,
+      lines.map((line) => line.sku),
+      actor,
+    )
+    return false
+  }
+
+  await assertBoletaStockAvailableForCommit(client, boletaId)
+  await commitStockFromBoletaLines(client, boletaId, boletaNumber, actor)
+  await reconcileInventoryForSkus(
+    client,
+    lines.map((line) => line.sku),
+    actor,
+  )
+  return true
+}
+
+export async function revertStockForBoleta(
+  client: PoolClient,
+  boletaId: string,
+  boletaNumber: string,
+  actor: AuditActor,
+): Promise<boolean> {
+  const invoiceLines = await loadBoletaLinesForStock(client, boletaId)
+  let changed = false
+
+  const skusToLock = new Set<string>(invoiceLines.map((l) => l.sku))
+  const salidaRows = await client.query<{
+    inventory_position_id: string
+    product_id: string | null
+    product_name: string
+    sku: string
+    quantity_delta: string | number
+  }>(
+    `SELECT inventory_position_id, product_id, product_name, sku, quantity_delta
+     FROM crm_stock_movements
+     WHERE source_kind = 'boleta'
+       AND source_id = $1
+       AND movement_type = 'Salida'`,
+    [boletaId],
+  )
+
+  for (const row of salidaRows.rows) {
+    skusToLock.add(row.sku.trim())
+  }
+  await acquireSkuStockLocksOrdered(client, [...skusToLock])
+
+  for (const row of salidaRows.rows) {
+    const qty = Math.abs(Number(row.quantity_delta))
+    if (qty <= 0) continue
+
+    const posResult = await client.query<InventoryPositionRow>(
+      `SELECT ${POSITION_COLUMNS}
+       FROM crm_inventory_positions
+       WHERE id = $1
+       FOR UPDATE`,
+      [row.inventory_position_id],
+    )
+    const pos = posResult.rows[0]
+    if (!pos) continue
+
+    const onHand = Number(pos.quantity_on_hand) + qty
+    const reserved = Number(pos.quantity_reserved)
+    const available = computeAvailableQuantity(onHand)
+    const minStock = Number(pos.min_stock ?? 0)
+    const previousStatus = pos.status ?? 'En stock'
+    const status = deriveOperationalInventoryStatus(
+      onHand,
+      reserved,
+      minStock,
+      pos.status,
+    )
+
+    await client.query(
+      `UPDATE crm_inventory_positions SET
+        quantity_on_hand = $2,
+        quantity_reserved = $3,
+        quantity_available = $4,
+        status = $5,
+        last_movement_at = now(),
+        updated_at = now()
+      WHERE id = $1`,
+      [pos.id, onHand, reserved, available, status],
+    )
+
+    void maybeNotifyInventoryStatusChange({
+      actor,
+      inventoryPositionId: pos.id,
+      productName: pos.product_name,
+      warehouseName: pos.warehouse_name ?? '',
+      sku: pos.sku,
+      previousStatus,
+      nextStatus: status,
+    }).catch(() => {
+      /* ignore realtime errors */
+    })
+
+    await client.query(
+      `INSERT INTO crm_stock_movements (
+        inventory_position_id, product_id, product_name, sku,
+        movement_type, reference, quantity_delta, reserved_delta,
+        author_user_id, author_name, source_kind, source_id
+      ) VALUES ($1, $2, $3, $4, 'Entrada', $5, $6, 0, $7, $8, 'boleta', $9)`,
+      [
+        pos.id,
+        row.product_id,
+        row.product_name,
+        row.sku,
+        `Anulación BOL ${boletaNumber}`,
+        qty,
+        actor.userId,
+        actor.userName,
+        boletaId,
+      ],
+    )
+    changed = true
+  }
+
+  if (salidaRows.rows.length > 0) {
+    await client.query(
+      `DELETE FROM crm_stock_movements
+       WHERE source_kind = 'boleta'
+         AND source_id = $1
+         AND movement_type = 'Salida'`,
+      [boletaId],
+    )
+  }
+
+  await reconcileInventoryForSkus(client, skusToLock, actor)
+  return changed
+}
+
+export async function syncBoletaStockOnStatusChange(
+  client: PoolClient,
+  boletaId: string,
+  boletaNumber: string,
+  previousStatus: string,
+  nextStatus: string,
+  actor: AuditActor,
+): Promise<boolean> {
+  const wasDraft = previousStatus === 'Borrador'
+  const isDraft = nextStatus === 'Borrador'
+  const isVoid = nextStatus === 'Anulada'
+  const wasVoid = previousStatus === 'Anulada'
+
+  if (isVoid) {
+    return revertStockForBoleta(client, boletaId, boletaNumber, actor)
+  }
+
+  if (wasVoid && nextStatus === 'Emitida') {
+    return commitStockForBoleta(client, boletaId, boletaNumber, actor)
+  }
+
+  if (wasDraft && nextStatus === 'Emitida') {
+    return commitStockForBoleta(client, boletaId, boletaNumber, actor)
+  }
+
+  if (!wasDraft && isDraft) {
+    return revertStockForBoleta(client, boletaId, boletaNumber, actor)
+  }
+
+  return false
+}

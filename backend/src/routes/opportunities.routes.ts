@@ -28,6 +28,10 @@ opportunitiesRouter.get(
         outcome: query.outcome,
         companyId: query.companyId,
         contactId: query.contactId,
+        sortBy: query.sortBy,
+        sortDir: query.sortDir,
+        dateFrom: query.dateFrom,
+        dateTo: query.dateTo,
         archivedOnly: query.archived === true,
       })
       res.json({

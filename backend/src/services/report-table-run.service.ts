@@ -10,6 +10,9 @@ import * as quotesRepo from '../repositories/quotes.repository.js'
 import * as purchasesRepo from '../repositories/purchases.repository.js'
 import * as stockReceiptsRepo from '../repositories/stock-receipts.repository.js'
 import * as inventoryRepo from '../repositories/inventory.repository.js'
+import * as expensesRepo from '../repositories/expenses.repository.js'
+import * as solicitudesRepo from '../repositories/solicitudes.repository.js'
+import * as bitacoraRepo from '../repositories/bitacora.repository.js'
 import { filterReportRows } from '../lib/report-filter-engine.js'
 import { reportFieldLabel } from '../lib/report-field-labels.js'
 import type { ReportDataSourceId } from '../types/report-table.js'
@@ -137,6 +140,30 @@ export async function loadReportRows(sourceId: ReportDataSourceId): Promise<Repo
     }
     case 'inventario': {
       const { items } = await inventoryRepo.listInventory({ page: 1, pageSize })
+      return items.map((r) => listItemToReportRow(r))
+    }
+    case 'gastos': {
+      const { items } = await expensesRepo.listExpenses({
+        page: 1,
+        pageSize,
+        archivedOnly: false,
+      })
+      return items.map((r) => listItemToReportRow(r))
+    }
+    case 'solicitudes': {
+      const { items } = await solicitudesRepo.listSolicitudes({
+        page: 1,
+        pageSize,
+        archivedOnly: false,
+      })
+      return items.map((r) => listItemToReportRow(r))
+    }
+    case 'bitacora': {
+      const { items } = await bitacoraRepo.listBitacora({
+        page: 1,
+        pageSize,
+        archivedOnly: false,
+      })
       return items.map((r) => listItemToReportRow(r))
     }
     default:

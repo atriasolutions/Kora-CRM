@@ -92,6 +92,7 @@ export function RegisterActivityDialog({
   const isOpportunity = relatedType === 'oportunidad'
   const isQuote = relatedType === 'cotizacion'
   const isInvoice = relatedType === 'factura'
+  const isBoleta = relatedType === 'boleta'
   const isProject = relatedType === 'proyecto'
   const isSolicitud = relatedType === 'solicitud'
   const isStockReceipt = relatedType === 'ingreso'
@@ -100,7 +101,7 @@ export function RegisterActivityDialog({
   const displayName =
     isPurchase || isStockReceipt
       ? contactName
-      : isCompany || isOpportunity || isQuote || isInvoice || isProject || isSolicitud
+      : isCompany || isOpportunity || isQuote || isInvoice || isBoleta || isProject || isSolicitud
         ? (companyName ?? contactName)
         : isProduct || isInventory
           ? contactName

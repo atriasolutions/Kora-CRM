@@ -18,15 +18,15 @@ export function VentasDashboardView({ data }: VentasDashboardViewProps) {
     <>
       <section className="grid min-w-0 gap-3 sm:gap-4 xl:grid-cols-3">
         <div className="min-h-0 min-w-0 xl:col-span-2">
-          <SalesFunnelCard
-            stages={data.funnelStages ?? []}
+          <RevenueExpenseChartCard
+            series={data.revenueExpenseSeries ?? []}
+            description={data.chartDescription}
             className={dashboardCardClass}
           />
         </div>
         <div className="min-h-0 min-w-0 xl:col-span-1">
-          <RevenueExpenseChartCard
-            series={data.revenueExpenseSeries ?? []}
-            description={data.chartDescription}
+          <SalesFunnelCard
+            stages={data.funnelStages ?? []}
             className={dashboardCardClass}
           />
         </div>

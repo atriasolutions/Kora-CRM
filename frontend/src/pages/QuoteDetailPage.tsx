@@ -52,11 +52,15 @@ import { useModulePermissions } from '@/hooks/use-module-permissions'
 import { useInvoicesRegistry } from '@/hooks/use-invoices-registry'
 import { useQuotesRegistry } from '@/hooks/use-quotes-registry'
 import { useStockSync } from '@/hooks/use-stock-sync'
+import { listInvoicesForQuoteApi } from '@/api/invoices'
 import {
   invoiceFormValuesFromQuote,
   type CreateInvoiceFormValues,
 } from '@/lib/invoice-create'
-import { invoiceSummariesForQuote } from '@/lib/invoice-relations'
+import {
+  invoiceSummariesForQuote,
+  type QuoteInvoiceSummary,
+} from '@/lib/invoice-relations'
 import { recordEntityView } from '@/lib/entity-recently-viewed'
 import { QUOTE_ARCHIVE_RETENTION_DAYS } from '@/lib/quote-archive'
 import {
@@ -108,9 +112,11 @@ export function QuoteDetailPage() {
   const { canEdit, canDelete } = useModulePermissions('cotizaciones')
   const { canEdit: canEditOpportunity } = useModulePermissions('oportunidades')
   const { archiveQuote, isArchived, updateQuoteFromDetail } = useQuotesRegistry()
-  const { addInvoice, allInvoices } = useInvoicesRegistry()
+  const { addInvoice, allInvoices, reloadFromApi: reloadInvoices } = useInvoicesRegistry()
   const stockVersion = useStockSync()
+  const useApi = isApiEnabled()
   const [quote, setQuote] = useState<QuoteDetail | null>(null)
+  const [quoteInvoices, setQuoteInvoices] = useState<QuoteInvoiceSummary[] | null>(null)
   const [syncOppLoading, setSyncOppLoading] = useState(false)
   const { loadState, reason, unavailableDetail, reload } = useRecordDetail({
     id: quoteId,
@@ -178,10 +184,44 @@ export function QuoteDetailPage() {
     [updateQuoteFromDetail],
   )
 
-  const linkedInvoices = useMemo(
-    () => (quote ? invoiceSummariesForQuote(quote.id) : []),
-    [quote, allInvoices],
-  )
+  useEffect(() => {
+    if (!quoteId) return
+    let cancelled = false
+
+    async function loadLinkedInvoices() {
+      if (!useApi) {
+        if (!cancelled) setQuoteInvoices(null)
+        return
+      }
+      try {
+        const items = await listInvoicesForQuoteApi(quoteId)
+        if (cancelled) return
+        setQuoteInvoices(
+          items.map(({ id, number, amount, status, dueDate, issueDate }) => ({
+            id,
+            number,
+            amount,
+            status,
+            dueDate,
+            issueDate,
+          })),
+        )
+        await reloadInvoices().catch(() => {})
+      } catch {
+        if (!cancelled) setQuoteInvoices([])
+      }
+    }
+
+    void loadLinkedInvoices()
+    return () => {
+      cancelled = true
+    }
+  }, [quoteId, useApi, reloadInvoices])
+
+  const linkedInvoices = useMemo(() => {
+    if (quoteInvoices !== null) return quoteInvoices
+    return quote ? invoiceSummariesForQuote(quote.id) : []
+  }, [quote, quoteInvoices, allInvoices])
 
   const handleCreateInvoice = useCallback(
     async (values: CreateInvoiceFormValues) => {
@@ -195,6 +235,17 @@ export function QuoteDetailPage() {
           )
           if (transfer.message) setStockMessage(transfer.message)
         }
+        setQuoteInvoices((prev) => [
+          {
+            id: item.id,
+            number: item.number,
+            amount: item.amount,
+            status: item.status,
+            dueDate: item.dueDate,
+            issueDate: item.issueDate,
+          },
+          ...(prev ?? []).filter((inv) => inv.id !== item.id),
+        ])
         setTab('facturas')
         navigate(`/facturacion/${item.id}`)
       } catch {

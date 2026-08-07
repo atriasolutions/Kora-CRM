@@ -1,4 +1,5 @@
 import type { CompactPeriodValue } from '@/lib/period-filter-options'
+import { chilePartsFromDate } from '@/lib/chile-timezone'
 
 export type DashboardPeriod =
   | { mode: 'years' }
@@ -27,7 +28,8 @@ export const MONTH_NAMES = [
 ]
 
 export function defaultDashboardPeriod(now = new Date()): DashboardPeriod {
-  return { mode: 'month', year: now.getFullYear(), month: now.getMonth() }
+  const p = chilePartsFromDate(now)
+  return { mode: 'month', year: p.year, month: p.month - 1 }
 }
 
 export function periodToQuery(period: DashboardPeriod): string {
@@ -44,7 +46,7 @@ export function periodOptionId(period: DashboardPeriod): string {
 
 export function labelForPeriod(period: DashboardPeriod): string {
   if (period.mode === 'years') {
-    const endYear = new Date().getFullYear()
+    const endYear = chilePartsFromDate(new Date()).year
     return `${endYear - 4} – ${endYear} (por año)`
   }
   if (period.mode === 'year') return `Año ${period.year}`
@@ -60,7 +62,8 @@ export function buildDashboardPeriodOptions(now = new Date()): DashboardPeriodOp
     },
   ]
 
-  const currentYear = now.getFullYear()
+  const chileNow = chilePartsFromDate(now)
+  const currentYear = chileNow.year
   for (let y = currentYear; y >= currentYear - 6; y -= 1) {
     options.push({
       id: `year-${y}`,
@@ -70,15 +73,20 @@ export function buildDashboardPeriodOptions(now = new Date()): DashboardPeriodOp
   }
 
   for (let i = 0; i < 18; i += 1) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    let month = chileNow.month - 1 - i
+    let year = chileNow.year
+    while (month < 0) {
+      month += 12
+      year -= 1
+    }
     const period: DashboardPeriod = {
       mode: 'month',
-      year: d.getFullYear(),
-      month: d.getMonth(),
+      year,
+      month,
     }
     options.push({
       id: periodOptionId(period),
-      label: `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`,
+      label: `${MONTH_NAMES[month]} ${year}`,
       period,
     })
   }

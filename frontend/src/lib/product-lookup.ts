@@ -1,8 +1,15 @@
 import { getRegistryProducts } from '@/data/products-registry-store'
 import type { ProductListItem } from '@/data/products.mock'
+import { isSellableProduct } from '@/lib/product-variants'
 
 export function getAllKnownProducts(): ProductListItem[] {
   return getRegistryProducts()
+}
+
+export function getSellableProducts(
+  products: ProductListItem[] = getAllKnownProducts(),
+): ProductListItem[] {
+  return products.filter((p) => isSellableProduct(p))
 }
 
 export type ProductLookupRef = {
@@ -55,10 +62,13 @@ export function findLinkedProduct(
 export function searchProducts(
   products: ProductListItem[],
   query: string,
-  options?: { limit?: number; activeOnly?: boolean },
+  options?: { limit?: number; activeOnly?: boolean; sellableOnly?: boolean },
 ): ProductListItem[] {
   const limit = options?.limit ?? 10
   let pool = products
+  if (options?.sellableOnly !== false) {
+    pool = pool.filter((p) => isSellableProduct(p))
+  }
   if (options?.activeOnly !== false) {
     pool = pool.filter((p) => p.status !== 'Borrador')
   }
@@ -71,13 +81,19 @@ export function searchProducts(
   }
 
   return pool
-    .filter(
-      (p) =>
+    .filter((p) => {
+      const attrText = p.variantAttributes
+        ? Object.values(p.variantAttributes).join(' ').toLowerCase()
+        : ''
+      return (
         p.name.toLowerCase().includes(q) ||
         p.sku.toLowerCase().includes(q) ||
         p.category.toLowerCase().includes(q) ||
-        (p.barcode?.toLowerCase().includes(q) ?? false),
-    )
+        (p.parentName?.toLowerCase().includes(q) ?? false) ||
+        attrText.includes(q) ||
+        (p.barcode?.toLowerCase().includes(q) ?? false)
+      )
+    })
     .sort((a, b) => a.name.localeCompare(b.name, 'es'))
     .slice(0, limit)
 }

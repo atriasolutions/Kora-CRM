@@ -1,6 +1,6 @@
 export type DashboardViewId = 'ventas' | 'operaciones' | 'abastecimiento'
 
-export type KpiAccent = 'blue' | 'emerald' | 'violet' | 'amber'
+export type KpiAccent = 'blue' | 'emerald' | 'violet' | 'amber' | 'rose'
 
 export type KpiDatum = {
   id: string

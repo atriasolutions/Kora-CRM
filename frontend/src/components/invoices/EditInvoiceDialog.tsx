@@ -7,6 +7,7 @@ import {
   ContactFormSelect,
 } from '@/components/contacts/ContactFormField'
 import { InvoiceLineItemsEditor } from '@/components/invoices/InvoiceLineItemsEditor'
+import { DocumentExchangeRatesSection } from '@/components/shared/DocumentExchangeRatesSection'
 import { DocumentGlobalDiscountField } from '@/components/shared/DocumentGlobalDiscountField'
 import { DocumentTotalsBreakdown } from '@/components/shared/DocumentTotalsBreakdown'
 import { SaleCustomerFields } from '@/components/shared/SaleCustomerFields'
@@ -21,7 +22,12 @@ import {
 } from '@/components/ui/dialog'
 import type { InvoiceDetail } from '@/data/invoice-detail.mock'
 import { UserLookupField } from '@/components/shared/UserLookupField'
-import { computeInvoiceTotals } from '@/lib/invoice-line-item'
+import { useExchangeRatesForDate } from '@/hooks/use-exchange-rates-for-date'
+import {
+  computeInvoiceTotals,
+  invoiceLineCurrency,
+  recalcInvoiceLinesWithRates,
+} from '@/lib/invoice-line-item'
 import {
   applyFormValuesToInvoice,
   invoiceDetailToFormValues,
@@ -52,6 +58,17 @@ export function EditInvoiceDialog({
     invoiceDetailToFormValues(invoice),
   )
   const [saving, setSaving] = useState(false)
+  const { rates: exchangeRates, loading: ratesLoading } = useExchangeRatesForDate(
+    form.issueDate,
+  )
+
+  const displayLineItems = useMemo(
+    () =>
+      recalcInvoiceLinesWithRates(form.lineItems, exchangeRates, {
+        skipWhileLoading: ratesLoading,
+      }),
+    [form.lineItems, exchangeRates, ratesLoading],
+  )
 
   useEffect(() => {
     if (!open) return
@@ -63,10 +80,15 @@ export function EditInvoiceDialog({
 
   const totals = useMemo(
     () =>
-      computeInvoiceTotals(form.lineItems, {
+      computeInvoiceTotals(displayLineItems, {
         globalDiscountPercent: form.globalDiscountPercent,
       }),
-    [form.lineItems, form.globalDiscountPercent],
+    [displayLineItems, form.globalDiscountPercent],
+  )
+
+  const lineCurrencies = useMemo(
+    () => displayLineItems.map((line) => invoiceLineCurrency(line)),
+    [displayLineItems],
   )
 
   const patch = (partial: Partial<InvoiceFormValues>) => {
@@ -92,7 +114,7 @@ export function EditInvoiceDialog({
       toast.warning(customerError)
       return
     }
-    if (form.lineItems.length === 0) {
+    if (displayLineItems.length === 0) {
       toast.warning('Agrega al menos una línea a la factura.')
       return
     }
@@ -104,7 +126,12 @@ export function EditInvoiceDialog({
       }
     }
     setSaving(true)
-    onSave(applyFormValuesToInvoice(invoice, form))
+    const nextForm: InvoiceFormValues = {
+      ...form,
+      lineItems: displayLineItems,
+      amount: totals.amount,
+    }
+    onSave(applyFormValuesToInvoice(invoice, nextForm))
     onOpenChange(false)
     setSaving(false)
   }
@@ -131,8 +158,29 @@ export function EditInvoiceDialog({
             onChange={(customerPatch) => patch(customerPatch)}
           />
 
+          <div className="grid gap-4 sm:grid-cols-2">
+            <ContactFormDateInput
+              id="edit-inv-issue"
+              label="Fecha de emisión"
+              value={form.issueDate}
+              onChange={(issueDate) => patch({ issueDate })}
+            />
+            <ContactFormDateInput
+              id="edit-inv-due"
+              label="Fecha de vencimiento"
+              value={form.dueDate}
+              onChange={(dueDate) => patch({ dueDate })}
+            />
+          </div>
+
+          <DocumentExchangeRatesSection
+            issueDate={form.issueDate}
+            currencies={lineCurrencies}
+          />
+
           <InvoiceLineItemsEditor
-            lineItems={form.lineItems}
+            lineItems={displayLineItems}
+            exchangeRates={exchangeRates}
             onChange={(lineItems) => patch({ lineItems })}
           />
 
@@ -155,25 +203,11 @@ export function EditInvoiceDialog({
           <ContactFormInput
             id="edit-inv-amount"
             label="Monto total (con IVA)"
-            value={form.amount}
+            value={totals.amount}
             disabled
             onChange={() => {}}
           />
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <ContactFormDateInput
-              id="edit-inv-issue"
-              label="Fecha de emisión"
-              value={form.issueDate}
-              onChange={(issueDate) => patch({ issueDate })}
-            />
-            <ContactFormDateInput
-              id="edit-inv-due"
-              label="Fecha de vencimiento"
-              value={form.dueDate}
-              onChange={(dueDate) => patch({ dueDate })}
-            />
-          </div>
           <ContactFormSelect
             id="edit-inv-payment"
             label="Medio de pago"

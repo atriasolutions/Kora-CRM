@@ -44,10 +44,17 @@ import type {
 } from '../types/solicitud.js'
 import { paginationOffset } from '../utils/pagination.js'
 
+import {
+  parseCommaSeparatedList,
+  pushDateRangeCondition,
+  resolveOrderByClause,
+} from '../lib/list-query.js'
+
 const SOLICITUD_COLUMNS = `
   id, code, title, description, status, priority,
   assignee_user_id, assignee_name,
   company_id, company_name,
+  documentation_url, git_branch_url,
   created_at, created_by_id, created_by_name,
   updated_at, updated_by_id, updated_by_name
 `
@@ -65,6 +72,10 @@ export type ListSolicitudesParams = {
   status?: string
   archivedOnly?: boolean
   memberAccess?: { userId: string; userName: string }
+  sortBy?: string
+  sortDir?: 'asc' | 'desc'
+  dateFrom?: string
+  dateTo?: string
 }
 
 export function userHasSolicitudTeamAccess(
@@ -323,6 +334,17 @@ async function insertSolicitudTeam(
   }
 }
 
+
+const SOLICITUD_SORT_COLUMNS: Record<string, string> = {
+  code: 'code',
+  title: 'title',
+  status: 'status',
+  priority: 'priority',
+  assignee: 'assignee_name',
+  updatedAt: 'updated_at',
+  createdAt: 'created_at',
+}
+
 export async function listSolicitudes(
   params: ListSolicitudesParams,
 ): Promise<{ items: SolicitudListItem[]; total: number }> {
@@ -337,9 +359,15 @@ export async function listSolicitudes(
   }
   idx = pushTenantCondition(conditions, values, idx)
 
-  if (params.status) {
-    conditions.push(`status = $${idx++}`)
-    values.push(params.status)
+  if (params.status?.trim()) {
+    const statuses = parseCommaSeparatedList(params.status)
+    if (statuses.length === 1) {
+      conditions.push(`status = $${idx++}`)
+      values.push(statuses[0])
+    } else if (statuses.length > 1) {
+      conditions.push(`status = ANY($${idx++}::text[])`)
+      values.push(statuses)
+    }
   }
   if (params.q) {
     conditions.push(
@@ -370,6 +398,22 @@ export async function listSolicitudes(
     values.push(userName, userId)
   }
 
+  idx = pushDateRangeCondition(
+    conditions,
+    values,
+    idx,
+    'updated_at',
+    params.dateFrom,
+    params.dateTo,
+  )
+
+  const orderBy = resolveOrderByClause(
+    params.sortBy,
+    params.sortDir,
+    SOLICITUD_SORT_COLUMNS,
+    'updated_at DESC',
+  )
+
   const where = `WHERE ${conditions.join(' AND ')}`
 
   return withTenantClient(async (client) => {
@@ -385,7 +429,7 @@ export async function listSolicitudes(
       `SELECT ${SOLICITUD_COLUMNS}
        FROM crm_solicitudes
        ${where}
-       ORDER BY updated_at DESC
+       ORDER BY ${orderBy}
        LIMIT $${idx++} OFFSET $${idx}`,
       listValues,
     )
@@ -459,12 +503,14 @@ export async function createSolicitud(
         code, title, description, status, priority,
         assignee_user_id, assignee_name,
         company_id, company_name,
+        documentation_url, git_branch_url,
         created_by_id, created_by_name, updated_by_id, updated_by_name, tenant_id
       ) VALUES (
         $1, $2, $3, $4, $5,
         $6, $7,
         $8, $9,
-        $10, $11, $12, $13, $14
+        $10, $11,
+        $12, $13, $14, $15, $16
       )
       RETURNING ${SOLICITUD_COLUMNS}`,
       [
@@ -477,6 +523,8 @@ export async function createSolicitud(
         assignee.userName,
         companyId,
         companyName,
+        input.documentationUrl?.trim() ?? '',
+        input.gitBranchUrl?.trim() ?? '',
         createdById,
         createdByName,
         actor.userId,
@@ -537,10 +585,12 @@ export async function updateSolicitud(
         priority = COALESCE($5, priority),
         assignee_user_id = $6,
         assignee_name = $7,
-        updated_by_id = $8,
-        updated_by_name = $9,
+        documentation_url = COALESCE($8, documentation_url),
+        git_branch_url = COALESCE($9, git_branch_url),
+        updated_by_id = $10,
+        updated_by_name = $11,
         updated_at = now()
-      WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(10)}
+      WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(12)}
       RETURNING ${SOLICITUD_COLUMNS}`,
       [
         id,
@@ -550,6 +600,8 @@ export async function updateSolicitud(
         input.priority ?? null,
         assignee.userId,
         assignee.userName,
+        input.documentationUrl !== undefined ? input.documentationUrl.trim() : null,
+        input.gitBranchUrl !== undefined ? input.gitBranchUrl.trim() : null,
         actor.userId,
         actor.userName,
         getTenantIdOrDefault(),

@@ -44,6 +44,7 @@ import {
   buildCsvContent,
   compareRowsByColumn,
   downloadCsvFile,
+  getColumnSortKey,
   getListCellText,
   isColumnSortable,
   listColumnKey,
@@ -96,6 +97,12 @@ export type ServerListConfig<T> = {
   /** Cambia cuando filtros externos deben recargar desde página 1. */
   resetKey?: unknown
   enabled?: boolean
+  /**
+   * Si true, los filtros ya van en la query del servidor: no se aplica
+   * `rowPredicate` sobre la página (evita huecos y totales incorrectos).
+   * `rowPredicate` solo se usa en modo cliente o cuando esto es false.
+   */
+  filtersOnServer?: boolean
 }
 
 type ModuleListPageProps<T extends ListRowBase> = {
@@ -180,6 +187,7 @@ export function ModuleListPage<T extends ListRowBase>({
         header: col.header,
         col,
         locked: col.kind === 'primary' && index === primaryColumnIndex,
+        defaultHidden: col.defaultHidden === true,
         defaultWidth:
           parseWidthFromClassName(col.className) ?? LIST_COL_DEFAULT_WIDTH,
       })),
@@ -187,6 +195,11 @@ export function ModuleListPage<T extends ListRowBase>({
   )
 
   const allColumnKeys = useMemo(() => columnMeta.map((m) => m.key), [columnMeta])
+
+  const defaultHiddenKeys = useMemo(
+    () => columnMeta.filter((m) => m.defaultHidden).map((m) => m.key),
+    [columnMeta],
+  )
 
   const defaultWidths = useMemo(
     () =>
@@ -198,7 +211,7 @@ export function ModuleListPage<T extends ListRowBase>({
   )
 
   const [columnPrefs, setColumnPrefs] = useState(() =>
-    loadListColumnPrefs(columnStorageKey, allColumnKeys, defaultWidths),
+    loadListColumnPrefs(columnStorageKey, allColumnKeys, defaultWidths, defaultHiddenKeys),
   )
 
   const [sort, setSort] = useState<{
@@ -208,11 +221,31 @@ export function ModuleListPage<T extends ListRowBase>({
 
   const useServerMode = Boolean(serverList && isApiEnabled())
 
+  const activeSortMeta = useMemo(() => {
+    if (!sort) return null
+    return columnMeta.find((m) => m.key === sort.key) ?? null
+  }, [sort, columnMeta])
+
+  const serverSortBy = useMemo(() => {
+    if (!useServerMode || !activeSortMeta) return undefined
+    return getColumnSortKey(activeSortMeta.col)
+  }, [useServerMode, activeSortMeta])
+
+  const serverSortDir = useMemo(() => {
+    if (!serverSortBy || !sort) return undefined
+    return sort.direction
+  }, [serverSortBy, sort])
+
+  const applyServerRowPredicate =
+    useServerMode && serverList?.filtersOnServer === true ? false : true
+
   const serverQuery = useServerListQuery<T>({
     fetchPage: serverList?.fetchPage ?? (async () => ({ rows: [], total: 0 })),
     page,
     pageSize,
     query,
+    sortBy: serverSortBy,
+    sortDir: serverSortDir,
     resetKey: serverList?.resetKey,
     enabled: useServerMode && serverList?.enabled !== false,
   })
@@ -333,13 +366,13 @@ export function ModuleListPage<T extends ListRowBase>({
 
   const resetColumns = useCallback(() => {
     const reset = {
-      hidden: new Set<string>(),
+      hidden: new Set(defaultHiddenKeys),
       order: [...allColumnKeys],
       widths: { ...defaultWidths },
     }
     persistColumnPrefs(reset)
     setSort(null)
-  }, [allColumnKeys, defaultWidths, persistColumnPrefs])
+  }, [allColumnKeys, defaultHiddenKeys, defaultWidths, persistColumnPrefs])
 
   useEffect(() => {
     queueMicrotask(() => setPage(1))
@@ -393,15 +426,17 @@ export function ModuleListPage<T extends ListRowBase>({
       const q = query.trim().toLowerCase()
       if (q) rows = rows.filter((row) => searchFilter(row, q))
     }
-    if (rowPredicate) rows = rows.filter(rowPredicate)
+    if (rowPredicate && (!useServerMode || applyServerRowPredicate)) {
+      rows = rows.filter(rowPredicate)
+    }
 
-    if (sort) {
-      const meta = columnMeta.find((m) => m.key === sort.key)
-      if (meta && isColumnSortable(meta.col)) {
-        rows = [...rows].sort((a, b) =>
-          compareRowsByColumn(a, b, meta.col, sort.direction),
-        )
-      }
+    // En modo API, si la columna tiene sortKey el orden ya viene del servidor.
+    const shouldClientSort = Boolean(sort && activeSortMeta && isColumnSortable(activeSortMeta.col))
+    const serverHandledSort = Boolean(useServerMode && serverSortBy)
+    if (shouldClientSort && !serverHandledSort && activeSortMeta) {
+      rows = [...rows].sort((a, b) =>
+        compareRowsByColumn(a, b, activeSortMeta.col, sort!.direction),
+      )
     }
 
     const resolved = applyResolveRow(rows)
@@ -413,8 +448,10 @@ export function ModuleListPage<T extends ListRowBase>({
     query,
     searchFilter,
     rowPredicate,
+    applyServerRowPredicate,
     sort,
-    columnMeta,
+    activeSortMeta,
+    serverSortBy,
     applyResolveRow,
     postFilterSort,
   ])
@@ -433,14 +470,17 @@ export function ModuleListPage<T extends ListRowBase>({
   const pageRows = useMemo(() => {
     if (useServerMode) {
       let rows = serverQuery.rows
-      if (rowPredicate) rows = rows.filter(rowPredicate)
-      if (sort) {
-        const meta = columnMeta.find((m) => m.key === sort.key)
-        if (meta && isColumnSortable(meta.col)) {
-          rows = [...rows].sort((a, b) =>
-            compareRowsByColumn(a, b, meta.col, sort.direction),
-          )
-        }
+      if (rowPredicate && applyServerRowPredicate) {
+        rows = rows.filter(rowPredicate)
+      }
+      const shouldClientSort = Boolean(
+        sort && activeSortMeta && isColumnSortable(activeSortMeta.col),
+      )
+      const serverHandledSort = Boolean(serverSortBy)
+      if (shouldClientSort && !serverHandledSort && activeSortMeta) {
+        rows = [...rows].sort((a, b) =>
+          compareRowsByColumn(a, b, activeSortMeta.col, sort!.direction),
+        )
       }
       return applyResolveRow(postFilterSort ? postFilterSort(rows) : rows)
     }
@@ -477,8 +517,10 @@ export function ModuleListPage<T extends ListRowBase>({
     listTotal,
     idPrefix,
     rowPredicate,
+    applyServerRowPredicate,
     sort,
-    columnMeta,
+    activeSortMeta,
+    serverSortBy,
     applyResolveRow,
     postFilterSort,
   ])

@@ -4,25 +4,35 @@ import { QuoteLineItemFields } from '@/components/quotes/QuoteLineItemFields'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { QuoteLineItem } from '@/data/quote-detail.mock'
-import { defaultQuoteLineItem } from '@/lib/quote-line-item'
+import { defaultQuoteLineItem, recalcQuoteLine } from '@/lib/quote-line-item'
 
 type QuoteLineItemsEditorProps = {
   lineItems: QuoteLineItem[]
   onChange: (lineItems: QuoteLineItem[]) => void
   idPrefix?: string
+  exchangeRates?: import('@/lib/currency').ExchangeRateSnapshot | null
+  defaultCurrency?: import('@/lib/currency').ProductCurrency
 }
 
 export function QuoteLineItemsEditor({
   lineItems,
   onChange,
   idPrefix = 'quote-lines',
+  exchangeRates = null,
+  defaultCurrency = 'CLP',
 }: QuoteLineItemsEditorProps) {
   const patchLine = (id: string, line: QuoteLineItem) => {
     onChange(lineItems.map((li) => (li.id === id ? line : li)))
   }
 
   const addLine = () => {
-    onChange([...lineItems, defaultQuoteLineItem()])
+    const line = defaultQuoteLineItem()
+    onChange([
+      ...lineItems,
+      defaultCurrency !== 'CLP'
+        ? recalcQuoteLine({ ...line, lineKind: 'manual', priceCurrency: defaultCurrency }, exchangeRates)
+        : line,
+    ])
   }
 
   const removeLine = (id: string) => {
@@ -57,6 +67,8 @@ export function QuoteLineItemsEditor({
               index={index}
               idPrefix={idPrefix}
               canRemove={lineItems.length > 1}
+              exchangeRates={exchangeRates}
+              defaultCurrency={defaultCurrency}
               onPatch={(line) => patchLine(li.id, line)}
               onRemove={() => removeLine(li.id)}
             />

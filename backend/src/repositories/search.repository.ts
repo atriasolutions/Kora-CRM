@@ -57,6 +57,20 @@ const SEARCH_SQL: Record<SearchEntityType, string> = {
          AND (number ILIKE $1 OR client_name ILIKE $1 OR quote_code ILIKE $1 OR contact_name ILIKE $1)
        ORDER BY updated_at DESC
        LIMIT $2`,
+  boleta: `SELECT 'boleta' AS type, id, number AS title,
+              coalesce(nullif(trim(buyer_name), ''), status::text) AS subtitle
+       FROM crm_boletas
+       WHERE ${ACTIVE_NOT_ARCHIVED} AND tenant_id = $3
+         AND (number ILIKE $1 OR buyer_name ILIKE $1 OR buyer_tax_id ILIKE $1 OR contact_name ILIKE $1 OR company_name ILIKE $1)
+       ORDER BY updated_at DESC
+       LIMIT $2`,
+  gasto: `SELECT 'gasto' AS type, id, number AS title,
+              coalesce(nullif(trim(concept), ''), category, status::text) AS subtitle
+       FROM crm_expenses
+       WHERE ${ACTIVE_NOT_ARCHIVED} AND tenant_id = $3
+         AND (number ILIKE $1 OR concept ILIKE $1 OR category ILIKE $1 OR supplier_name ILIKE $1)
+       ORDER BY updated_at DESC
+       LIMIT $2`,
   activity: `SELECT 'activity' AS type, id, title,
               coalesce(nullif(trim(company_name), ''), type_label, status::text) AS subtitle
        FROM crm_activities

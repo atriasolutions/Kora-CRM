@@ -5,6 +5,12 @@ import { getAuditActor } from '../middleware/audit-actor.js'
 import { routeParam } from '../lib/route-params.js'
 import * as notificationsRepo from '../repositories/notifications.repository.js'
 import * as notificationsService from '../services/notifications.service.js'
+import * as webPushRepo from '../repositories/web-push.repository.js'
+import {
+  getWebPushPublicKey,
+  isAndroidUserAgent,
+  isWebPushConfigured,
+} from '../services/web-push.service.js'
 
 export const notificationsRouter = Router()
 
@@ -20,6 +26,75 @@ const notifyMentionsSchema = z.object({
     (body.mentionedUserIds?.length ?? 0) > 0,
   { message: 'Indica al menos un usuario mencionado.' },
 )
+
+const pushSubscribeSchema = z.object({
+  endpoint: z.string().url().max(2048),
+  keys: z.object({
+    p256dh: z.string().min(1).max(512),
+    auth: z.string().min(1).max(512),
+  }),
+  userAgent: z.string().trim().max(512).optional(),
+})
+
+const pushUnsubscribeSchema = z.object({
+  endpoint: z.string().url().max(2048),
+})
+
+notificationsRouter.get('/push/vapid-public-key', (_req, res) => {
+  if (!isWebPushConfigured()) {
+    res.status(503).json({ error: 'Web Push no configurado en el servidor.' })
+    return
+  }
+  res.json({ data: { publicKey: getWebPushPublicKey() } })
+})
+
+notificationsRouter.post('/push/subscribe', async (req, res, next) => {
+  try {
+    if (!isWebPushConfigured()) {
+      res.status(503).json({ error: 'Web Push no configurado en el servidor.' })
+      return
+    }
+    const actor = getAuditActor(req)
+    const body = pushSubscribeSchema.parse(req.body)
+    const userAgent = body.userAgent ?? req.get('user-agent') ?? undefined
+    if (!isAndroidUserAgent(userAgent)) {
+      res.status(400).json({
+        error:
+          'Las notificaciones push solo se pueden activar desde un celular Android (Chrome o la app instalada).',
+      })
+      return
+    }
+    const saved = await webPushRepo.upsertWebPushSubscription({
+      userId: actor.userId,
+      endpoint: body.endpoint,
+      p256dh: body.keys.p256dh,
+      auth: body.keys.auth,
+      userAgent,
+    })
+    res.status(201).json({
+      data: {
+        id: saved.id,
+        endpoint: saved.endpoint,
+      },
+    })
+  } catch (e) {
+    next(e)
+  }
+})
+
+notificationsRouter.delete('/push/subscribe', async (req, res, next) => {
+  try {
+    const actor = getAuditActor(req)
+    const body = pushUnsubscribeSchema.parse(req.body)
+    await webPushRepo.deleteWebPushSubscription({
+      userId: actor.userId,
+      endpoint: body.endpoint,
+    })
+    res.status(204).send()
+  } catch (e) {
+    next(e)
+  }
+})
 
 notificationsRouter.get('/', async (req, res, next) => {
   try {
@@ -105,4 +180,3 @@ notificationsRouter.post('/mentions', async (req, res, next) => {
     next(e)
   }
 })
-

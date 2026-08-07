@@ -109,7 +109,7 @@ export function ContactFormInput({
         onChange={onChange}
         onBlur={onBlur}
         className={className}
-        placeholder={placeholder ?? '0%'}
+        placeholder={placeholder ?? '0'}
         disabled={disabled}
         autoFocus={autoFocus}
       />
@@ -359,7 +359,7 @@ export function ContactFormAmountInput({
   )
 }
 
-/** Porcentaje 0–100 con sufijo % */
+/** Porcentaje 0–100; el % es adornment visual (no forma parte del texto editable). */
 export function ContactFormPercentInput({
   id,
   label,
@@ -367,24 +367,33 @@ export function ContactFormPercentInput({
   onChange,
   onBlur,
   className,
-  placeholder = '0%',
+  placeholder = '0',
   disabled,
   autoFocus,
 }: FormControlBaseProps) {
+  const displayValue = value.replace(/[^\d]/g, '')
   return (
     <ContactFormField label={label} id={id} className={className}>
-      <Input
-        id={id}
-        type="text"
-        inputMode="numeric"
-        value={value}
-        placeholder={placeholder}
-        disabled={disabled}
-        autoFocus={autoFocus}
-        className={fieldInputClass}
-        onChange={(e) => onChange(formatPercentFromInput(e.target.value))}
-        onBlur={onBlur}
-      />
+      <div className="relative">
+        <Input
+          id={id}
+          type="text"
+          inputMode="numeric"
+          value={displayValue}
+          placeholder={placeholder.replace(/%/g, '') || '0'}
+          disabled={disabled}
+          autoFocus={autoFocus}
+          className={cn(fieldInputClass, 'pr-8')}
+          onChange={(e) => onChange(formatPercentFromInput(e.target.value))}
+          onBlur={onBlur}
+        />
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-muted-foreground"
+        >
+          %
+        </span>
+      </div>
     </ContactFormField>
   )
 }

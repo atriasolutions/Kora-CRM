@@ -4,6 +4,13 @@ import type {
   CompanyOperationalStatus,
 } from '@/data/companies.mock'
 import { normalizeCompanyLifecycle } from '@/lib/company-form'
+import {
+  createDefaultListDateFilter,
+  isListDateFilterActive,
+  listDateFilterToServerQuery,
+  listRowMatchesDateFilter,
+  type ListDateFilter,
+} from '@/lib/list-date-filter'
 
 export type CompanyLastActivityFilter = 'all' | 'today' | 'week' | 'stale'
 
@@ -11,6 +18,7 @@ export type CompanyFilters = {
   lifecycles: CompanyLifecycleStatus[]
   operationalStatus: CompanyOperationalStatus | 'all'
   lastActivity: CompanyLastActivityFilter
+  date: ListDateFilter
 }
 
 export const COMPANY_LIFECYCLE_OPTIONS: CompanyLifecycleStatus[] = [
@@ -38,7 +46,12 @@ export const COMPANY_LAST_ACTIVITY_OPTIONS: {
 ]
 
 export function createDefaultCompanyFilters(): CompanyFilters {
-  return { lifecycles: [], operationalStatus: 'all', lastActivity: 'all' }
+  return {
+    lifecycles: [],
+    operationalStatus: 'all',
+    lastActivity: 'all',
+    date: createDefaultListDateFilter(),
+  }
 }
 
 export function countActiveCompanyFilters(filters: CompanyFilters): number {
@@ -46,6 +59,7 @@ export function countActiveCompanyFilters(filters: CompanyFilters): number {
   if (filters.lifecycles.length > 0) n += 1
   if (filters.operationalStatus !== 'all') n += 1
   if (filters.lastActivity !== 'all') n += 1
+  if (isListDateFilterActive(filters.date)) n += 1
   return n
 }
 
@@ -82,7 +96,30 @@ export function matchesCompanyFilters(
   if (!matchesLastActivity(company.lastActivity, filters.lastActivity)) {
     return false
   }
+  if (!listRowMatchesDateFilter(company.createdAt, filters.date)) return false
   return true
+}
+
+export function companyFiltersToServerQuery(
+  filters: CompanyFilters,
+  options?: { mine?: boolean; ownerName?: string },
+): Record<string, string> {
+  const query: Record<string, string> = {
+    ...listDateFilterToServerQuery(filters.date),
+  }
+  if (filters.lifecycles.length > 0) {
+    query.lifecycle = filters.lifecycles.join(',')
+  }
+  if (filters.operationalStatus !== 'all') {
+    query.operationalStatus = filters.operationalStatus
+  }
+  if (filters.lastActivity !== 'all') {
+    query.lastActivity = filters.lastActivity
+  }
+  if (options?.mine && options.ownerName?.trim()) {
+    query.ownerName = options.ownerName.trim()
+  }
+  return query
 }
 
 export function toggleCompanyLifecycle(

@@ -6,6 +6,8 @@ export const GLOBAL_SEARCH_TYPE_LABELS: Record<GlobalSearchEntityType, string> =
   opportunity: 'Oportunidades',
   quote: 'Cotizaciones',
   invoice: 'Facturación',
+  boleta: 'Boletas',
+  gasto: 'Gastos',
   activity: 'Actividades',
   project: 'Proyectos',
   product: 'Productos',
@@ -27,6 +29,10 @@ export function globalSearchResultPath(
       return `/cotizaciones/${id}`
     case 'invoice':
       return `/facturacion/${id}`
+    case 'boleta':
+      return `/boletas/${id}`
+    case 'gasto':
+      return `/gastos/${id}`
     case 'activity':
       return `/actividades/${id}`
     case 'project':

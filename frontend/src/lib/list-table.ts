@@ -74,6 +74,16 @@ export function isColumnSortable<T extends ListRowBase>(col: ListColumnDef<T>): 
   return false
 }
 
+/** `sortBy` para la API; undefined = orden solo en cliente. */
+export function getColumnSortKey<T extends ListRowBase>(
+  col: ListColumnDef<T>,
+): string | undefined {
+  if (col.kind === 'primary' || col.kind === 'text' || col.kind === 'badge') {
+    return col.sortKey?.trim() || undefined
+  }
+  return undefined
+}
+
 export function getColumnSortValue<T extends ListRowBase>(
   row: T,
   col: ListColumnDef<T>,
@@ -134,12 +144,13 @@ export function loadListColumnPrefs(
   storageKey: string,
   allKeys: string[],
   defaultWidths: Record<string, number>,
+  defaultHiddenKeys: string[] = [],
 ): ListColumnPrefs {
   try {
     const raw = localStorage.getItem(storageKey)
     if (!raw) {
       return {
-        hidden: new Set(),
+        hidden: new Set(defaultHiddenKeys.filter((k) => allKeys.includes(k))),
         order: [...allKeys],
         widths: { ...defaultWidths },
       }
@@ -167,7 +178,7 @@ export function loadListColumnPrefs(
   }
 
   return {
-    hidden: new Set(),
+    hidden: new Set(defaultHiddenKeys.filter((k) => allKeys.includes(k))),
     order: [...allKeys],
     widths: { ...defaultWidths },
   }

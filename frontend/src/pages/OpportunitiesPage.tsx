@@ -1,9 +1,11 @@
-import { Archive } from 'lucide-react'
+import { Archive, Pencil } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from '@/lib/toast'
 
+import { updateOpportunityApi } from '@/api/opportunities'
 import { ListPageLayout } from '@/components/list/ListPageLayout'
+import { BulkEditDialog } from '@/components/list/BulkEditDialog'
 import { ModuleListPage, type ListSelectionAction } from '@/components/list/ModuleListPage'
 import { useEmbeddedListToolbarSlot } from '@/hooks/use-embedded-list-toolbar-slot'
 import { CreateOpportunityDialog } from '@/components/opportunities/CreateOpportunityDialog'
@@ -42,10 +44,15 @@ import {
 } from '@/lib/opportunity-create'
 import {
   createDefaultOpportunityFilters,
+  OPPORTUNITY_OUTCOME_OPTIONS,
+  OPPORTUNITY_PRIORITY_FILTER_OPTIONS,
+  OPPORTUNITY_STAGE_OPTIONS,
+  opportunityFiltersToServerQuery,
   opportunityRowMatchesFilters,
   type OpportunityFilters,
 } from '@/lib/opportunity-filters'
 import { OPPORTUNITY_ARCHIVE_RETENTION_DAYS } from '@/lib/opportunity-archive'
+import { getCurrentUser } from '@/lib/current-user'
 import {
   loadOpportunityRecentIds,
   opportunityMatchesListScope,
@@ -82,6 +89,17 @@ export function OpportunitiesPage() {
     [listRefreshKey, location.key, listScope],
   )
 
+  const serverListQuery = useMemo(
+    () =>
+      opportunityFiltersToServerQuery(filters, {
+        mine: listScope === 'mine',
+        ownerName: getCurrentUser().name,
+      }),
+    [filters, listScope],
+  )
+
+  const filtersOnServer = listScope !== 'recent' && isApiEnabled()
+
   const rowPredicate = useMemo(
     () => (row: OpportunityListItem) =>
       opportunityRowMatchesFilters(row, filters) &&
@@ -117,6 +135,8 @@ export function OpportunitiesPage() {
   const [editingOpportunity, setEditingOpportunity] = useState<OpportunityDetail | null>(null)
   const [archiveTarget, setArchiveTarget] = useState<OpportunityListItem | null>(null)
   const [bulkArchiveIds, setBulkArchiveIds] = useState<string[] | null>(null)
+  const [bulkEditIds, setBulkEditIds] = useState<string[] | null>(null)
+  const [bulkEditSaving, setBulkEditSaving] = useState(false)
 
   const handleCreateSubmit = useCallback(
     async (values: CreateOpportunityFormValues) => {
@@ -190,20 +210,62 @@ export function OpportunitiesPage() {
     }
   }, [archiveOpportunities, bulkArchiveIds])
 
-  const listSelectionActions = useMemo<ListSelectionAction[]>(
-    () =>
-      canDelete
-        ? [
-            {
-              label: 'Archivar',
-              icon: Archive,
-              variant: 'destructive',
-              onClick: (ids) => setBulkArchiveIds(ids),
-            },
-          ]
-        : [],
-    [canDelete],
+  const handleBulkEdit = useCallback(
+    async (patch: Record<string, string>) => {
+      if (!bulkEditIds?.length) return
+      setBulkEditSaving(true)
+      let ok = 0
+      let fail = 0
+      try {
+        for (const id of bulkEditIds) {
+          try {
+            await updateOpportunityApi(id, {
+              stage: patch.stage,
+              owner: patch.ownerName,
+              priority: patch.priority,
+              outcome: patch.outcome,
+            })
+            ok += 1
+          } catch {
+            fail += 1
+          }
+        }
+        setBulkEditIds(null)
+        setListRefreshKey((k) => k + 1)
+        void reloadFromApi().catch(() => {})
+        if (fail === 0) {
+          toast.success(
+            `${ok} oportunidad${ok === 1 ? '' : 'es'} actualizada${ok === 1 ? '' : 's'}.`,
+          )
+        } else {
+          toast.warning(`${ok} actualizadas, ${fail} con error.`)
+        }
+      } finally {
+        setBulkEditSaving(false)
+      }
+    },
+    [bulkEditIds, reloadFromApi],
   )
+
+  const listSelectionActions = useMemo<ListSelectionAction[]>(() => {
+    const actions: ListSelectionAction[] = []
+    if (canEdit) {
+      actions.push({
+        label: 'Editar',
+        icon: Pencil,
+        onClick: (ids) => setBulkEditIds(ids),
+      })
+    }
+    if (canDelete) {
+      actions.push({
+        label: 'Archivar',
+        icon: Archive,
+        variant: 'destructive',
+        onClick: (ids) => setBulkArchiveIds(ids),
+      })
+    }
+    return actions
+  }, [canDelete, canEdit])
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -242,8 +304,10 @@ export function OpportunitiesPage() {
             listScope === 'recent'
               ? undefined
               : {
-                  fetchPage: (params) => fetchOpportunitiesServerPage(params, false),
-                  resetKey: `${listRefreshKey}-${listScope}`,
+                  fetchPage: (params) =>
+                    fetchOpportunitiesServerPage(params, false, serverListQuery),
+                  resetKey: `${listRefreshKey}-${listScope}-${JSON.stringify(serverListQuery)}`,
+                  filtersOnServer,
                 }
           }
           rowPredicate={rowPredicate}
@@ -365,6 +429,42 @@ export function OpportunitiesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <BulkEditDialog
+        open={bulkEditIds !== null && bulkEditIds.length > 0}
+        onOpenChange={(open) => {
+          if (!open) setBulkEditIds(null)
+        }}
+        selectedCount={bulkEditIds?.length ?? 0}
+        saving={bulkEditSaving}
+        title="Editar oportunidades seleccionadas"
+        fields={[
+          {
+            key: 'stage',
+            label: 'Etapa',
+            options: OPPORTUNITY_STAGE_OPTIONS.map((s) => ({ value: s, label: s })),
+          },
+          {
+            key: 'outcome',
+            label: 'Resultado',
+            options: OPPORTUNITY_OUTCOME_OPTIONS.map((o) => ({ value: o, label: o })),
+          },
+          {
+            key: 'priority',
+            label: 'Prioridad',
+            options: OPPORTUNITY_PRIORITY_FILTER_OPTIONS.map((p) => ({
+              value: p,
+              label: p,
+            })),
+          },
+          {
+            key: 'ownerName',
+            label: 'Responsable',
+            placeholder: 'Nombre del responsable',
+          },
+        ]}
+        onSubmit={handleBulkEdit}
+      />
     </div>
   )
 }

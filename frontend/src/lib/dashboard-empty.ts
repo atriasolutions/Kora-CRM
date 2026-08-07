@@ -4,7 +4,7 @@ import type { DashboardData, DashboardViewId } from '@/types/dashboard'
 function chartDescriptionForPeriod(period: DashboardPeriod): string {
   if (period.mode === 'years') return 'Comparación anual'
   if (period.mode === 'year') return 'Desglose mensual del año'
-  return 'Últimos 6 meses'
+  return 'Desglose diario del mes'
 }
 
 function emptyTimeSeries(period: DashboardPeriod) {
@@ -19,7 +19,11 @@ function emptyTimeSeries(period: DashboardPeriod) {
   if (period.mode === 'year') {
     return months.map((label) => ({ label, value: 0 }))
   }
-  return months.slice(0, 6).map((label) => ({ label, value: 0 }))
+  const daysInMonth = new Date(period.year, period.month + 1, 0).getDate()
+  return Array.from({ length: daysInMonth }, (_, i) => ({
+    label: String(i + 1),
+    value: 0,
+  }))
 }
 
 function zeroKpis(
@@ -154,8 +158,9 @@ export function getEmptyDashboard(period: DashboardPeriod, view: DashboardViewId
     kpis: zeroKpis([
       { id: 'opportunities', title: 'Oportunidades', value: '0', accent: 'blue' },
       { id: 'revenue', title: 'Ingresos', value: '$0', accent: 'emerald' },
+      { id: 'expenses', title: 'Gastos', value: '$0', accent: 'rose' },
+      { id: 'pipeline', title: 'Pipeline', value: '$0', accent: 'amber' },
       { id: 'newClients', title: 'Clientes nuevos', value: '0', accent: 'violet' },
-      { id: 'activities', title: 'Actividades', value: '0', accent: 'amber' },
     ]),
     funnelStages: [],
     revenueExpenseSeries: series.map(({ label, ingresos, gastos }) => ({

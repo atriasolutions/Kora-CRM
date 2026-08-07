@@ -27,6 +27,10 @@ purchasesRouter.get(
         pageSize: query.pageSize,
         q: query.q,
         status: query.status,
+        sortBy: query.sortBy,
+        sortDir: query.sortDir,
+        dateFrom: query.dateFrom,
+        dateTo: query.dateTo,
         archivedOnly: query.archived === true,
       })
       res.json({

@@ -5,6 +5,8 @@ export type ListPageParams = {
   page: number
   pageSize: number
   q?: string
+  sortBy?: string
+  sortDir?: 'asc' | 'desc'
   extra?: Record<string, string | undefined>
 }
 
@@ -25,6 +27,8 @@ export async function fetchListPage<T>(
   search.set('page', String(params.page))
   search.set('pageSize', String(params.pageSize))
   if (params.q?.trim()) search.set('q', params.q.trim())
+  if (params.sortBy?.trim()) search.set('sortBy', params.sortBy.trim())
+  if (params.sortDir) search.set('sortDir', params.sortDir)
   for (const [key, value] of Object.entries(params.extra ?? {})) {
     if (value !== undefined && value !== '') search.set(key, value)
   }

@@ -7,6 +7,13 @@ import { QUOTE_JOURNEY_STAGE_OPTIONS } from '@/lib/quote-journey'
 import { DEFAULT_GLOBAL_DISCOUNT } from '@/lib/document-global-discount'
 import { computeQuoteTotals } from '@/lib/quote-line-item'
 import type { QuoteLineItem } from '@/data/quote-detail.mock'
+import { normalizeProductCurrency, type ProductCurrency } from '@/lib/currency'
+import { loadCatalogSettings } from '@/lib/catalog-settings'
+import {
+  defaultWarehouseFromCatalog,
+  warehouseFormPatchFromSelection,
+} from '@/lib/warehouse-lookup'
+import { formatPurchaseDisplayDate } from '@/lib/purchase-dates'
 
 export const QUOTE_STATUS_OPTIONS: QuoteStatus[] = QUOTE_JOURNEY_STAGE_OPTIONS
 
@@ -36,9 +43,28 @@ export type QuoteFormValues = {
   globalDiscountPercent: string
   includeBankDetails: boolean
   bankAccountId: string
+  issueDate: string
+  quoteCurrency: ProductCurrency
+}
+
+export function inferQuoteCurrency(quote: QuoteDetail): ProductCurrency {
+  for (const line of quote.lineItems) {
+    const currency = normalizeProductCurrency(line.priceCurrency)
+    if (currency !== 'CLP') return currency
+  }
+  if (quote.exchangeRateUf != null) return 'UF'
+  if (quote.exchangeRateUsd != null) return 'USD'
+  if (quote.exchangeRateEur != null) return 'EUR'
+  return 'CLP'
+}
+
+function defaultWarehousePatch() {
+  const catalog = loadCatalogSettings()
+  return warehouseFormPatchFromSelection(defaultWarehouseFromCatalog(catalog.warehouses))
 }
 
 export function quoteDetailToFormValues(quote: QuoteDetail): QuoteFormValues {
+  const whPatch = defaultWarehousePatch()
   return {
     code: quote.code,
     title: quote.title,
@@ -57,14 +83,16 @@ export function quoteDetailToFormValues(quote: QuoteDetail): QuoteFormValues {
     paymentTerms: quote.paymentTerms,
     deliveryTerms: quote.deliveryTerms,
     billingAddress: quote.billingAddress,
-    destinationWarehouseId: quote.destinationWarehouseId ?? '',
-    destinationWarehouse: quote.destinationWarehouse,
-    deliveryAddress: quote.deliveryAddress,
+    destinationWarehouseId: quote.destinationWarehouseId?.trim() || whPatch.warehouseId || '',
+    destinationWarehouse: quote.destinationWarehouse?.trim() || whPatch.warehouse || '',
+    deliveryAddress: quote.deliveryAddress?.trim() || whPatch.deliveryAddress || '',
     terms: quote.terms,
     internalNotes: quote.internalNotes,
     globalDiscountPercent: quote.discountPercent ?? DEFAULT_GLOBAL_DISCOUNT,
     includeBankDetails: quote.includeBankDetails === true,
     bankAccountId: quote.bankAccountId ?? '',
+    issueDate: quote.issueDate?.trim() && quote.issueDate !== '—' ? quote.issueDate : formatPurchaseDisplayDate(new Date()),
+    quoteCurrency: inferQuoteCurrency(quote),
   }
 }
 
@@ -117,6 +145,8 @@ export function applyFormValuesToQuote(
     amount: totals.amount,
     includeBankDetails: values.includeBankDetails,
     bankAccountId: values.bankAccountId.trim() || null,
+    issueDate: values.issueDate.trim(),
+    currency: values.quoteCurrency,
   }
 }
 

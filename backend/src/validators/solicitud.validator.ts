@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { listSortAndDateQueryFields } from '../lib/list-query.js'
+
 const solicitudStatusSchema = z.enum([
   'Nuevo',
   'En Proceso',
@@ -23,11 +25,12 @@ export const listSolicitudesQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(200).default(50),
   q: z.string().optional(),
-  status: solicitudStatusSchema.optional(),
+  status: z.string().optional(),
   archived: z
     .union([z.literal('true'), z.literal('false')])
     .optional()
     .transform((v) => v === 'true'),
+  ...listSortAndDateQueryFields,
 })
 
 export const createSolicitudSchema = z.object({
@@ -39,6 +42,8 @@ export const createSolicitudSchema = z.object({
   assigneeUserId: z.string().uuid().nullish(),
   requesterUserId: z.string().uuid().nullish(),
   team: z.array(teamMemberSchema).optional(),
+  documentationUrl: z.string().max(512).optional(),
+  gitBranchUrl: z.string().max(512).optional(),
 })
 
 export const updateSolicitudSchema = createSolicitudSchema.partial()

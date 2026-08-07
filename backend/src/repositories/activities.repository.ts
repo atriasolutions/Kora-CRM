@@ -17,6 +17,12 @@ import type {
 } from '../types/activity.js'
 import { parseDatetimeInput } from '../utils/format.js'
 import { paginationOffset } from '../utils/pagination.js'
+
+import {
+  parseCommaSeparatedList,
+  pushDateRangeCondition,
+  resolveOrderByClause,
+} from '../lib/list-query.js'
 import { purgeEntityNotesAndFiles } from '../services/entity-purge.service.js'
 import {
   broadcastActivitiesRefreshForUserName,
@@ -47,6 +53,10 @@ export type ListActivitiesParams = {
   relatedId?: string
   assigneeName?: string
   archivedOnly?: boolean
+  sortBy?: string
+  sortDir?: 'asc' | 'desc'
+  dateFrom?: string
+  dateTo?: string
 }
 
 function typeLabelFor(activityType: string, override?: string): string {
@@ -70,6 +80,7 @@ async function resolveRelatedSnapshot(
     cotizacion: `SELECT code AS name, company_name FROM crm_quotes WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
     compra: `SELECT reference AS name, supplier_name AS company_name FROM crm_purchases WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
     factura: `SELECT number AS name, client_name AS company_name FROM crm_invoices WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
+    boleta: `SELECT number AS name, buyer_name AS company_name FROM crm_boletas WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
     proyecto: `SELECT name, client_name AS company_name FROM crm_projects WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
     ingreso: `SELECT number AS name, supplier_name AS company_name FROM crm_stock_receipts WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
     producto: `SELECT name, '' AS company_name FROM crm_products WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
@@ -96,6 +107,17 @@ function scheduledFromInput(input: CreateActivityInput | UpdateActivityInput): D
   return parseDatetimeInput(input.scheduledAt ?? input.dueAt)
 }
 
+
+const ACTIVITY_SORT_COLUMNS: Record<string, string> = {
+  title: 'title',
+  status: 'status',
+  dueAt: 'due_at',
+  scheduledAt: 'scheduled_at',
+  assignee: 'assignee_name',
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
+}
+
 export async function listActivities(
   params: ListActivitiesParams,
 ): Promise<{ items: ActivityListItem[]; total: number }> {
@@ -109,9 +131,15 @@ export async function listActivities(
     conditions.push('deleted_at IS NULL')
   }
   idx = pushTenantCondition(conditions, values, idx)
-  if (params.status) {
-    conditions.push(`status = $${idx++}`)
-    values.push(params.status)
+  if (params.status?.trim()) {
+    const statuses = parseCommaSeparatedList(params.status)
+    if (statuses.length === 1) {
+      conditions.push(`status = $${idx++}`)
+      values.push(statuses[0])
+    } else if (statuses.length > 1) {
+      conditions.push(`status = ANY($${idx++}::text[])`)
+      values.push(statuses)
+    }
   }
   if (params.relatedType) {
     conditions.push(`related_type = $${idx++}`)
@@ -133,6 +161,22 @@ export async function listActivities(
     idx++
   }
 
+  idx = pushDateRangeCondition(
+    conditions,
+    values,
+    idx,
+    'COALESCE(due_at, scheduled_at, created_at)',
+    params.dateFrom,
+    params.dateTo,
+  )
+
+  const orderBy = resolveOrderByClause(
+    params.sortBy,
+    params.sortDir,
+    ACTIVITY_SORT_COLUMNS,
+    'COALESCE(due_at, scheduled_at, created_at) DESC',
+  )
+
   const where = `WHERE ${conditions.join(' AND ')}`
 
   return withTenantClient(async (client) => {
@@ -148,7 +192,7 @@ export async function listActivities(
       `SELECT ${ACTIVITY_COLUMNS}
        FROM crm_activities
        ${where}
-       ORDER BY COALESCE(due_at, scheduled_at, created_at) DESC
+       ORDER BY ${orderBy}
        LIMIT $${idx++} OFFSET $${idx}`,
       listValues,
     )

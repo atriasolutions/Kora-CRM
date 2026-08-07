@@ -1,9 +1,11 @@
-import { Archive } from 'lucide-react'
+import { Archive, Pencil } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from '@/lib/toast'
 
+import { updateProductApi } from '@/api/products'
 import { ListPageLayout } from '@/components/list/ListPageLayout'
+import { BulkEditDialog } from '@/components/list/BulkEditDialog'
 import { ModuleListPage, type ListSelectionAction } from '@/components/list/ModuleListPage'
 import { useEmbeddedListToolbarSlot } from '@/hooks/use-embedded-list-toolbar-slot'
 import { CreateProductDialog } from '@/components/products/CreateProductDialog'
@@ -41,10 +43,13 @@ import {
 } from '@/lib/product-create'
 import {
   createDefaultProductFilters,
+  PRODUCT_STATUS_OPTIONS,
+  productFiltersToServerQuery,
   productRowMatchesFilters,
   type ProductFilters,
 } from '@/lib/product-filters'
 import { PRODUCT_ARCHIVE_RETENTION_DAYS, PRODUCT_ARCHIVE_INVENTORY_WARNING } from '@/lib/product-archive'
+import { getCurrentUser } from '@/lib/current-user'
 import {
   loadProductRecentIds,
   productMatchesListScope,
@@ -81,8 +86,20 @@ export function ProductsPage() {
     [listRefreshKey, location.key, listScope],
   )
 
+  const serverListQuery = useMemo(
+    () =>
+      productFiltersToServerQuery(filters, {
+        mine: listScope === 'mine',
+        ownerName: getCurrentUser().name,
+      }),
+    [filters, listScope],
+  )
+
+  const filtersOnServer = listScope !== 'recent' && isApiEnabled()
+
   const rowPredicate = useMemo(
     () => (row: ProductListItem) =>
+      !row.parentProductId &&
       productRowMatchesFilters(row, filters) &&
       !isArchived(row.id) &&
       productMatchesListScope(row, listScope, recentIds),
@@ -115,6 +132,8 @@ export function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<ProductDetail | null>(null)
   const [archiveTarget, setArchiveTarget] = useState<ProductListItem | null>(null)
   const [bulkArchiveIds, setBulkArchiveIds] = useState<string[] | null>(null)
+  const [bulkEditIds, setBulkEditIds] = useState<string[] | null>(null)
+  const [bulkEditSaving, setBulkEditSaving] = useState(false)
 
   const handleCreateSubmit = useCallback(
     async (values: import('@/lib/product-form').ProductFormValues) => {
@@ -188,20 +207,58 @@ export function ProductsPage() {
     }
   }, [archiveProducts, bulkArchiveIds])
 
-  const listSelectionActions = useMemo<ListSelectionAction[]>(
-    () =>
-      canDelete
-        ? [
-            {
-              label: 'Archivar',
-              icon: Archive,
-              variant: 'destructive',
-              onClick: (ids) => setBulkArchiveIds(ids),
-            },
-          ]
-        : [],
-    [canDelete],
+  const handleBulkEdit = useCallback(
+    async (patch: Record<string, string>) => {
+      if (!bulkEditIds?.length) return
+      setBulkEditSaving(true)
+      let ok = 0
+      let fail = 0
+      try {
+        for (const id of bulkEditIds) {
+          try {
+            await updateProductApi(id, {
+              status: patch.status,
+              ownerName: patch.ownerName,
+            })
+            ok += 1
+          } catch {
+            fail += 1
+          }
+        }
+        setBulkEditIds(null)
+        setListRefreshKey((k) => k + 1)
+        void reloadFromApi().catch(() => {})
+        if (fail === 0) {
+          toast.success(`${ok} producto${ok === 1 ? '' : 's'} actualizado${ok === 1 ? '' : 's'}.`)
+        } else {
+          toast.warning(`${ok} actualizados, ${fail} con error.`)
+        }
+      } finally {
+        setBulkEditSaving(false)
+      }
+    },
+    [bulkEditIds, reloadFromApi],
   )
+
+  const listSelectionActions = useMemo<ListSelectionAction[]>(() => {
+    const actions: ListSelectionAction[] = []
+    if (canEdit) {
+      actions.push({
+        label: 'Editar',
+        icon: Pencil,
+        onClick: (ids) => setBulkEditIds(ids),
+      })
+    }
+    if (canDelete) {
+      actions.push({
+        label: 'Archivar',
+        icon: Archive,
+        variant: 'destructive',
+        onClick: (ids) => setBulkArchiveIds(ids),
+      })
+    }
+    return actions
+  }, [canDelete, canEdit])
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -240,8 +297,9 @@ export function ProductsPage() {
             listScope === 'recent'
               ? undefined
               : {
-                  fetchPage: (params) => fetchProductsServerPage(params),
-                  resetKey: `${listRefreshKey}-${listScope}`,
+                  fetchPage: (params) => fetchProductsServerPage(params, serverListQuery),
+                  resetKey: `${listRefreshKey}-${listScope}-${JSON.stringify(serverListQuery)}`,
+                  filtersOnServer,
                 }
           }
           rowPredicate={rowPredicate}
@@ -378,6 +436,29 @@ export function ProductsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <BulkEditDialog
+        open={bulkEditIds !== null && bulkEditIds.length > 0}
+        onOpenChange={(open) => {
+          if (!open) setBulkEditIds(null)
+        }}
+        selectedCount={bulkEditIds?.length ?? 0}
+        saving={bulkEditSaving}
+        title="Editar productos seleccionados"
+        fields={[
+          {
+            key: 'status',
+            label: 'Estado',
+            options: PRODUCT_STATUS_OPTIONS.map((s) => ({ value: s, label: s })),
+          },
+          {
+            key: 'ownerName',
+            label: 'Responsable',
+            placeholder: 'Nombre del responsable',
+          },
+        ]}
+        onSubmit={handleBulkEdit}
+      />
     </div>
   )
 }

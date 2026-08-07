@@ -11,11 +11,17 @@ import type {
   UpdateCompanyInput,
 } from '../types/company.js'
 import { paginationOffset } from '../utils/pagination.js'
+
+import {
+  parseCommaSeparatedList,
+  pushDateRangeCondition,
+  resolveOrderByClause,
+} from '../lib/list-query.js'
 import { purgeEntityNotesAndFiles } from '../services/entity-purge.service.js'
 import {
   assertUniqueCompanyTaxId,
 } from '../lib/tax-id-uniqueness.js'
-import { maybeNotifyRecordOwnerChange } from '../lib/owner-assignment.js'
+import { maybeNotifyRecordOwnerChange, maybeNotifyRecordOwnerOnCreate } from '../lib/owner-assignment.js'
 
 const SELECT_COLUMNS = `
   id, name, logo_url, rut, headquarters_street, industry, city, employees,
@@ -25,6 +31,17 @@ const SELECT_COLUMNS = `
   updated_at, updated_by_id, updated_by_name
 `
 
+
+const COMPANY_SORT_COLUMNS: Record<string, string> = {
+  name: 'name',
+  industry: 'industry',
+  city: 'city',
+  lifecycle: 'lifecycle',
+  owner: 'owner_name',
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
+}
+
 export type ListCompaniesParams = {
   page: number
   pageSize: number
@@ -32,6 +49,10 @@ export type ListCompaniesParams = {
   lifecycle?: string
   includeDeleted?: boolean
   archivedOnly?: boolean
+  sortBy?: string
+  sortDir?: 'asc' | 'desc'
+  dateFrom?: string
+  dateTo?: string
 }
 
 export async function listCompanies(
@@ -50,9 +71,15 @@ export async function listCompanies(
   } else {
     conditions.push('archived_at IS NULL')
   }
-  if (params.lifecycle) {
-    conditions.push(`lifecycle = $${idx++}`)
-    values.push(params.lifecycle)
+  if (params.lifecycle?.trim()) {
+    const lifecycles = parseCommaSeparatedList(params.lifecycle)
+    if (lifecycles.length === 1) {
+      conditions.push(`lifecycle = $${idx++}`)
+      values.push(lifecycles[0])
+    } else if (lifecycles.length > 1) {
+      conditions.push(`lifecycle = ANY($${idx++}::text[])`)
+      values.push(lifecycles)
+    }
   }
   if (params.q) {
     conditions.push(
@@ -62,7 +89,22 @@ export async function listCompanies(
     idx++
   }
 
+  idx = pushDateRangeCondition(
+    conditions,
+    values,
+    idx,
+    'created_at',
+    params.dateFrom,
+    params.dateTo,
+  )
+
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
+  const orderBy = resolveOrderByClause(
+    params.sortBy,
+    params.sortDir,
+    COMPANY_SORT_COLUMNS,
+    'name ASC',
+  )
 
   return withTenantClient(async (client) => {
     const countResult = await client.query<{ count: string }>(
@@ -78,7 +120,7 @@ export async function listCompanies(
       `SELECT ${SELECT_COLUMNS}
        FROM crm_companies
        ${where}
-       ORDER BY name ASC
+       ORDER BY ${orderBy}
        LIMIT $${idx++} OFFSET $${idx}`,
       listValues,
     )
@@ -182,7 +224,17 @@ export async function createCompany(
       getTenantIdOrDefault(),
     ],
   )
-  return mapCompanyRow(result.rows[0]!)
+  const detail = mapCompanyRow(result.rows[0]!)
+  maybeNotifyRecordOwnerOnCreate({
+    actor,
+    nextOwner: detail.owner ?? '',
+    moduleLabel: 'la empresa',
+    recordTitle: detail.name,
+    href: `/empresas/${detail.id}`,
+    entityType: 'empresa',
+    entityId: detail.id,
+  })
+  return detail
 }
 
 export async function updateCompany(
@@ -306,4 +358,48 @@ export async function restoreCompany(
   const row = result.rows[0]
   if (!row) throw notFound('Empresa no encontrada')
   return mapCompanyRow(row)
+}
+
+export async function getCompanyMonthlyAssignedHours(
+  companyId: string,
+): Promise<number | null> {
+  const result = await tenantQuery<{ monthly_assigned_hours: string | null }>(
+    `SELECT monthly_assigned_hours::text
+     FROM crm_companies
+     WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(2)}`,
+    [companyId, getTenantIdOrDefault()],
+  )
+  const raw = result.rows[0]?.monthly_assigned_hours
+  if (raw == null || raw === '') return null
+  const value = Number(raw)
+  return Number.isFinite(value) ? value : null
+}
+
+export async function updateCompanyMonthlyAssignedHours(
+  companyId: string,
+  monthlyAssignedHours: number | null,
+  actor: AuditActor,
+): Promise<number | null> {
+  const result = await tenantQuery<{ monthly_assigned_hours: string | null }>(
+    `UPDATE crm_companies SET
+      monthly_assigned_hours = $2,
+      updated_by_id = $3,
+      updated_by_name = $4,
+      updated_at = now()
+     WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(5)}
+     RETURNING monthly_assigned_hours::text`,
+    [
+      companyId,
+      monthlyAssignedHours,
+      actor.userId,
+      actor.userName,
+      getTenantIdOrDefault(),
+    ],
+  )
+  const row = result.rows[0]
+  if (!row) throw notFound('Empresa no encontrada')
+  const raw = row.monthly_assigned_hours
+  if (raw == null || raw === '') return null
+  const value = Number(raw)
+  return Number.isFinite(value) ? value : null
 }

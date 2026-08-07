@@ -116,6 +116,7 @@ export async function searchMentions(
   const perKind = trimmed ? limit : 2
   const tenantId = getTenantIdOrDefault()
   const userTenantParam = pattern ? '$3' : '$2'
+  const entityTenantParam = pattern ? '$3' : '$2'
 
   const batches = await Promise.all([
     searchKind(
@@ -130,15 +131,18 @@ export async function searchMentions(
                   coalesce(nullif(trim(company_name), ''), nullif(trim(email), '')) AS subtitle
            FROM crm_contacts
            WHERE ${ACTIVE_NOT_ARCHIVED}
+             AND tenant_id = ${entityTenantParam}::uuid
              AND (name ILIKE $1 OR email ILIKE $1 OR company_name ILIKE $1)
            ORDER BY name ASC LIMIT $2`
         : `SELECT 'contact'::text AS kind, id::text AS record_id, name AS label,
                   coalesce(nullif(trim(company_name), ''), nullif(trim(email), '')) AS subtitle
            FROM crm_contacts
            WHERE ${ACTIVE_NOT_ARCHIVED}
+             AND tenant_id = ${entityTenantParam}::uuid
            ORDER BY updated_at DESC LIMIT $1`,
       pattern,
       perKind,
+      [tenantId],
     ),
     searchKind(
       pattern
@@ -146,15 +150,18 @@ export async function searchMentions(
                   coalesce(nullif(trim(industry), ''), nullif(trim(city), '')) AS subtitle
            FROM crm_companies
            WHERE ${ACTIVE_NOT_ARCHIVED}
+             AND tenant_id = ${entityTenantParam}::uuid
              AND (name ILIKE $1 OR industry ILIKE $1 OR city ILIKE $1)
            ORDER BY name ASC LIMIT $2`
         : `SELECT 'company'::text AS kind, id::text AS record_id, name AS label,
                   coalesce(nullif(trim(industry), ''), nullif(trim(city), '')) AS subtitle
            FROM crm_companies
            WHERE ${ACTIVE_NOT_ARCHIVED}
+             AND tenant_id = ${entityTenantParam}::uuid
            ORDER BY updated_at DESC LIMIT $1`,
       pattern,
       perKind,
+      [tenantId],
     ),
     searchKind(
       pattern
@@ -162,15 +169,18 @@ export async function searchMentions(
                   coalesce(nullif(trim(company_name), ''), stage) AS subtitle
            FROM crm_opportunities
            WHERE ${ACTIVE_NOT_ARCHIVED}
+             AND tenant_id = ${entityTenantParam}::uuid
              AND (name ILIKE $1 OR company_name ILIKE $1)
            ORDER BY updated_at DESC LIMIT $2`
         : `SELECT 'opportunity'::text AS kind, id::text AS record_id, name AS label,
                   coalesce(nullif(trim(company_name), ''), stage) AS subtitle
            FROM crm_opportunities
            WHERE ${ACTIVE_NOT_ARCHIVED}
+             AND tenant_id = ${entityTenantParam}::uuid
            ORDER BY updated_at DESC LIMIT $1`,
       pattern,
       perKind,
+      [tenantId],
     ),
     searchKind(
       pattern
@@ -178,15 +188,18 @@ export async function searchMentions(
                   coalesce(nullif(trim(title), ''), nullif(trim(company_name), '')) AS subtitle
            FROM crm_quotes
            WHERE ${ACTIVE_NOT_ARCHIVED}
+             AND tenant_id = ${entityTenantParam}::uuid
              AND (code ILIKE $1 OR title ILIKE $1 OR company_name ILIKE $1)
            ORDER BY updated_at DESC LIMIT $2`
         : `SELECT 'quote'::text AS kind, id::text AS record_id, code AS label,
                   coalesce(nullif(trim(title), ''), nullif(trim(company_name), '')) AS subtitle
            FROM crm_quotes
            WHERE ${ACTIVE_NOT_ARCHIVED}
+             AND tenant_id = ${entityTenantParam}::uuid
            ORDER BY updated_at DESC LIMIT $1`,
       pattern,
       perKind,
+      [tenantId],
     ),
     searchKind(
       pattern
@@ -194,15 +207,18 @@ export async function searchMentions(
                   coalesce(nullif(trim(client_name), ''), status) AS subtitle
            FROM crm_projects
            WHERE ${ACTIVE_NOT_ARCHIVED}
+             AND tenant_id = ${entityTenantParam}::uuid
              AND (name ILIKE $1 OR client_name ILIKE $1)
            ORDER BY updated_at DESC LIMIT $2`
         : `SELECT 'project'::text AS kind, id::text AS record_id, name AS label,
                   coalesce(nullif(trim(client_name), ''), status) AS subtitle
            FROM crm_projects
            WHERE ${ACTIVE_NOT_ARCHIVED}
+             AND tenant_id = ${entityTenantParam}::uuid
            ORDER BY updated_at DESC LIMIT $1`,
       pattern,
       perKind,
+      [tenantId],
     ),
     searchKind(
       pattern
@@ -210,15 +226,18 @@ export async function searchMentions(
                   coalesce(nullif(trim(sku), ''), nullif(trim(product_type), '')) AS subtitle
            FROM crm_products
            WHERE ${ACTIVE_NOT_ARCHIVED}
+             AND tenant_id = ${entityTenantParam}::uuid
              AND (name ILIKE $1 OR sku ILIKE $1)
            ORDER BY name ASC LIMIT $2`
         : `SELECT 'product'::text AS kind, id::text AS record_id, name AS label,
                   coalesce(nullif(trim(sku), ''), nullif(trim(product_type), '')) AS subtitle
            FROM crm_products
            WHERE ${ACTIVE_NOT_ARCHIVED}
+             AND tenant_id = ${entityTenantParam}::uuid
            ORDER BY updated_at DESC LIMIT $1`,
       pattern,
       perKind,
+      [tenantId],
     ),
     searchKind(
       pattern
@@ -226,15 +245,18 @@ export async function searchMentions(
                   coalesce(nullif(trim(client_name), ''), status::text) AS subtitle
            FROM crm_invoices
            WHERE ${ACTIVE_NOT_ARCHIVED}
+             AND tenant_id = ${entityTenantParam}::uuid
              AND (number ILIKE $1 OR client_name ILIKE $1)
            ORDER BY updated_at DESC LIMIT $2`
         : `SELECT 'invoice'::text AS kind, id::text AS record_id, number AS label,
                   coalesce(nullif(trim(client_name), ''), status::text) AS subtitle
            FROM crm_invoices
            WHERE ${ACTIVE_NOT_ARCHIVED}
+             AND tenant_id = ${entityTenantParam}::uuid
            ORDER BY updated_at DESC LIMIT $1`,
       pattern,
       perKind,
+      [tenantId],
     ),
     searchKind(
       pattern
@@ -242,15 +264,18 @@ export async function searchMentions(
                   coalesce(nullif(trim(related_name), ''), type_label, status::text) AS subtitle
            FROM crm_activities
            WHERE ${ACTIVE_ONLY}
+             AND tenant_id = ${entityTenantParam}::uuid
              AND (title ILIKE $1 OR related_name ILIKE $1 OR company_name ILIKE $1)
            ORDER BY scheduled_at DESC NULLS LAST LIMIT $2`
         : `SELECT 'activity'::text AS kind, id::text AS record_id, title AS label,
                   coalesce(nullif(trim(related_name), ''), type_label) AS subtitle
            FROM crm_activities
            WHERE ${ACTIVE_ONLY}
+             AND tenant_id = ${entityTenantParam}::uuid
            ORDER BY scheduled_at DESC NULLS LAST LIMIT $1`,
       pattern,
       perKind,
+      [tenantId],
     ),
     searchKind(
       pattern
@@ -258,15 +283,18 @@ export async function searchMentions(
                   coalesce(nullif(trim(title), ''), status::text) AS subtitle
            FROM crm_solicitudes
            WHERE ${ACTIVE_NOT_ARCHIVED}
+             AND tenant_id = ${entityTenantParam}::uuid
              AND (code ILIKE $1 OR title ILIKE $1)
            ORDER BY updated_at DESC LIMIT $2`
         : `SELECT 'solicitud'::text AS kind, id::text AS record_id, code AS label,
                   coalesce(nullif(trim(title), ''), status::text) AS subtitle
            FROM crm_solicitudes
            WHERE ${ACTIVE_NOT_ARCHIVED}
+             AND tenant_id = ${entityTenantParam}::uuid
            ORDER BY updated_at DESC LIMIT $1`,
       pattern,
       perKind,
+      [tenantId],
     ),
   ])
 

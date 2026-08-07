@@ -6,12 +6,15 @@ import {
   resolveBitacoraCompanyScopeForActor,
 } from '../lib/bitacora-guest-scope.js'
 import { getAuditActor, getAuthProfile } from '../middleware/audit-actor.js'
+import { forbidden } from '../middleware/errors.js'
 import { requirePermission } from '../middleware/require-permission.js'
 import { routeParam } from '../lib/route-params.js'
 import * as bitacoraRepo from '../repositories/bitacora.repository.js'
+import * as companiesRepo from '../repositories/companies.repository.js'
 import type { CreateBitacoraInput, UpdateBitacoraInput } from '../types/bitacora.js'
 import {
   bitacoraDashboardQuerySchema,
+  companyMonthlyQuotaSchema,
   createBitacoraSchema,
   listBitacoraQuerySchema,
   updateBitacoraSchema,
@@ -59,6 +62,8 @@ bitacoraRouter.get(
           workDateTo: query.workDateTo,
           companyId: companyScope.companyId,
           archivedOnly: query.archived === true,
+          sortBy: query.sortBy,
+          sortDir: query.sortDir,
         })
         res.json({
           data: result.items,
@@ -85,6 +90,8 @@ bitacoraRouter.get(
         workDateTo: query.workDateTo,
         companyId: query.companyId,
         archivedOnly: query.archived === true,
+        sortBy: query.sortBy,
+        sortDir: query.sortDir,
       })
       res.json({
         data: result.items,
@@ -149,6 +156,29 @@ bitacoraRouter.get(
         stats.companyName = companyScope.companyName
       }
       res.json({ data: stats })
+    } catch (e) {
+      next(e)
+    }
+  },
+)
+
+bitacoraRouter.patch(
+  '/monthly-quota/:companyId',
+  requirePermission('bitacora', 'view'),
+  async (req, res, next) => {
+    try {
+      const profile = getAuthProfile(req)
+      if (!hasElevatedTenantScope(profile)) {
+        throw forbidden('Solo administradores pueden configurar la cuota mensual de horas.')
+      }
+      const companyId = routeParam(req, 'companyId')
+      const body = companyMonthlyQuotaSchema.parse(req.body)
+      const monthlyAssignedHours = await companiesRepo.updateCompanyMonthlyAssignedHours(
+        companyId,
+        body.monthlyAssignedHours,
+        getAuditActor(req),
+      )
+      res.json({ data: { companyId, monthlyAssignedHours } })
     } catch (e) {
       next(e)
     }

@@ -1,5 +1,6 @@
 import { Check, Filter } from 'lucide-react'
 
+import { CompactPeriodFilter } from '@/components/shared/CompactPeriodFilter'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -16,6 +17,11 @@ import {
   STOCK_RECEIPT_STATUS_OPTIONS,
   type StockReceiptFilters,
 } from '@/lib/stock-receipt-filters'
+import {
+  labelForListDateFilter,
+  listDateToCompact,
+  compactToListDate,
+} from '@/lib/list-date-filter'
 import { cn } from '@/lib/utils'
 
 function CheckboxRow({
@@ -74,7 +80,25 @@ export function StockReceiptsFiltersMenu({
           ) : null}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
+      <DropdownMenuContent
+        align="end"
+        className="max-h-[70vh] w-80 overflow-y-auto p-3"
+        onCloseAutoFocus={(e) => e.preventDefault()}
+      >
+        <DropdownMenuLabel>Fecha</DropdownMenuLabel>
+        <p className="mb-2 px-0.5 text-xs text-muted-foreground">
+          {labelForListDateFilter(filters.date)}
+        </p>
+        <CompactPeriodFilter
+          idPrefix="stock-receipts-filter"
+          modes={['all', 'month', 'year', 'custom']}
+          value={listDateToCompact(filters.date)}
+          onChange={(next) =>
+            onFiltersChange({ ...filters, date: compactToListDate(next) })
+          }
+        />
+
+        <DropdownMenuSeparator className="my-3" />
         <DropdownMenuLabel>Estado</DropdownMenuLabel>
         {STOCK_RECEIPT_STATUS_OPTIONS.map((status) => (
           <CheckboxRow
@@ -115,18 +139,14 @@ export function StockReceiptsFiltersMenu({
             className="h-8 text-sm"
           />
         </div>
-        {active > 0 ? (
-          <>
-            <DropdownMenuSeparator />
-            <button
-              type="button"
-              className="w-full px-2 py-1.5 text-left text-xs text-primary hover:underline"
-              onClick={() => onFiltersChange(createDefaultStockReceiptFilters())}
-            >
-              Limpiar filtros
-            </button>
-          </>
-        ) : null}
+        <DropdownMenuSeparator />
+        <button
+          type="button"
+          className="w-full rounded-sm px-2 py-1.5 text-start text-sm text-muted-foreground hover:bg-accent"
+          onClick={() => onFiltersChange(createDefaultStockReceiptFilters())}
+        >
+          Limpiar filtros
+        </button>
       </DropdownMenuContent>
     </DropdownMenu>
   )

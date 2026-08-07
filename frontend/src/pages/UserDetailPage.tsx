@@ -14,6 +14,7 @@ import { EditUserDialog } from '@/components/users/EditUserDialog'
 import { UserDetailHeader } from '@/components/users/UserDetailHeader'
 import { UserDetailSidebar } from '@/components/users/UserDetailSidebar'
 import { UserTwoFactorPanel } from '@/components/users/UserTwoFactorPanel'
+import { UserWebPushPanel } from '@/components/users/UserWebPushPanel'
 import { UserPermissionsPanel } from '@/components/users/UserPermissionsPanel'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -236,6 +237,7 @@ export function UserDetailPage() {
             canAdminManage={canEdit}
             onUserUpdated={handleTwoFactorUserPatch}
           />
+          <UserWebPushPanel isSelf={isOwnProfile} />
         </div>
       ) : null}
 

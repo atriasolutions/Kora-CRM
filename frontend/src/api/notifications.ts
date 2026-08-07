@@ -51,3 +51,33 @@ export async function sendMentionNotificationsApi(input: {
   })
 }
 
+export async function getWebPushVapidPublicKeyApi(): Promise<string> {
+  const res = await fetchJSON<ApiItemResponse<{ publicKey: string }>>(
+    `${BASE}/push/vapid-public-key`,
+  )
+  return res.data.publicKey
+}
+
+export async function subscribeWebPushApi(input: {
+  endpoint: string
+  keys: { p256dh: string; auth: string }
+  userAgent?: string
+}): Promise<{ id: string; endpoint: string }> {
+  const res = await fetchJSON<ApiItemResponse<{ id: string; endpoint: string }>>(
+    `${BASE}/push/subscribe`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    },
+  )
+  return res.data
+}
+
+export async function unsubscribeWebPushApi(endpoint: string): Promise<void> {
+  await fetchJSON(`${BASE}/push/subscribe`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ endpoint }),
+  })
+}

@@ -10,6 +10,9 @@ export type ReportDataSourceId =
   | 'compras'
   | 'ingresos'
   | 'inventario'
+  | 'gastos'
+  | 'solicitudes'
+  | 'bitacora'
 
 export type ReportFilterOperator =
   | 'equals'

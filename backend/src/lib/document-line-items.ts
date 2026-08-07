@@ -109,8 +109,11 @@ function unitPriceCentsFromCurrency(
   currency: ProductCurrency,
   rates: ExchangeRateSnapshot,
 ): number {
+  // unitPriceOriginal ya viene en unidades de la moneda (pesos CLP / UF / USD / EUR).
+  // No usar parseMoneyToCents: con montos enteros > 999_999 lo interpreta como
+  // centavos ya convertidos y deja el precio CLP 100× más bajo.
   if (currency === 'CLP') {
-    return parseMoneyToCents(String(originalAmount)) || clpAmountToCents(originalAmount)
+    return clpAmountToCents(originalAmount)
   }
   const clp = convertAmountToClp(originalAmount, currency, rates)
   return clpAmountToCents(clp)

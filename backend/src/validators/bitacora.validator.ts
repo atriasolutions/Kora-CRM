@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { listSortAndDateQueryFields } from '../lib/list-query.js'
+
 const hoursSchema = z.coerce
   .number()
   .refine((h) => h >= 0.5, { message: 'Mínimo 0,5 horas' })
@@ -80,6 +82,8 @@ export const listBitacoraQuerySchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
   companyId: z.string().uuid().optional(),
+  sortBy: listSortAndDateQueryFields.sortBy,
+  sortDir: listSortAndDateQueryFields.sortDir,
 })
 
 export const createBitacoraSchema = bitacoraFieldsSchema.superRefine(validateNonBillableReason)
@@ -88,4 +92,15 @@ export const updateBitacoraSchema = bitacoraFieldsSchema.partial().superRefine((
   if (data.isBillable === false) {
     validateNonBillableReason(data, ctx)
   }
+})
+
+const monthlyAssignedHoursValueSchema = z.coerce
+  .number()
+  .refine((h) => h >= 0.5, { message: 'Mínimo 0,5 horas' })
+  .refine((h) => h * 2 === Math.round(h * 2), {
+    message: 'Las horas deben ser múltiplos de 0,5',
+  })
+
+export const companyMonthlyQuotaSchema = z.object({
+  monthlyAssignedHours: z.union([z.null(), monthlyAssignedHoursValueSchema]),
 })

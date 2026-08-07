@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { listSortAndDateQueryFields } from '../lib/list-query.js'
+
 const purchaseLineSchema = z.object({
   id: z.string().optional(),
   productId: z.string().uuid().optional(),
@@ -24,6 +26,7 @@ export const listPurchasesQuerySchema = z.object({
     .union([z.literal('true'), z.literal('false')])
     .optional()
     .transform((v) => v === 'true'),
+  ...listSortAndDateQueryFields,
 })
 
 const purchaseStatusSchema = z.enum(['Borrador', 'Emitida', 'Confirmada'])

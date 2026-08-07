@@ -145,4 +145,8 @@ export type ListInvoicesParams = {
   companyId?: string
   archivedOnly?: boolean
   documentKind?: InvoiceDocumentKind | 'all'
+  sortBy?: string
+  sortDir?: 'asc' | 'desc'
+  dateFrom?: string
+  dateTo?: string
 }

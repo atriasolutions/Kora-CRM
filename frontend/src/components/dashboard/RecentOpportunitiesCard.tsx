@@ -9,9 +9,14 @@ import type { RecentOpportunity } from '@/types/dashboard'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
-function statusVariant(status: string): 'proposal' | 'negotiation' | 'qualified' {
+function statusVariant(
+  status: string,
+): 'proposal' | 'negotiation' | 'qualified' | 'customer' | 'destructive' | 'secondary' {
   if (status === 'Propuesta') return 'proposal'
-  if (status === 'Negociación') return 'negotiation'
+  if (status === 'Negociación' || status === 'En espera cliente') return 'negotiation'
+  if (status === 'Cerrada' || status === 'Ganada') return 'customer'
+  if (status === 'Perdida' || status === 'No calificada') return 'destructive'
+  if (status === 'Pausada internamente') return 'secondary'
   return 'qualified'
 }
 
@@ -31,10 +36,10 @@ export function RecentOpportunitiesCard({
           Oportunidades recientes
         </CardTitle>
         <CardDescription className="text-xs sm:text-sm md:hidden">
-          Últimas oportunidades del pipeline
+          Actualizadas en el periodo (etapa real)
         </CardDescription>
         <CardDescription className="hidden text-xs sm:text-sm md:block">
-          Vista detallada por filas
+          Etapa real de cada oportunidad actualizada en el periodo
         </CardDescription>
       </CardHeader>
       <CardContent className="min-w-0 px-0 pb-3 sm:pb-3">

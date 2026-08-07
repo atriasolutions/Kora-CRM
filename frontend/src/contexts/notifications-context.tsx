@@ -14,6 +14,7 @@ import {
   dispatchActivitiesUpdated,
   dispatchInventoryUpdated,
 } from '@/lib/realtime-events'
+import { syncWebPushIfGranted } from '@/lib/web-push'
 import { toast } from '@/lib/toast'
 
 const LOCAL_NOTIFICATIONS_KEY = 'kora-crm-local-notifications'
@@ -259,6 +260,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     void loadInitial().catch(() => {
       // sin toast: solo afecta UI si no hay backend
     })
+    void syncWebPushIfGranted()
   }, [useApi, authToken, loadInitial])
 
   const loadInitialRef = useRef(loadInitial)

@@ -32,6 +32,10 @@ invoicesRouter.get(
         quoteId: query.quoteId,
         companyId: query.companyId,
         archivedOnly: query.archived === true,
+        sortBy: query.sortBy,
+        sortDir: query.sortDir,
+        dateFrom: query.dateFrom,
+        dateTo: query.dateTo,
         documentKind: query.documentKind,
       })
       res.json({

@@ -35,6 +35,12 @@ import type {
 } from '../types/user.js'
 import { paginationOffset } from '../utils/pagination.js'
 
+import {
+  parseCommaSeparatedList,
+  pushDateRangeCondition,
+  resolveOrderByClause,
+} from '../lib/list-query.js'
+
 const MEMBERSHIP_JOIN = `
   INNER JOIN crm_tenant_memberships mem
     ON mem.user_id = u.id
@@ -259,6 +265,18 @@ export type ListUsersParams = {
   pageSize: number
   q?: string
   status?: string
+  sortBy?: string
+  sortDir?: 'asc' | 'desc'
+  dateFrom?: string
+  dateTo?: string
+}
+
+
+const USER_SORT_COLUMNS: Record<string, string> = {
+  name: 'u.name',
+  email: 'u.email',
+  status: 'u.status',
+  createdAt: 'mem.created_at',
 }
 
 export async function listUsers(
@@ -273,9 +291,15 @@ export async function listUsers(
   const values: unknown[] = [tenantId]
   let idx = 2
 
-  if (params.status) {
-    conditions.push(`u.status = $${idx++}`)
-    values.push(params.status)
+  if (params.status?.trim()) {
+    const statuses = parseCommaSeparatedList(params.status)
+    if (statuses.length === 1) {
+      conditions.push(`u.status = $${idx++}`)
+      values.push(statuses[0])
+    } else if (statuses.length > 1) {
+      conditions.push(`u.status = ANY($${idx++}::text[])`)
+      values.push(statuses)
+    }
   }
   if (params.q) {
     conditions.push(
@@ -284,6 +308,22 @@ export async function listUsers(
     values.push(`%${params.q}%`)
     idx++
   }
+
+  idx = pushDateRangeCondition(
+    conditions,
+    values,
+    idx,
+    'mem.created_at',
+    params.dateFrom,
+    params.dateTo,
+  )
+
+  const orderBy = resolveOrderByClause(
+    params.sortBy,
+    params.sortDir,
+    USER_SORT_COLUMNS,
+    'u.name ASC',
+  )
 
   const where = `WHERE ${conditions.join(' AND ')}`
   const fromClause = `
@@ -307,7 +347,7 @@ export async function listUsers(
       `SELECT ${SELECT_LIST_COLUMNS}
        ${fromClause}
        ${where}
-       ORDER BY u.name ASC
+       ORDER BY ${orderBy}
        LIMIT $${idx++} OFFSET $${idx}`,
       listValues,
     )

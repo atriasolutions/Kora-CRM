@@ -2,6 +2,8 @@ import { activityListSeed } from '@/data/activities.mock'
 import { companyListSeed } from '@/data/companies.mock'
 import { contactListSeed } from '@/data/contacts.mock'
 import { invoiceListSeed } from '@/data/invoices.mock'
+import { boletaListSeed } from '@/data/boletas.mock'
+import { expenseListSeed } from '@/data/expenses.mock'
 import { opportunityListSeed } from '@/data/opportunities.mock'
 import { productListSeed } from '@/data/products.mock'
 import { projectListSeed } from '@/data/projects.mock'
@@ -91,6 +93,34 @@ export function globalSearchMock(query: string, limitPerType = 5): GlobalSearchR
       id: row.id,
       title: row.number,
       subtitle: row.client || row.status,
+    })
+  })
+
+  take(
+    boletaListSeed.filter((row) =>
+      matches(q, row.number, row.buyerName, row.companyName, row.contactName),
+    ),
+    limitPerType,
+  ).forEach((row) => {
+    results.push({
+      type: 'boleta',
+      id: row.id,
+      title: row.number,
+      subtitle: row.buyerName || row.status,
+    })
+  })
+
+  take(
+    expenseListSeed.filter((row) =>
+      matches(q, row.number, row.concept, row.category, row.supplierName),
+    ),
+    limitPerType,
+  ).forEach((row) => {
+    results.push({
+      type: 'gasto',
+      id: row.id,
+      title: row.number,
+      subtitle: row.concept || row.status,
     })
   })
 

@@ -1,4 +1,5 @@
 import { getAllKnownCompanies } from '@/data/companies-registry-store'
+import { getAllKnownExpenses } from '@/data/expenses-registry-store'
 import { getAllKnownInventory } from '@/data/inventory-registry-store'
 import { getAllKnownInvoices } from '@/data/invoices-registry-store'
 import { getAllKnownOpportunities } from '@/data/opportunities-registry-store'
@@ -9,6 +10,9 @@ import { getRegistryActivities } from '@/data/activities-registry-store'
 import { getAllRegistryStockReceipts } from '@/data/stock-receipts-registry-store'
 import { getAllKnownContacts } from '@/lib/contact-lookup'
 import { getAllKnownProducts } from '@/lib/product-lookup'
+import { STORAGE_PREFIX } from '@/config/brand'
+import type { BitacoraListItem } from '@/data/bitacora.mock'
+import type { SolicitudListItem } from '@/data/solicitudes.mock'
 import type {
   ReportDataSourceId,
   ReportFieldDef,
@@ -111,6 +115,7 @@ const LOOKUP_ID_TO_DISPLAY: Record<string, string[]> = {
   relatedId: ['relatedName'],
   ownerUserId: ['owner', 'ownerName'],
   assigneeUserId: ['assignee'],
+  partnerUserId: ['partnerName'],
   warehouseId: ['warehouse', 'location'],
   destinationWarehouseId: ['destinationWarehouse', 'warehouse'],
 }
@@ -248,6 +253,25 @@ const REPORT_FIELD_LABELS: Record<string, string> = {
   updatedAtDate: 'Fecha modificación',
   createdByName: 'Creado por',
   updatedByName: 'Modificado por',
+  concept: 'Concepto',
+  expenseDate: 'Fecha gasto',
+  currency: 'Moneda',
+  supplierName: 'Proveedor',
+  isPartnerLoan: 'Préstamo de socio',
+  partnerUserId: 'ID socio',
+  partnerName: 'Socio',
+  partnerLoanReturned: 'Préstamo devuelto',
+  documentationUrl: 'URL documentación',
+  gitBranchUrl: 'URL rama Git',
+  solicitudId: 'ID solicitud',
+  solicitudCode: 'Código solicitud',
+  solicitudTitle: 'Solicitud',
+  workDate: 'Fecha trabajo',
+  hours: 'Horas',
+  isBillable: 'Facturable',
+  nonBillableReason: 'Motivo no facturable',
+  assignedUserId: 'ID usuario asignado',
+  assignedUserName: 'Usuario asignado',
 }
 
 const HIDDEN_REPORT_FIELDS = new Set([
@@ -264,6 +288,7 @@ const JOIN_PRIMARY_DISPLAY: Record<string, string> = {
   proveedor: 'name',
   cotizacion: 'code',
   compra: 'reference',
+  solicitud: 'code',
 }
 
 /** Con join activo, ocultar en la fuente base lo que ya aporta la relación. */
@@ -273,6 +298,9 @@ const JOIN_HIDES_BASE_FIELDS: Record<string, string[]> = {
   'compras->empresas': ['supplier', 'supplierId'],
   'ingresos->compras': ['purchaseReference', 'purchaseId'],
   'facturas->cotizaciones': ['quoteId'],
+  'gastos->empresas': ['supplierName', 'supplierId', 'supplier'],
+  'solicitudes->empresas': ['companyName', 'companyId'],
+  'bitacora->solicitudes': ['solicitudCode', 'solicitudTitle', 'solicitudId'],
 }
 
 const LOOKUP_DISPLAY_BY_ID: Record<string, string[]> = {
@@ -286,6 +314,7 @@ const LOOKUP_DISPLAY_BY_ID: Record<string, string[]> = {
   relatedId: ['relatedName'],
   ownerUserId: ['owner', 'ownerName'],
   assigneeUserId: ['assignee'],
+  partnerUserId: ['partnerName'],
   warehouseId: ['warehouse', 'location'],
   destinationWarehouseId: ['destinationWarehouse', 'warehouse'],
 }
@@ -311,6 +340,10 @@ const LOOKUP_DISPLAY_FIELD_BASES = new Set([
   'purchase',
   'code',
   'customer',
+  'partnerName',
+  'solicitudTitle',
+  'solicitudCode',
+  'assignedUserName',
 ])
 
 function shouldHideReportField(id: string, allKeys: string[]): boolean {
@@ -748,6 +781,43 @@ function buildInventario(): SourceDef {
   )
 }
 
+function readLocalList<T>(storageKey: string): T[] {
+  try {
+    const raw = localStorage.getItem(storageKey)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as unknown
+    return Array.isArray(parsed) ? (parsed as T[]) : []
+  } catch {
+    return []
+  }
+}
+
+function buildGastos(): SourceDef {
+  return buildFromSeeds(
+    getAllKnownExpenses() as unknown as Array<Record<string, unknown>>,
+    ['expenseDate'],
+    'gastos',
+  )
+}
+
+function buildSolicitudes(): SourceDef {
+  const items = readLocalList<SolicitudListItem>(`${STORAGE_PREFIX}-crm-user-solicitudes`)
+  return buildFromSeeds(
+    items as unknown as Array<Record<string, unknown>>,
+    [],
+    'solicitudes',
+  )
+}
+
+function buildBitacora(): SourceDef {
+  const items = readLocalList<BitacoraListItem>(`${STORAGE_PREFIX}-crm-user-bitacora`)
+  return buildFromSeeds(
+    items as unknown as Array<Record<string, unknown>>,
+    ['workDate'],
+    'bitacora',
+  )
+}
+
 /** Campos estables por fuente (alineados con el backend) aunque no haya filas en memoria. */
 const SOURCE_FIELD_TEMPLATES: Record<ReportDataSourceId, string[]> = {
   contactos: [
@@ -990,6 +1060,65 @@ const SOURCE_FIELD_TEMPLATES: Record<ReportDataSourceId, string[]> = {
     'createdAtDate',
     'updatedAtDate',
   ],
+  gastos: [
+    'id',
+    'number',
+    'concept',
+    'category',
+    'expenseDate',
+    'amount',
+    'amountNum',
+    'currency',
+    'paymentMethod',
+    'status',
+    'supplierId',
+    'supplierName',
+    'owner',
+    'isPartnerLoan',
+    'partnerName',
+    'partnerLoanReturned',
+    'createdByName',
+    'createdAtDate',
+    'updatedByName',
+    'updatedAtDate',
+  ],
+  solicitudes: [
+    'id',
+    'code',
+    'title',
+    'description',
+    'status',
+    'priority',
+    'assignee',
+    'assigneeUserId',
+    'companyId',
+    'companyName',
+    'documentationUrl',
+    'gitBranchUrl',
+    'createdByName',
+    'createdAtDate',
+    'updatedByName',
+    'updatedAtDate',
+  ],
+  bitacora: [
+    'id',
+    'solicitudId',
+    'solicitudCode',
+    'solicitudTitle',
+    'workDate',
+    'hours',
+    'description',
+    'isBillable',
+    'nonBillableReason',
+    'assignedUserId',
+    'assignedUserName',
+    'companyId',
+    'companyName',
+    'createdByName',
+    'createdAtDate',
+    'updatedByName',
+    'updatedAtDate',
+  ],
 }
 
 function buildSourceFromTemplate(sourceId: ReportDataSourceId): SourceDef {
@@ -1019,6 +1148,9 @@ const SOURCE_BUILDERS: Record<ReportDataSourceId, () => SourceDef> = {
   compras: buildCompras,
   ingresos: buildIngresos,
   inventario: buildInventario,
+  gastos: buildGastos,
+  solicitudes: buildSolicitudes,
+  bitacora: buildBitacora,
 }
 
 const JOIN_OPTIONS: Record<ReportDataSourceId, JoinOption[]> = {
@@ -1084,6 +1216,39 @@ const JOIN_OPTIONS: Record<ReportDataSourceId, JoinOption[]> = {
   proyectos: [],
   cotizaciones: [],
   inventario: [],
+  gastos: [
+    {
+      id: 'gastos->empresas',
+      label: 'Proveedor (empresa)',
+      relatedSource: 'empresas',
+      baseKey: 'supplierId',
+      relatedKey: 'id',
+      prefixLabel: 'Proveedor',
+      prefixId: 'proveedor',
+    },
+  ],
+  solicitudes: [
+    {
+      id: 'solicitudes->empresas',
+      label: 'Empresa (lookup)',
+      relatedSource: 'empresas',
+      baseKey: 'companyId',
+      relatedKey: 'id',
+      prefixLabel: 'Empresa',
+      prefixId: 'empresa',
+    },
+  ],
+  bitacora: [
+    {
+      id: 'bitacora->solicitudes',
+      label: 'Solicitud',
+      relatedSource: 'solicitudes',
+      baseKey: 'solicitudId',
+      relatedKey: 'id',
+      prefixLabel: 'Solicitud',
+      prefixId: 'solicitud',
+    },
+  ],
 }
 
 export function getReportJoinOptions(sourceId: ReportDataSourceId): JoinOption[] {

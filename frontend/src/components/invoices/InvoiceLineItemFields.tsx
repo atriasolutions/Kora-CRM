@@ -2,7 +2,9 @@ import { Trash2 } from 'lucide-react'
 
 import {
   ContactFormCheckbox,
+  ContactFormField,
   ContactFormInput,
+  ContactFormSelect,
 } from '@/components/contacts/ContactFormField'
 import { ProductLookupField } from '@/components/shared/ProductLookupField'
 import { Badge } from '@/components/ui/badge'
@@ -10,12 +12,25 @@ import { Button } from '@/components/ui/button'
 import type { InvoiceLineItem } from '@/data/invoice-detail.mock'
 import type { ProductListItem } from '@/data/products.mock'
 import {
+  PRODUCT_CURRENCIES,
+  PRODUCT_CURRENCY_LABELS,
+  type ExchangeRateSnapshot,
+  type ProductCurrency,
+} from '@/lib/currency'
+import {
+  invoiceLineCurrency,
   invoiceLineFromProduct,
   invoiceLineKind,
   invoiceLineSubjectToVat,
   isManualInvoiceLine,
   recalcInvoiceLine,
 } from '@/lib/invoice-line-item'
+import {
+  formatProductPriceAmount,
+  parseProductPrice,
+  productPricePlaceholder,
+  productPriceUsesDecimals,
+} from '@/lib/product-currency-input'
 
 function ReadOnlyField({ label, value }: { label: string; value: string }) {
   return (
@@ -33,6 +48,8 @@ type InvoiceLineItemFieldsProps = {
   index: number
   idPrefix: string
   canRemove: boolean
+  exchangeRates?: ExchangeRateSnapshot | null
+  defaultCurrency?: ProductCurrency
   onPatch: (line: InvoiceLineItem) => void
   onRemove: () => void
 }
@@ -42,55 +59,76 @@ export function InvoiceLineItemFields({
   index,
   idPrefix,
   canRemove,
+  exchangeRates = null,
+  defaultCurrency = 'CLP',
   onPatch,
   onRemove,
 }: InvoiceLineItemFieldsProps) {
   const kind = invoiceLineKind(line)
   const isManual = isManualInvoiceLine(line)
+  const currency = invoiceLineCurrency(line)
 
   const patchRecalc = (patch: Partial<InvoiceLineItem>) => {
-    onPatch(recalcInvoiceLine({ ...line, ...patch }))
+    onPatch(recalcInvoiceLine({ ...line, ...patch }, exchangeRates))
   }
 
   const handleProductChange = (_productId: string, product?: ProductListItem) => {
     if (!product) {
       onPatch(
-        recalcInvoiceLine({
-          ...line,
-          lineKind: 'product',
-          productId: '',
-          sku: '',
-          description: '',
-          unitPrice: '$0',
-        }),
+        recalcInvoiceLine(
+          {
+            ...line,
+            lineKind: 'product',
+            productId: '',
+            sku: '',
+            description: '',
+            priceCurrency: 'CLP',
+            unitPriceOriginalNum: 0,
+            unitPrice: '$0',
+          },
+          exchangeRates,
+        ),
       )
       return
     }
-    onPatch(invoiceLineFromProduct(product, line.id))
+    onPatch(invoiceLineFromProduct(product, line.id, exchangeRates))
   }
 
   const setLineKind = (nextKind: 'product' | 'manual') => {
     if (nextKind === kind) return
     if (nextKind === 'manual') {
       onPatch(
-        recalcInvoiceLine({
-          ...line,
-          lineKind: 'manual',
-          productId: undefined,
-          sku: '',
-          description: line.description.trim(),
-        }),
+        recalcInvoiceLine(
+          {
+            ...line,
+            lineKind: 'manual',
+            productId: undefined,
+            sku: '',
+            description: line.description.trim(),
+            priceCurrency: defaultCurrency,
+            unitPriceOriginalNum: 0,
+            unitPriceOriginal: undefined,
+            unitPrice: '$0',
+          },
+          exchangeRates,
+        ),
       )
     } else {
       onPatch(
-        recalcInvoiceLine({
-          ...line,
-          lineKind: 'product',
-          productId: '',
-          sku: '',
-          description: '',
-          unitPrice: '$0',
-        }),
+        recalcInvoiceLine(
+          {
+            ...line,
+            lineKind: 'product',
+            productId: '',
+            sku: '',
+            description: '',
+            priceCurrency: 'CLP',
+            unitPriceOriginalNum: 0,
+            unitPriceOriginal: undefined,
+            unitPrice: '$0',
+          },
+          exchangeRates,
+        ),
       )
     }
   }
@@ -171,7 +209,7 @@ export function InvoiceLineItemFields({
         </>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {isManual ? (
           <ContactFormInput
             id={`${idPrefix}-sku-${line.id}`}
@@ -185,19 +223,101 @@ export function InvoiceLineItemFields({
           id={`${idPrefix}-qty-${line.id}`}
           label="Cantidad"
           inputVariant="integer"
-          value={String(line.quantity)}
+          value={line.quantity > 0 ? String(line.quantity) : ''}
           onChange={(raw) => {
-            const quantity = Math.max(1, Number.parseInt(raw, 10) || 1)
-            patchRecalc({ quantity })
+            if (!raw.trim()) {
+              patchRecalc({ quantity: 0 })
+              return
+            }
+            const quantity = Number.parseInt(raw, 10)
+            if (!Number.isFinite(quantity)) return
+            patchRecalc({ quantity: Math.max(0, quantity) })
+          }}
+          onBlur={() => {
+            if (line.quantity < 1) patchRecalc({ quantity: 1 })
           }}
         />
-        <ContactFormInput
-          id={`${idPrefix}-price-${line.id}`}
-          label="Precio unit."
-          inputVariant="amount"
-          value={line.unitPrice}
-          onChange={(unitPrice) => patchRecalc({ unitPrice })}
-        />
+        {isManual ? (
+          <>
+            <ContactFormSelect
+              id={`${idPrefix}-currency-${line.id}`}
+              label="Moneda"
+              value={currency}
+              options={PRODUCT_CURRENCIES.map((value) => ({
+                value,
+                label: PRODUCT_CURRENCY_LABELS[value],
+              }))}
+              onChange={(value) =>
+                patchRecalc({
+                  priceCurrency: value as ProductCurrency,
+                  unitPriceOriginalNum: 0,
+                  unitPriceOriginal: undefined,
+                  unitPrice: '$0',
+                })
+              }
+            />
+            <ContactFormInput
+              id={`${idPrefix}-price-${line.id}`}
+              label={`Precio unitario (${currency})`}
+              inputVariant={productPriceUsesDecimals(currency) ? 'text' : 'amount'}
+              value={
+                currency === 'CLP'
+                  ? line.unitPrice
+                  : formatProductPriceAmount(
+                      line.unitPriceOriginalNum ?? 0,
+                      currency,
+                      { allowEmpty: true },
+                    )
+              }
+              placeholder={productPricePlaceholder(currency)}
+              onChange={(raw) => {
+                if (currency === 'CLP') {
+                  patchRecalc({
+                    priceCurrency: 'CLP',
+                    unitPrice: raw,
+                    unitPriceOriginalNum: undefined,
+                  })
+                  return
+                }
+                const unitPriceOriginalNum = parseProductPrice(raw, currency)
+                patchRecalc({
+                  priceCurrency: currency,
+                  unitPriceOriginalNum,
+                  unitPriceOriginal: formatProductPriceAmount(unitPriceOriginalNum, currency),
+                })
+              }}
+              onBlur={() => {
+                if (currency === 'CLP' && !String(line.unitPrice).replace(/[^\d]/g, '')) {
+                  patchRecalc({ unitPrice: '$0' })
+                }
+              }}
+            />
+            {currency !== 'CLP' ? (
+              <ReadOnlyField label="Precio CLP" value={line.unitPrice} />
+            ) : null}
+          </>
+        ) : currency !== 'CLP' ? (
+          <>
+            <ReadOnlyField
+              label={`Precio (${currency})`}
+              value={line.unitPriceOriginal ?? '—'}
+            />
+            <ReadOnlyField label="Precio CLP" value={line.unitPrice} />
+          </>
+        ) : (
+          <ContactFormInput
+            id={`${idPrefix}-price-${line.id}`}
+            label="Precio unit."
+            inputVariant="amount"
+            value={line.unitPrice}
+            onChange={(unitPrice) => patchRecalc({ unitPrice })}
+            onBlur={() => {
+              if (!String(line.unitPrice).replace(/[^\d]/g, '')) {
+                patchRecalc({ unitPrice: '$0' })
+              }
+            }}
+          />
+        )}
         <ContactFormInput
           id={`${idPrefix}-disc-${line.id}`}
           label="Descuento"
@@ -205,13 +325,11 @@ export function InvoiceLineItemFields({
           value={line.discount}
           onChange={(discount) => patchRecalc({ discount })}
         />
-        <ContactFormInput
-          id={`${idPrefix}-total-${line.id}`}
-          label="Total línea"
-          value={line.total}
-          disabled
-          onChange={() => {}}
-        />
+        <ContactFormField id={`${idPrefix}-total-${line.id}`} label="Total línea">
+          <p className="flex h-9 items-center rounded-md border border-input bg-muted/40 px-3 text-sm font-semibold tabular-nums">
+            {line.total}
+          </p>
+        </ContactFormField>
       </div>
 
       <ContactFormCheckbox

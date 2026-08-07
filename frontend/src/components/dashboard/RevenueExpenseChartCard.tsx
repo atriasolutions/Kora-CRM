@@ -10,14 +10,14 @@ import {
 } from 'recharts'
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  formatChartMoneyTooltip,
+  formatCompactChartMoney,
+} from '@/lib/dashboard-money-format'
 import type { RevenueExpensePoint } from '@/types/dashboard'
 import { cn } from '@/lib/utils'
 
-const currencyFmt = Intl.NumberFormat('es-CO', {
-  maximumFractionDigits: 0,
-})
-
-const CHART_MARGIN = { top: 8, right: 8, left: 0, bottom: 0 }
+const CHART_MARGIN = { top: 8, right: 8, left: 4, bottom: 0 }
 
 type RevenueExpenseChartCardProps = {
   series: RevenueExpensePoint[]
@@ -54,16 +54,16 @@ export function RevenueExpenseChartCard({
               <YAxis
                 tickLine={false}
                 axisLine={false}
-                width={36}
-                tickMargin={4}
+                width={44}
+                tickMargin={6}
                 tick={{ fill: 'hsl(215 16% 47%)', fontSize: 10 }}
                 tickFormatter={(v) =>
-                  typeof v === 'number' ? `${Math.round(v / 1000)}k` : String(v)
+                  typeof v === 'number' ? formatCompactChartMoney(v) : String(v)
                 }
               />
               <Tooltip
                 formatter={(value) =>
-                  typeof value === 'number' ? `$${currencyFmt.format(value)}` : value
+                  typeof value === 'number' ? formatChartMoneyTooltip(value) : value
                 }
                 contentStyle={{
                   borderRadius: 10,

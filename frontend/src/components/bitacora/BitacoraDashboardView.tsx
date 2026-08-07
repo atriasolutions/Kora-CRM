@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   Clock3,
   Loader2,
+  Settings2,
   Sparkles,
   UsersRound,
 } from 'lucide-react'
@@ -23,6 +24,8 @@ import {
 } from 'recharts'
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { BitacoraMonthlyQuotaSection } from '@/components/bitacora/BitacoraMonthlyQuotaSection'
 import { formatBitacoraHours } from '@/lib/bitacora-form'
 import { cn } from '@/lib/utils'
 import type { BitacoraDashboardStats } from '@/types/bitacora-dashboard'
@@ -37,6 +40,8 @@ type BitacoraDashboardViewProps = {
   stats: BitacoraDashboardStats | null
   loading: boolean
   fromApi: boolean
+  canConfigureMonthlyQuota?: boolean
+  onConfigureMonthlyQuota?: () => void
 }
 
 function KpiCard({
@@ -105,6 +110,8 @@ export function BitacoraDashboardView({
   stats,
   loading,
   fromApi,
+  canConfigureMonthlyQuota = false,
+  onConfigureMonthlyQuota,
 }: BitacoraDashboardViewProps) {
   if (loading || !stats) {
     return (
@@ -172,14 +179,15 @@ export function BitacoraDashboardView({
   const companyYAxisWidth = verticalBarYAxisWidth(companyData.map((d) => d.name), 96, 160)
 
   const hasData = stats.entryCount > 0
+  const monthlyQuota = stats.monthlyQuota ?? null
 
   return (
     <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3 pb-8 sm:space-y-6 sm:p-6">
       <section className="relative overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/15 via-primary/5 to-amber-500/10 p-5 shadow-sm sm:p-6">
         <div className="pointer-events-none absolute -end-8 -top-8 size-36 rounded-full bg-primary/15 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-6 start-10 size-24 rounded-full bg-amber-500/20 blur-2xl" />
-        <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="min-w-0 space-y-2">
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0 flex-1 space-y-2">
             <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-primary">
               <Sparkles aria-hidden className="size-3.5" />
               Resumen para cliente
@@ -206,8 +214,23 @@ export function BitacoraDashboardView({
                 </span>
               ) : null}
             </div>
+            {canConfigureMonthlyQuota &&
+            stats.companyId &&
+            onConfigureMonthlyQuota &&
+            !monthlyQuota ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-1 h-8 gap-1.5 bg-background/80"
+                onClick={onConfigureMonthlyQuota}
+              >
+                <Settings2 aria-hidden className="size-3.5" />
+                Configurar cuota mensual
+              </Button>
+            ) : null}
           </div>
-          <div className="rounded-xl border border-border/70 bg-background/85 px-4 py-3 text-center shadow-sm backdrop-blur-sm">
+          <div className="shrink-0 rounded-xl border border-border/70 bg-background/85 px-5 py-3 text-center shadow-sm backdrop-blur-sm sm:min-w-[9rem]">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Participación facturable
             </p>
@@ -217,6 +240,15 @@ export function BitacoraDashboardView({
           </div>
         </div>
       </section>
+
+      {monthlyQuota ? (
+        <BitacoraMonthlyQuotaSection
+          quota={monthlyQuota}
+          companyName={stats.companyName}
+          canConfigure={canConfigureMonthlyQuota && Boolean(stats.companyId)}
+          onConfigure={onConfigureMonthlyQuota}
+        />
+      ) : null}
 
       <section className="grid min-w-0 grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <KpiCard

@@ -5,6 +5,8 @@ import { activitiesListConfig } from './activities'
 import { companiesListConfig } from './companies'
 import { contactsListConfig } from './contacts'
 import { invoicingListConfig } from './invoicing'
+import { boletasListConfig } from './boletas'
+import { gastosListConfig } from './gastos'
 import { opportunitiesListConfig } from './opportunities'
 import { quotesListConfig } from './quotes'
 import { productsListConfig } from './products'
@@ -23,6 +25,8 @@ export type ListModuleSlug =
   | 'proyectos'
   | 'solicitudes'
   | 'facturacion'
+  | 'boletas'
+  | 'gastos'
   | 'productos'
   | 'reportes'
   | 'usuarios'
@@ -43,6 +47,8 @@ export const listModuleSlugs: ListModuleSlug[] = [
   'proyectos',
   'solicitudes',
   'facturacion',
+  'boletas',
+  'gastos',
   'productos',
   'reportes',
   'usuarios',
@@ -69,6 +75,10 @@ export function getListModuleConfig(
       return asBaseConfig(solicitudesListConfig)
     case 'facturacion':
       return asBaseConfig(invoicingListConfig)
+    case 'boletas':
+      return asBaseConfig(boletasListConfig)
+    case 'gastos':
+      return asBaseConfig(gastosListConfig)
     case 'productos':
       return asBaseConfig(productsListConfig)
     case 'reportes':

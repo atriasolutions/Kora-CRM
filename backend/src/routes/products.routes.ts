@@ -5,7 +5,9 @@ import { requirePermission } from '../middleware/require-permission.js'
 import { routeParam } from '../lib/route-params.js'
 import * as productsRepo from '../repositories/products.repository.js'
 import {
+  convertToParentSchema,
   createProductSchema,
+  createVariantsBatchSchema,
   listProductsQuerySchema,
   updateProductSchema,
 } from '../validators/product.validator.js'
@@ -24,6 +26,13 @@ productsRouter.get(
         q: query.q,
         status: query.status,
         archivedOnly: query.archived === true,
+        sellableOnly: query.sellable === true,
+        groupVariants: query.groupVariants === true,
+        sortBy: query.sortBy,
+        sortDir: query.sortDir,
+        dateFrom: query.dateFrom,
+        dateTo: query.dateTo,
+        parentId: query.parentId,
       })
       res.json({
         data: result.items,
@@ -54,11 +63,63 @@ productsRouter.get(
 )
 
 productsRouter.get(
+  '/:id/variants',
+  requirePermission('productos', 'view'),
+  async (req, res, next) => {
+    try {
+      const items = await productsRepo.listProductVariants(routeParam(req))
+      res.json({ data: items })
+    } catch (e) {
+      next(e)
+    }
+  },
+)
+
+productsRouter.post(
+  '/:id/variants',
+  requirePermission('productos', 'create'),
+  async (req, res, next) => {
+    try {
+      const body = createVariantsBatchSchema.parse(req.body)
+      const items = await productsRepo.createProductVariantsBatch(
+        routeParam(req),
+        body,
+        getAuditActor(req),
+      )
+      res.status(201).json({ data: items })
+    } catch (e) {
+      next(e)
+    }
+  },
+)
+
+productsRouter.post(
+  '/:id/convert-to-parent',
+  requirePermission('productos', 'edit'),
+  async (req, res, next) => {
+    try {
+      const body = convertToParentSchema.parse(req.body)
+      const item = await productsRepo.convertProductToParent(
+        routeParam(req),
+        body,
+        getAuditActor(req),
+      )
+      res.json({ data: item })
+    } catch (e) {
+      next(e)
+    }
+  },
+)
+
+productsRouter.get(
   '/:id',
   requirePermission('productos', 'view'),
   async (req, res, next) => {
     try {
       const item = await productsRepo.getProductById(routeParam(req))
+      if (item.variantKind === 'parent') {
+        item.variants = await productsRepo.listProductVariants(item.id)
+      }
       res.json({ data: item })
     } catch (e) {
       next(e)

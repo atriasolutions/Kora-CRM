@@ -1,5 +1,6 @@
 import { Check, Filter } from 'lucide-react'
 
+import { CompactPeriodFilter } from '@/components/shared/CompactPeriodFilter'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -20,6 +21,11 @@ import {
 } from '@/lib/invoice-filters'
 import { invoiceStageDisplayName } from '@/lib/invoice-journey'
 import type { InvoiceJourneyStage } from '@/lib/invoice-journey'
+import {
+  labelForListDateFilter,
+  listDateToCompact,
+  compactToListDate,
+} from '@/lib/list-date-filter'
 import { cn } from '@/lib/utils'
 
 function CheckboxRow({
@@ -75,7 +81,25 @@ export function InvoicesFiltersMenu({ filters, onFiltersChange }: InvoicesFilter
           ) : null}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="max-h-[70vh] w-64 overflow-y-auto">
+      <DropdownMenuContent
+        align="end"
+        className="max-h-[70vh] w-80 overflow-y-auto p-3"
+        onCloseAutoFocus={(e) => e.preventDefault()}
+      >
+        <DropdownMenuLabel>Fecha</DropdownMenuLabel>
+        <p className="mb-2 px-0.5 text-xs text-muted-foreground">
+          {labelForListDateFilter(filters.date)}
+        </p>
+        <CompactPeriodFilter
+          idPrefix="invoices-filter"
+          modes={['all', 'month', 'year', 'custom']}
+          value={listDateToCompact(filters.date)}
+          onChange={(next) =>
+            onFiltersChange({ ...filters, date: compactToListDate(next) })
+          }
+        />
+
+        <DropdownMenuSeparator className="my-3" />
         <DropdownMenuLabel>Estado</DropdownMenuLabel>
         {INVOICE_STATUS_OPTIONS.map((status) => (
           <CheckboxRow

@@ -6,11 +6,14 @@ export type MenuModuleId =
   | 'oportunidades'
   | 'cotizaciones'
   | 'facturacion'
+  | 'boletas'
   | 'actividades'
   | 'proyectos'
   | 'solicitudes'
   | 'bitacora'
+  | 'pruebas_solicitud'
   | 'compras'
+  | 'gastos'
   | 'ingresos'
   | 'inventario'
   | 'productos'
@@ -36,11 +39,14 @@ export const MODULE_LABELS: Record<MenuModuleId, string> = {
   oportunidades: 'Oportunidades',
   cotizaciones: 'Cotizaciones',
   facturacion: 'Facturación',
+  boletas: 'Boletas',
   actividades: 'Actividades',
   proyectos: 'Proyectos',
   solicitudes: 'Solicitudes',
   bitacora: 'Bitácora',
+  pruebas_solicitud: 'Pruebas de Solicitud',
   compras: 'Compras',
+  gastos: 'Gastos',
   ingresos: 'Ingresos',
   inventario: 'Inventario',
   productos: 'Productos',

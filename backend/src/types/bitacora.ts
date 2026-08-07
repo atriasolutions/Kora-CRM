@@ -69,6 +69,14 @@ export type BitacoraDashboardUserPoint = {
   entryCount: number
 }
 
+export type BitacoraDashboardMonthlyQuota = {
+  assignedHours: number
+  usedHours: number
+  utilizationPercent: number
+  monthProgressPercent: number
+  monthLabel: string
+}
+
 export type BitacoraDashboardStats = {
   billableHours: number
   nonBillableHours: number
@@ -76,7 +84,9 @@ export type BitacoraDashboardStats = {
   entryCount: number
   billableSharePercent: number
   periodLabel: string
+  companyId?: string
   companyName?: string
+  monthlyQuota?: BitacoraDashboardMonthlyQuota | null
   byMonth: BitacoraDashboardMonthPoint[]
   bySolicitud: BitacoraDashboardSolicitudPoint[]
   byCompany: BitacoraDashboardCompanyPoint[]

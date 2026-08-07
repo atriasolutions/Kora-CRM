@@ -5,6 +5,7 @@ import {
   getPeriodRanges,
   type DashboardPeriod,
 } from '../lib/dashboard-period.js'
+import { chilePartsFromDate } from '../lib/chile-timezone.js'
 import { tenantQuery } from '../db/tenant-query.js'
 import { getTenantIdOrDefault } from '../lib/tenant-context.js'
 import type {
@@ -40,7 +41,9 @@ const CHART_COLORS = [
 const MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
 function toDateParam(d: Date): string {
-  return d.toISOString().slice(0, 10)
+  // Prefer calendario Chile vía getPeriodRanges.*.Date; fallback seguro.
+  const iso = d.toISOString().slice(0, 10)
+  return iso
 }
 
 function formatCompactMoney(cents: number): string {
@@ -88,13 +91,13 @@ function mapDonutRows(
 async function loadBitacoraHoursSeries(
   period: DashboardPeriod,
   _rangeStart: Date,
-  _rangeEnd: Date,
+  _rangeEndExclusive: Date,
 ): Promise<{ series: DashboardTimeSeriesPoint[]; lines: DashboardTimeSeriesLine[] }> {
   if (period.mode === 'years') {
-    const endYear = _rangeEnd.getFullYear()
+    const endYear = chilePartsFromDate(new Date()).year
     const startYear = endYear - 4
-    const chartStart = toDateParam(new Date(startYear, 0, 1))
-    const chartEnd = toDateParam(new Date(endYear, 11, 31))
+    const chartStart = `${startYear}-01-01`
+    const chartEnd = `${endYear}-12-31`
 
     const result = await tenantQuery<{
       year: number
@@ -414,12 +417,21 @@ export async function getOperacionesDashboardSnapshot(
   period: DashboardPeriod = defaultDashboardPeriod(),
 ): Promise<DashboardViewSnapshot> {
   const now = new Date()
-  const { rangeStart, rangeEnd, prevRangeStart, prevRangeEnd, compareLabel } =
-    getPeriodRanges(period, now)
-  const rangeStartIso = toDateParam(rangeStart)
-  const rangeEndIso = toDateParam(rangeEnd)
-  const prevStartIso = toDateParam(prevRangeStart)
-  const prevEndIso = toDateParam(prevRangeEnd)
+  const {
+    rangeStart,
+    rangeEndExclusive,
+    prevRangeStart,
+    prevRangeEndExclusive,
+    rangeStartDate,
+    rangeEndDate,
+    prevRangeStartDate,
+    prevRangeEndDate,
+    compareLabel,
+  } = getPeriodRanges(period, now)
+  const rangeStartIso = rangeStartDate
+  const rangeEndIso = rangeEndDate
+  const prevStartIso = prevRangeStartDate
+  const prevEndIso = prevRangeEndDate
 
   const [
     solicitudCounts,
@@ -436,15 +448,15 @@ export async function getOperacionesDashboardSnapshot(
       `SELECT
         count(*) FILTER (
           WHERE deleted_at IS NULL AND archived_at IS NULL
-            AND created_at >= $1 AND created_at <= $2
+            AND created_at >= $1 AND created_at < $2
         )::text AS current,
         count(*) FILTER (
           WHERE deleted_at IS NULL AND archived_at IS NULL
-            AND created_at >= $3 AND created_at <= $4
+            AND created_at >= $3 AND created_at < $4
         )::text AS previous
        FROM crm_solicitudes
        WHERE ${dashTenantFilter()}`,
-      [rangeStart, rangeEnd, prevRangeStart, prevRangeEnd],
+      [rangeStart, rangeEndExclusive, prevRangeStart, prevRangeEndExclusive],
     ),
     tenantQuery<{ current: string; previous: string }>(
       `SELECT
@@ -460,7 +472,7 @@ export async function getOperacionesDashboardSnapshot(
         )::text AS previous
        FROM crm_projects
        WHERE ${dashTenantFilter()}`,
-      [rangeStart, rangeEnd, prevRangeStart, prevRangeEnd],
+      [rangeStart, rangeEndExclusive, prevRangeStart, prevRangeEndExclusive],
     ),
     tenantQuery<{ current: string; previous: string }>(
       `SELECT
@@ -481,26 +493,26 @@ export async function getOperacionesDashboardSnapshot(
         count(*) FILTER (
           WHERE deleted_at IS NULL
             AND status IN ('Pendiente', 'En curso')
-            AND created_at >= $1 AND created_at <= $2
+            AND created_at >= $1 AND created_at < $2
         )::text AS current,
         count(*) FILTER (
           WHERE deleted_at IS NULL
             AND status IN ('Pendiente', 'En curso')
-            AND created_at >= $3 AND created_at <= $4
+            AND created_at >= $3 AND created_at < $4
         )::text AS previous
        FROM crm_activities
        WHERE ${dashTenantFilter()}`,
-      [rangeStart, rangeEnd, prevRangeStart, prevRangeEnd],
+      [rangeStart, rangeEndExclusive, prevRangeStart, prevRangeEndExclusive],
     ),
     tenantQuery<{ label: string; count: string }>(
       `SELECT trim(status::text) AS label, count(*)::text AS count
        FROM crm_solicitudes
        WHERE deleted_at IS NULL AND archived_at IS NULL
-         AND created_at >= $1 AND created_at <= $2
+         AND created_at >= $1 AND created_at < $2
          AND ${dashTenantFilter()}
        GROUP BY trim(status::text)
        ORDER BY count(*) DESC`,
-      [rangeStart, rangeEnd],
+      [rangeStart, rangeEndExclusive],
     ),
     tenantQuery<{ label: string; count: string }>(
       `SELECT coalesce(nullif(trim(health), ''), 'Sin clasificar') AS label,
@@ -512,7 +524,7 @@ export async function getOperacionesDashboardSnapshot(
          AND ${dashTenantFilter()}
        GROUP BY 1
        ORDER BY count(*) DESC`,
-      [rangeStart, rangeEnd],
+      [rangeStart, rangeEndExclusive],
     ),
     tenantQuery<{
       id: string
@@ -535,7 +547,7 @@ export async function getOperacionesDashboardSnapshot(
          AND ${dashTenantFilter()}
        ORDER BY updated_at DESC
        LIMIT 5`,
-      [rangeStart, rangeEnd],
+      [rangeStart, rangeEndExclusive],
     ),
     tenantQuery<{ id: string; name: string; progress_pct: number | null }>(
       `SELECT id, name, progress_pct
@@ -546,9 +558,9 @@ export async function getOperacionesDashboardSnapshot(
          AND ${dashTenantFilter()}
        ORDER BY progress_pct ASC NULLS FIRST, updated_at DESC
        LIMIT 5`,
-      [rangeStart, rangeEnd],
+      [rangeStart, rangeEndExclusive],
     ),
-    loadBitacoraHoursSeries(period, rangeStart, rangeEnd),
+    loadBitacoraHoursSeries(period, rangeStart, rangeEndExclusive),
   ])
 
   const solCurrent = Number.parseInt(solicitudCounts.rows[0]?.current ?? '0', 10)
@@ -649,12 +661,21 @@ export async function getAbastecimientoDashboardSnapshot(
   period: DashboardPeriod = defaultDashboardPeriod(),
 ): Promise<DashboardViewSnapshot> {
   const now = new Date()
-  const { rangeStart, rangeEnd, prevRangeStart, prevRangeEnd, compareLabel } =
-    getPeriodRanges(period, now)
-  const rangeStartIso = toDateParam(rangeStart)
-  const rangeEndIso = toDateParam(rangeEnd)
-  const prevStartIso = toDateParam(prevRangeStart)
-  const prevEndIso = toDateParam(prevRangeEnd)
+  const {
+    rangeStart,
+    rangeEndExclusive,
+    prevRangeStart,
+    prevRangeEndExclusive,
+    rangeStartDate,
+    rangeEndDate,
+    prevRangeStartDate,
+    prevRangeEndDate,
+    compareLabel,
+  } = getPeriodRanges(period, now)
+  const rangeStartIso = rangeStartDate
+  const rangeEndIso = rangeEndDate
+  const prevStartIso = prevRangeStartDate
+  const prevEndIso = prevRangeEndDate
 
   const [
     purchaseAmounts,
@@ -723,7 +744,7 @@ export async function getAbastecimientoDashboardSnapshot(
         )::text AS previous
        FROM crm_stock_receipts
        WHERE ${dashTenantFilter()}`,
-      [rangeStart, rangeEnd, prevRangeStart, prevRangeEnd],
+      [rangeStart, rangeEndExclusive, prevRangeStart, prevRangeEndExclusive],
     ),
     tenantQuery<{ label: string; count: string }>(
       `SELECT trim(status::text) AS label, count(*)::text AS count

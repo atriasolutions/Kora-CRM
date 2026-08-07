@@ -22,10 +22,16 @@ import type {
   UpdateContactInput,
 } from '../types/contact.js'
 import { paginationOffset } from '../utils/pagination.js'
+
+import {
+  parseCommaSeparatedList,
+  pushDateRangeCondition,
+  resolveOrderByClause,
+} from '../lib/list-query.js'
 import { purgeEntityNotesAndFiles } from '../services/entity-purge.service.js'
 import { assertUniqueContactEmail } from '../lib/contact-uniqueness.js'
 import { assertUniqueContactRut } from '../lib/tax-id-uniqueness.js'
-import { maybeNotifyRecordOwnerChange } from '../lib/owner-assignment.js'
+import { maybeNotifyRecordOwnerChange, maybeNotifyRecordOwnerOnCreate } from '../lib/owner-assignment.js'
 
 const SELECT_COLUMNS = `
   id, name, subtitle, avatar_url, company_id, company_name,
@@ -58,6 +64,17 @@ async function resolveCompanySnapshot(
   return { companyId: null, companyName: '' }
 }
 
+
+const CONTACT_SORT_COLUMNS: Record<string, string> = {
+  name: 'name',
+  email: 'email',
+  companyName: 'company_name',
+  status: 'status',
+  owner: 'owner_name',
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
+}
+
 export type ListContactsParams = {
   page: number
   pageSize: number
@@ -67,6 +84,10 @@ export type ListContactsParams = {
   includeDeleted?: boolean
   /** Si true, solo registros en papelera (archived_at IS NOT NULL). */
   archivedOnly?: boolean
+  sortBy?: string
+  sortDir?: 'asc' | 'desc'
+  dateFrom?: string
+  dateTo?: string
 }
 
 export async function listContacts(
@@ -83,9 +104,15 @@ export async function listContacts(
     conditions.push('archived_at IS NULL')
   }
   idx = pushTenantCondition(conditions, values, idx)
-  if (params.status) {
-    conditions.push(`status = $${idx++}`)
-    values.push(params.status)
+  if (params.status?.trim()) {
+    const statuses = parseCommaSeparatedList(params.status)
+    if (statuses.length === 1) {
+      conditions.push(`status = $${idx++}`)
+      values.push(statuses[0])
+    } else if (statuses.length > 1) {
+      conditions.push(`status = ANY($${idx++}::text[])`)
+      values.push(statuses)
+    }
   }
   if (params.companyId) {
     conditions.push(
@@ -105,7 +132,22 @@ export async function listContacts(
     idx++
   }
 
+  idx = pushDateRangeCondition(
+    conditions,
+    values,
+    idx,
+    'created_at',
+    params.dateFrom,
+    params.dateTo,
+  )
+
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
+  const orderBy = resolveOrderByClause(
+    params.sortBy,
+    params.sortDir,
+    CONTACT_SORT_COLUMNS,
+    'updated_at DESC',
+  )
 
   return withTenantClient(async (client) => {
     const countResult = await client.query<{ count: string }>(
@@ -121,7 +163,7 @@ export async function listContacts(
       `SELECT ${SELECT_COLUMNS}
        FROM crm_contacts
        ${where}
-       ORDER BY updated_at DESC
+       ORDER BY ${orderBy}
        LIMIT $${idx++} OFFSET $${idx}`,
       listValues,
     )
@@ -213,7 +255,17 @@ export async function createContact(
       getTenantIdOrDefault(),
     ],
   )
-  return mapContactDetail(result.rows[0]!)
+  const detail = mapContactDetail(result.rows[0]!)
+  maybeNotifyRecordOwnerOnCreate({
+    actor,
+    nextOwner: detail.ownerName ?? '',
+    moduleLabel: 'el contacto',
+    recordTitle: detail.name,
+    href: `/contactos/${detail.id}`,
+    entityType: 'contacto',
+    entityId: detail.id,
+  })
+  return detail
 }
 
 export async function updateContact(

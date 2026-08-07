@@ -1,6 +1,13 @@
 import type { ProductListItem, ProductStatus } from '@/data/products.mock'
 import { PRODUCT_STATUS_OPTIONS } from '@/data/products.mock'
 import { PRODUCT_CATEGORY_OPTIONS } from '@/lib/product-catalog'
+import {
+  createDefaultListDateFilter,
+  isListDateFilterActive,
+  listDateFilterToServerQuery,
+  listRowMatchesDateFilter,
+  type ListDateFilter,
+} from '@/lib/list-date-filter'
 
 export type ProductStockFilter = 'all' | 'low' | 'out'
 
@@ -8,6 +15,7 @@ export type ProductFilters = {
   statuses: ProductStatus[]
   categories: string[]
   stock: ProductStockFilter
+  date: ListDateFilter
 }
 
 export { PRODUCT_STATUS_OPTIONS, PRODUCT_CATEGORY_OPTIONS }
@@ -22,7 +30,7 @@ export const PRODUCT_STOCK_OPTIONS: {
 ]
 
 export function createDefaultProductFilters(): ProductFilters {
-  return { statuses: [], categories: [], stock: 'all' }
+  return { statuses: [], categories: [], stock: 'all', date: createDefaultListDateFilter() }
 }
 
 export function countActiveProductFilters(filters: ProductFilters): number {
@@ -30,6 +38,7 @@ export function countActiveProductFilters(filters: ProductFilters): number {
   if (filters.statuses.length > 0) n += 1
   if (filters.categories.length > 0) n += 1
   if (filters.stock !== 'all') n += 1
+  if (isListDateFilterActive(filters.date)) n += 1
   return n
 }
 
@@ -53,5 +62,28 @@ export function productRowMatchesFilters(
     return false
   }
   if (!matchesStock(row, filters.stock)) return false
+  if (!listRowMatchesDateFilter(row.createdAt, filters.date)) return false
   return true
+}
+
+export function productFiltersToServerQuery(
+  filters: ProductFilters,
+  options?: { mine?: boolean; ownerName?: string },
+): Record<string, string> {
+  const query: Record<string, string> = {
+    ...listDateFilterToServerQuery(filters.date),
+  }
+  if (filters.statuses.length > 0) {
+    query.status = filters.statuses.join(',')
+  }
+  if (filters.categories.length > 0) {
+    query.category = filters.categories.join(',')
+  }
+  if (filters.stock !== 'all') {
+    query.stock = filters.stock
+  }
+  if (options?.mine && options.ownerName?.trim()) {
+    query.ownerName = options.ownerName.trim()
+  }
+  return query
 }

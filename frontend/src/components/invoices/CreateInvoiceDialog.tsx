@@ -8,6 +8,7 @@ import {
   ContactFormSelect,
 } from '@/components/contacts/ContactFormField'
 import { InvoiceLineItemsEditor } from '@/components/invoices/InvoiceLineItemsEditor'
+import { DocumentExchangeRatesSection } from '@/components/shared/DocumentExchangeRatesSection'
 import { DocumentGlobalDiscountField } from '@/components/shared/DocumentGlobalDiscountField'
 import { DocumentTotalsBreakdown } from '@/components/shared/DocumentTotalsBreakdown'
 import { QuoteLookupField } from '@/components/shared/QuoteLookupField'
@@ -23,6 +24,7 @@ import {
 } from '@/components/ui/dialog'
 import { INVOICE_PAYMENT_METHOD_OPTIONS } from '@/data/invoices.mock'
 import { UserLookupField } from '@/components/shared/UserLookupField'
+import { useExchangeRatesForDate } from '@/hooks/use-exchange-rates-for-date'
 import {
   applyQuoteToInvoiceForm,
   createDefaultInvoiceFormValues,
@@ -31,7 +33,11 @@ import {
   type CreateInvoiceFormValues,
   type InvoiceSourceMode,
 } from '@/lib/invoice-create'
-import { computeInvoiceTotals } from '@/lib/invoice-line-item'
+import {
+  computeInvoiceTotals,
+  invoiceLineCurrency,
+  recalcInvoiceLinesWithRates,
+} from '@/lib/invoice-line-item'
 import { cn } from '@/lib/utils'
 
 type CreateInvoiceDialogProps = {
@@ -72,6 +78,17 @@ export function CreateInvoiceDialog({
   onSubmit,
 }: CreateInvoiceDialogProps) {
   const [form, setForm] = useState(() => createDefaultInvoiceFormValues(initialValues))
+  const { rates: exchangeRates, loading: ratesLoading } = useExchangeRatesForDate(
+    form.issueDate,
+  )
+
+  const displayLineItems = useMemo(
+    () =>
+      recalcInvoiceLinesWithRates(form.lineItems, exchangeRates, {
+        skipWhileLoading: ratesLoading,
+      }),
+    [form.lineItems, exchangeRates, ratesLoading],
+  )
 
   const lockSource = Boolean(initialValues?.lockQuote)
 
@@ -122,20 +139,30 @@ export function CreateInvoiceDialog({
 
   const totals = useMemo(
     () =>
-      computeInvoiceTotals(form.lineItems, {
+      computeInvoiceTotals(displayLineItems, {
         globalDiscountPercent: form.globalDiscountPercent,
       }),
-    [form.lineItems, form.globalDiscountPercent],
+    [displayLineItems, form.globalDiscountPercent],
+  )
+
+  const lineCurrencies = useMemo(
+    () => displayLineItems.map((line) => invoiceLineCurrency(line)),
+    [displayLineItems],
   )
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    const validation = validateCreateInvoiceForm(form)
+    const payload: CreateInvoiceFormValues = {
+      ...form,
+      lineItems: displayLineItems,
+      amount: totals.amount,
+    }
+    const validation = validateCreateInvoiceForm(payload)
     if (validation) {
       toast.warning(validation)
       return
     }
-    onSubmit(form)
+    onSubmit(payload)
     onOpenChange(false)
   }
 
@@ -204,8 +231,29 @@ export function CreateInvoiceDialog({
             />
           ) : null}
 
+          <div className="grid gap-4 sm:grid-cols-2">
+            <ContactFormDateInput
+              id="inv-issue"
+              label="Fecha de emisión"
+              value={form.issueDate}
+              onChange={(issueDate) => patch({ issueDate })}
+            />
+            <ContactFormDateInput
+              id="inv-due"
+              label="Fecha de vencimiento"
+              value={form.dueDate}
+              onChange={(dueDate) => patch({ dueDate })}
+            />
+          </div>
+
+          <DocumentExchangeRatesSection
+            issueDate={form.issueDate}
+            currencies={lineCurrencies}
+          />
+
           <InvoiceLineItemsEditor
-            lineItems={form.lineItems}
+            lineItems={displayLineItems}
+            exchangeRates={exchangeRates}
             onChange={(lineItems) => patch({ lineItems })}
           />
 
@@ -228,25 +276,10 @@ export function CreateInvoiceDialog({
           <ContactFormInput
             id="inv-amount"
             label="Monto total (con IVA)"
-            value={form.amount}
+            value={totals.amount}
             disabled
             onChange={() => {}}
           />
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <ContactFormDateInput
-              id="inv-issue"
-              label="Fecha de emisión"
-              value={form.issueDate}
-              onChange={(issueDate) => patch({ issueDate })}
-            />
-            <ContactFormDateInput
-              id="inv-due"
-              label="Fecha de vencimiento"
-              value={form.dueDate}
-              onChange={(dueDate) => patch({ dueDate })}
-            />
-          </div>
           <ContactFormSelect
             id="inv-payment"
             label="Medio de pago"

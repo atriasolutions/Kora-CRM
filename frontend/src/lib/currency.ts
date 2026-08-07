@@ -97,6 +97,37 @@ export function formatExchangeRateLabel(
   return `1 ${currency} = $ ${formatted} CLP`
 }
 
+/** dd/MM/yyyy para PDF y textos legales. */
+export function formatDocumentRateDate(value: string | null | undefined): string {
+  const trimmed = value?.trim() ?? ''
+  if (!trimmed) return '—'
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    const [y, m, d] = trimmed.split('-')
+    return `${d}/${m}/${y}`
+  }
+  return trimmed
+}
+
+export function formatUfRatePdfLine(rateDate: string, ufClp: number): string {
+  return `Valor de la UF al día ${formatDocumentRateDate(rateDate)}: $ ${new Intl.NumberFormat('es-CL', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(ufClp)}`
+}
+
+export function formatForeignRatePdfLine(
+  currency: Exclude<ProductCurrency, 'CLP'>,
+  rateDate: string,
+  value: number,
+): string {
+  if (currency === 'UF') return formatUfRatePdfLine(rateDate, value)
+  const label = currency === 'USD' ? 'dólar' : 'euro'
+  return `Valor del ${label} al día ${formatDocumentRateDate(rateDate)}: $ ${new Intl.NumberFormat('es-CL', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value)}`
+}
+
 export function documentHasForeignExchange(
   rates: DocumentExchangeRates | null | undefined,
 ): boolean {

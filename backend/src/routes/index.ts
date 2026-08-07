@@ -7,6 +7,8 @@ import { companiesRouter } from './companies.routes.js'
 import { contactsRouter } from './contacts.routes.js'
 import { dashboardRouter } from './dashboard.routes.js'
 import { inventoryRouter } from './inventory.routes.js'
+import { boletasRouter } from './boletas.routes.js'
+import { expensesRouter } from './expenses.routes.js'
 import { invoicesRouter } from './invoices.routes.js'
 import { siiRouter } from './sii.routes.js'
 import { opportunitiesRouter } from './opportunities.routes.js'
@@ -21,6 +23,7 @@ import { productsRouter } from './products.routes.js'
 import { projectsRouter } from './projects.routes.js'
 import { bitacoraRouter } from './bitacora.routes.js'
 import { solicitudesRouter } from './solicitudes.routes.js'
+import { solicitudPruebasRouter } from './solicitud-pruebas.routes.js'
 import { quotesRouter } from './quotes.routes.js'
 import { usersRouter } from './users.routes.js'
 import { warehousesRouter } from './warehouses.routes.js'
@@ -60,9 +63,12 @@ apiRouter.use('/stock-receipts', stockReceiptsRouter)
 apiRouter.use('/inventory', inventoryRouter)
 apiRouter.use('/quotes', quotesRouter)
 apiRouter.use('/invoices', invoicesRouter)
+apiRouter.use('/boletas', boletasRouter)
+apiRouter.use('/expenses', expensesRouter)
 apiRouter.use('/sii', siiRouter)
 apiRouter.use('/projects', projectsRouter)
 apiRouter.use('/solicitudes', solicitudesRouter)
+apiRouter.use('/pruebas-solicitud', solicitudPruebasRouter)
 apiRouter.use('/bitacora', bitacoraRouter)
 apiRouter.use('/reports', reportsRouter)
 apiRouter.use('/search', searchRouter)

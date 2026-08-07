@@ -7,6 +7,7 @@ import {
   type ComputedLineWithCurrency,
 } from '../lib/document-line-items.js'
 import { getExchangeRatesForDocumentDate } from '../services/exchange-rates.service.js'
+import { normalizeProductCurrency } from '../types/currency.js'
 import {
   resolveCustomerSnapshots,
   resolveOpportunitySnapshot,
@@ -22,18 +23,25 @@ import {
   type QuoteLineRow,
   type QuoteRow,
 } from '../mappers/quote.mapper.js'
-import { maybeNotifyRecordOwnerChange } from '../lib/owner-assignment.js'
+import { maybeNotifyRecordOwnerChange, maybeNotifyRecordOwnerOnCreate } from '../lib/owner-assignment.js'
 import { badRequest, notFound } from '../middleware/errors.js'
 import type { AuditActor } from '../types/audit.js'
 import type {
   CreateQuoteInput,
   QuoteDetail,
   QuoteListItem,
+  QuoteLineItemInput,
   UpdateQuoteInput,
 } from '../types/quote.js'
 import { parseDateInput } from '../utils/format.js'
-import { parseMoneyToCents, parsePercentToInt } from '../utils/money.js'
+import { formatDiscountPct, parseMoneyToCents, parsePercentToInt } from '../utils/money.js'
 import { paginationOffset } from '../utils/pagination.js'
+
+import {
+  parseCommaSeparatedList,
+  pushDateRangeCondition,
+  resolveOrderByClause,
+} from '../lib/list-query.js'
 import { purgeEntityNotesAndFiles } from '../services/entity-purge.service.js'
 import { broadcastInventoryUpdated } from '../services/notifications.service.js'
 import { syncQuoteStockOnStatusChange } from './stock-reservations.repository.js'
@@ -82,6 +90,10 @@ export type ListQuotesParams = {
   opportunityId?: string
   companyId?: string
   archivedOnly?: boolean
+  sortBy?: string
+  sortDir?: 'asc' | 'desc'
+  dateFrom?: string
+  dateTo?: string
 }
 
 async function loadQuoteLineItems(quoteId: string): Promise<QuoteLineRow[]> {
@@ -150,6 +162,23 @@ async function insertQuoteLineItems(
   }
 }
 
+function quoteLineRowsToInputs(rows: QuoteLineRow[]): QuoteLineItemInput[] {
+  return rows.map((row) => ({
+    productId: row.product_id,
+    sku: row.sku,
+    productName: row.product_name,
+    description: row.description ?? row.product_name,
+    quantity: Number(row.quantity),
+    unitPriceOriginal:
+      row.unit_price_original != null ? Number(row.unit_price_original) : undefined,
+    priceCurrency: row.price_currency ?? 'CLP',
+    discount: formatDiscountPct(row.discount_pct),
+    subjectToVat: row.subject_to_vat !== false,
+    deferredPayment: row.deferred_payment === true,
+    deferredPaymentText: row.deferred_payment_text ?? undefined,
+  }))
+}
+
 async function prepareQuoteLines(
   items: CreateQuoteInput['lineItems'],
   issueDate: string | null | undefined,
@@ -165,6 +194,11 @@ async function prepareQuoteLines(
       },
     }
   }
+
+  const { assertDocumentLineProductsAreSellable } = await import(
+    '../lib/assert-sellable-line-products.js'
+  )
+  await assertDocumentLineProductsAreSellable(items)
 
   const rates = await getExchangeRatesForDocumentDate(issueDate)
   const productPrices = await loadProductPricesByIds(
@@ -187,6 +221,20 @@ function resolveAmountCents(
   return lineTotal
 }
 
+
+const QUOTE_SORT_COLUMNS: Record<string, string> = {
+  code: 'code',
+  number: 'code',
+  amount: 'amount_cents',
+  status: 'status',
+  issueDate: 'issue_date',
+  validUntil: 'valid_until',
+  companyName: 'company_name',
+  owner: 'owner_name',
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
+}
+
 export async function listQuotes(
   params: ListQuotesParams,
 ): Promise<{ items: QuoteListItem[]; total: number }> {
@@ -200,9 +248,15 @@ export async function listQuotes(
     conditions.push('archived_at IS NULL')
   }
   idx = pushTenantCondition(conditions, values, idx)
-  if (params.status) {
-    conditions.push(`status = $${idx++}`)
-    values.push(params.status)
+  if (params.status?.trim()) {
+    const statuses = parseCommaSeparatedList(params.status)
+    if (statuses.length === 1) {
+      conditions.push(`status = $${idx++}`)
+      values.push(statuses[0])
+    } else if (statuses.length > 1) {
+      conditions.push(`status = ANY($${idx++}::text[])`)
+      values.push(statuses)
+    }
   }
   if (params.opportunityId) {
     conditions.push(
@@ -235,6 +289,22 @@ export async function listQuotes(
     idx++
   }
 
+  idx = pushDateRangeCondition(
+    conditions,
+    values,
+    idx,
+    'issue_date',
+    params.dateFrom,
+    params.dateTo,
+  )
+
+  const orderBy = resolveOrderByClause(
+    params.sortBy,
+    params.sortDir,
+    QUOTE_SORT_COLUMNS,
+    'updated_at DESC',
+  )
+
   const where = `WHERE ${conditions.join(' AND ')}`
 
   return withTenantClient(async (client) => {
@@ -251,7 +321,7 @@ export async function listQuotes(
       `SELECT ${QUOTE_COLUMNS}
        FROM crm_quotes
        ${where}
-       ORDER BY updated_at DESC
+       ORDER BY ${orderBy}
        LIMIT $${idx++} OFFSET $${idx}`,
       listValues,
     )
@@ -384,7 +454,17 @@ export async function createQuote(
     const row = result.rows[0]!
     await insertQuoteLineItems(client, row.id, lines)
     await client.query('COMMIT')
-    return mapQuoteDetail(row, await loadQuoteLineItems(row.id))
+    const detail = mapQuoteDetail(row, await loadQuoteLineItems(row.id))
+    maybeNotifyRecordOwnerOnCreate({
+      actor,
+      nextOwner: detail.owner ?? '',
+      moduleLabel: 'la cotización',
+      recordTitle: detail.title || detail.code,
+      href: `/cotizaciones/${detail.id}`,
+      entityType: 'cotizacion',
+      entityId: detail.id,
+    })
+    return detail
   } catch (e) {
     await client.query('ROLLBACK')
     throw e
@@ -451,8 +531,23 @@ export async function updateQuote(
             ? parseDateInput(input.issueDate)
             : existing.issueDate,
         )
-  const lines = linesResult?.lines ?? null
-  const exchangeRates = linesResult?.exchangeRates
+  let lines = linesResult?.lines ?? null
+  let exchangeRates = linesResult?.exchangeRates ?? null
+
+  if (!lines && input.issueDate !== undefined) {
+    const existingLineRows = await loadQuoteLineItems(id)
+    const hasForeign = existingLineRows.some(
+      (row) => normalizeProductCurrency(row.price_currency) !== 'CLP',
+    )
+    if (hasForeign && existingLineRows.length > 0) {
+      const recalc = await prepareQuoteLines(
+        quoteLineRowsToInputs(existingLineRows),
+        parseDateInput(input.issueDate),
+      )
+      lines = recalc.lines
+      exchangeRates = recalc.exchangeRates
+    }
+  }
   const lineTotal = lines ? sumLineTotals(lines) : null
   const amountCents =
     input.amountCents != null

@@ -15,7 +15,7 @@ import {
   type OpportunityLineRow,
   type OpportunityRow,
 } from '../mappers/opportunity.mapper.js'
-import { maybeNotifyRecordOwnerChange } from '../lib/owner-assignment.js'
+import { maybeNotifyRecordOwnerChange, maybeNotifyRecordOwnerOnCreate } from '../lib/owner-assignment.js'
 import { badRequest, notFound } from '../middleware/errors.js'
 import type { AuditActor } from '../types/audit.js'
 import type {
@@ -32,6 +32,12 @@ import {
   weightedCents,
 } from '../utils/money.js'
 import { paginationOffset } from '../utils/pagination.js'
+
+import {
+  parseCommaSeparatedList,
+  pushDateRangeCondition,
+  resolveOrderByClause,
+} from '../lib/list-query.js'
 import { purgeEntityNotesAndFiles } from '../services/entity-purge.service.js'
 
 const OPP_COLUMNS = `
@@ -60,6 +66,10 @@ export type ListOpportunitiesParams = {
   companyId?: string
   contactId?: string
   archivedOnly?: boolean
+  sortBy?: string
+  sortDir?: 'asc' | 'desc'
+  dateFrom?: string
+  dateTo?: string
 }
 
 async function loadLineItems(
@@ -110,6 +120,18 @@ async function insertLineItems(
   }
 }
 
+
+const OPPORTUNITY_SORT_COLUMNS: Record<string, string> = {
+  name: 'name',
+  amount: 'amount_cents',
+  stage: 'stage',
+  closeDate: 'close_date',
+  owner: 'owner_name',
+  companyName: 'company_name',
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
+}
+
 export async function listOpportunities(
   params: ListOpportunitiesParams,
 ): Promise<{ items: OpportunityListItem[]; total: number }> {
@@ -123,9 +145,15 @@ export async function listOpportunities(
     conditions.push('archived_at IS NULL')
   }
   idx = pushTenantCondition(conditions, values, idx)
-  if (params.stage) {
-    conditions.push(`stage = $${idx++}`)
-    values.push(params.stage)
+  if (params.stage?.trim()) {
+    const stages = parseCommaSeparatedList(params.stage)
+    if (stages.length === 1) {
+      conditions.push(`stage = $${idx++}`)
+      values.push(stages[0])
+    } else if (stages.length > 1) {
+      conditions.push(`stage = ANY($${idx++}::text[])`)
+      values.push(stages)
+    }
   }
   if (params.outcome) {
     conditions.push(`outcome = $${idx++}`)
@@ -153,6 +181,22 @@ export async function listOpportunities(
     idx++
   }
 
+  idx = pushDateRangeCondition(
+    conditions,
+    values,
+    idx,
+    'close_date',
+    params.dateFrom,
+    params.dateTo,
+  )
+
+  const orderBy = resolveOrderByClause(
+    params.sortBy,
+    params.sortDir,
+    OPPORTUNITY_SORT_COLUMNS,
+    'updated_at DESC',
+  )
+
   const where = `WHERE ${conditions.join(' AND ')}`
 
   return withTenantClient(async (client) => {
@@ -169,7 +213,7 @@ export async function listOpportunities(
       `SELECT ${OPP_COLUMNS}
        FROM crm_opportunities
        ${where}
-       ORDER BY updated_at DESC
+       ORDER BY ${orderBy}
        LIMIT $${idx++} OFFSET $${idx}`,
       listValues,
     )
@@ -271,7 +315,17 @@ export async function createOpportunity(
     await client.query('COMMIT')
 
     const lineRows = await loadLineItems(row.id)
-    return mapOpportunityDetail(row, lineRows)
+    const detail = mapOpportunityDetail(row, lineRows)
+    maybeNotifyRecordOwnerOnCreate({
+      actor,
+      nextOwner: detail.owner ?? '',
+      moduleLabel: 'la oportunidad',
+      recordTitle: detail.name,
+      href: `/oportunidades/${detail.id}`,
+      entityType: 'oportunidad',
+      entityId: detail.id,
+    })
+    return detail
   } catch (e) {
     await client.query('ROLLBACK')
     throw e

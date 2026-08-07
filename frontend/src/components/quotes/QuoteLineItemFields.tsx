@@ -4,13 +4,19 @@ import {
   ContactFormCheckbox,
   ContactFormField,
   ContactFormInput,
+  ContactFormSelect,
 } from '@/components/contacts/ContactFormField'
 import { ProductLookupField } from '@/components/shared/ProductLookupField'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import type { QuoteLineItem } from '@/data/quote-detail.mock'
 import type { ProductListItem } from '@/data/products.mock'
-import { useExchangeRates } from '@/hooks/use-exchange-rates'
+import {
+  PRODUCT_CURRENCIES,
+  PRODUCT_CURRENCY_LABELS,
+  type ExchangeRateSnapshot,
+  type ProductCurrency,
+} from '@/lib/currency'
 import { quoteLineCurrency } from '@/lib/quote-line-item'
 import {
   isManualQuoteLine,
@@ -20,6 +26,12 @@ import {
   quoteLineSubjectToVat,
   recalcQuoteLine,
 } from '@/lib/quote-line-item'
+import {
+  formatProductPriceAmount,
+  parseProductPrice,
+  productPricePlaceholder,
+  productPriceUsesDecimals,
+} from '@/lib/product-currency-input'
 
 function ReadOnlyField({ label, value }: { label: string; value: string }) {
   return (
@@ -37,6 +49,8 @@ type QuoteLineItemFieldsProps = {
   index: number
   idPrefix: string
   canRemove: boolean
+  exchangeRates?: ExchangeRateSnapshot | null
+  defaultCurrency?: ProductCurrency
   onPatch: (line: QuoteLineItem) => void
   onRemove: () => void
 }
@@ -46,16 +60,17 @@ export function QuoteLineItemFields({
   index,
   idPrefix,
   canRemove,
+  exchangeRates = null,
+  defaultCurrency = 'CLP',
   onPatch,
   onRemove,
 }: QuoteLineItemFieldsProps) {
-  const { rates } = useExchangeRates()
   const kind = quoteLineKind(line)
   const isManual = isManualQuoteLine(line)
   const currency = quoteLineCurrency(line)
 
   const patchRecalc = (patch: Partial<QuoteLineItem>) => {
-    onPatch(recalcQuoteLine({ ...line, ...patch }, rates))
+    onPatch(recalcQuoteLine({ ...line, ...patch }, exchangeRates))
   }
 
   const handleProductChange = (_productId: string, product?: ProductListItem) => {
@@ -72,25 +87,32 @@ export function QuoteLineItemFields({
             unitPriceOriginalNum: 0,
             unitPrice: '$0',
           },
-          rates,
+          exchangeRates,
         ),
       )
       return
     }
-    onPatch(quoteLineFromProduct(product, line.id, rates))
+    onPatch(quoteLineFromProduct(product, line.id, exchangeRates))
   }
 
   const setLineKind = (nextKind: 'product' | 'manual') => {
     if (nextKind === kind) return
     if (nextKind === 'manual') {
       onPatch(
-        recalcQuoteLine({
-          ...line,
-          lineKind: 'manual',
-          productId: undefined,
-          sku: '',
-          description: quoteLineDescription(line),
-        }),
+        recalcQuoteLine(
+          {
+            ...line,
+            lineKind: 'manual',
+            productId: undefined,
+            sku: '',
+            description: quoteLineDescription(line),
+            priceCurrency: defaultCurrency,
+            unitPriceOriginalNum: 0,
+            unitPriceOriginal: undefined,
+            unitPrice: '$0',
+          },
+          exchangeRates,
+        ),
       )
     } else {
       onPatch(
@@ -192,22 +214,75 @@ export function QuoteLineItemFields({
           id={`${idPrefix}-qty-${line.id}`}
           label="Cantidad"
           inputVariant="integer"
-          value={String(line.quantity)}
+          value={line.quantity > 0 ? String(line.quantity) : ''}
           onChange={(raw) => {
-            const quantity = Math.max(1, Number.parseInt(raw, 10) || 1)
-            patchRecalc({ quantity })
+            if (!raw.trim()) {
+              patchRecalc({ quantity: 0 })
+              return
+            }
+            const quantity = Number.parseInt(raw, 10)
+            if (!Number.isFinite(quantity)) return
+            patchRecalc({ quantity: Math.max(0, quantity) })
+          }}
+          onBlur={() => {
+            if (line.quantity < 1) patchRecalc({ quantity: 1 })
           }}
         />
         {isManual ? (
-          <ContactFormInput
-            id={`${idPrefix}-price-${line.id}`}
-            label="Precio unitario (CLP)"
-            inputVariant="amount"
-            value={line.unitPrice}
-            onChange={(unitPrice) =>
-              patchRecalc({ priceCurrency: 'CLP', unitPrice, unitPriceOriginalNum: undefined })
-            }
-          />
+          <>
+            <ContactFormSelect
+              id={`${idPrefix}-currency-${line.id}`}
+              label="Moneda"
+              value={currency}
+              options={PRODUCT_CURRENCIES.map((value) => ({
+                value,
+                label: PRODUCT_CURRENCY_LABELS[value],
+              }))}
+              onChange={(value) =>
+                patchRecalc({
+                  priceCurrency: value as ProductCurrency,
+                  unitPriceOriginalNum: 0,
+                  unitPriceOriginal: undefined,
+                  unitPrice: '$0',
+                })
+              }
+            />
+            <ContactFormInput
+              id={`${idPrefix}-price-${line.id}`}
+              label={`Precio unitario (${currency})`}
+              inputVariant={productPriceUsesDecimals(currency) ? 'text' : 'amount'}
+              value={
+                currency === 'CLP'
+                  ? line.unitPrice
+                  : formatProductPriceAmount(
+                      line.unitPriceOriginalNum ?? 0,
+                      currency,
+                      { allowEmpty: true },
+                    )
+              }
+              placeholder={productPricePlaceholder(currency)}
+              onChange={(raw) => {
+                if (currency === 'CLP') {
+                  patchRecalc({ priceCurrency: 'CLP', unitPrice: raw, unitPriceOriginalNum: undefined })
+                  return
+                }
+                const unitPriceOriginalNum = parseProductPrice(raw, currency)
+                patchRecalc({
+                  priceCurrency: currency,
+                  unitPriceOriginalNum,
+                  unitPriceOriginal: formatProductPriceAmount(unitPriceOriginalNum, currency),
+                })
+              }}
+              onBlur={() => {
+                if (currency === 'CLP' && !String(line.unitPrice).replace(/[^\d]/g, '')) {
+                  patchRecalc({ unitPrice: '$0' })
+                }
+              }}
+            />
+            {currency !== 'CLP' ? (
+              <ReadOnlyField label="Precio CLP" value={line.unitPrice} />
+            ) : null}
+          </>
         ) : currency !== 'CLP' ? (
           <>
             <ReadOnlyField

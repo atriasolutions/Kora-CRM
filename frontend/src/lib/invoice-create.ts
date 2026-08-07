@@ -22,6 +22,7 @@ import {
   validateSaleCustomer,
   type SaleCustomerValues,
 } from '@/lib/sale-customer'
+import { formatPurchaseDisplayDate } from '@/lib/purchase-dates'
 
 export type InvoiceSourceMode = 'cotizacion' | 'directa'
 
@@ -57,7 +58,7 @@ export function createDefaultInvoiceFormValues(
     invoiceSource: partial?.quoteId || partial?.lockQuote ? 'cotizacion' : 'directa',
     number: '',
     amount: partial?.amount ?? totals.amount,
-    issueDate: '',
+    issueDate: partial?.issueDate ?? formatPurchaseDisplayDate(new Date()),
     dueDate: '',
     ownerName: getDefaultOwnerName(),
     status: 'Borrador',

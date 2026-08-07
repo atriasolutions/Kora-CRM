@@ -39,6 +39,8 @@ type SolicitudDescriptionEditorProps = {
   onFilesChange: (files: SolicitudFile[]) => void
   disabled?: boolean
   className?: string
+  placeholder?: string
+  imagesHint?: string
 }
 
 function ToolbarButton({
@@ -81,6 +83,8 @@ export function SolicitudDescriptionEditor({
   onFilesChange,
   disabled = false,
   className,
+  placeholder = 'Describe la solicitud. Combina texto e imágenes; las imágenes se guardan en Archivos.',
+  imagesHint = 'Imágenes → Archivos',
 }: SolicitudDescriptionEditorProps) {
   const inputId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -137,8 +141,7 @@ export function SolicitudDescriptionEditor({
       }),
       Underline,
       Placeholder.configure({
-        placeholder:
-          'Describe la solicitud. Combina texto e imágenes; las imágenes se guardan en Archivos.',
+        placeholder,
       }),
       SolicitudInlineImage,
     ],
@@ -303,8 +306,8 @@ export function SolicitudDescriptionEditor({
             <ImagePlus aria-hidden className="size-4" />
           )}
         </ToolbarButton>
-        <span className="ms-auto pe-2 text-xs text-muted-foreground">
-          Imágenes → Archivos
+        <span className="ms-auto hidden pe-2 text-xs text-muted-foreground sm:inline">
+          {imagesHint}
         </span>
       </div>
       <EditorContent editor={editor} />

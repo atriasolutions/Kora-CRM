@@ -5,6 +5,13 @@ import type {
   OpportunityStage,
 } from '@/data/opportunities.mock'
 import { OPPORTUNITY_STAGE_OPTIONS } from '@/data/opportunities.mock'
+import {
+  createDefaultListDateFilter,
+  isListDateFilterActive,
+  listDateFilterToServerQuery,
+  listRowMatchesDateFilter,
+  type ListDateFilter,
+} from '@/lib/list-date-filter'
 
 export type OpportunityLastActivityFilter = 'all' | 'today' | 'week' | 'stale'
 
@@ -13,6 +20,7 @@ export type OpportunityFilters = {
   outcomes: OpportunityOutcome[]
   priorities: OpportunityPriority[]
   lastActivity: OpportunityLastActivityFilter
+  date: ListDateFilter
 }
 
 export { OPPORTUNITY_STAGE_OPTIONS }
@@ -40,7 +48,13 @@ export const OPPORTUNITY_LAST_ACTIVITY_OPTIONS: {
 ]
 
 export function createDefaultOpportunityFilters(): OpportunityFilters {
-  return { stages: [], outcomes: [], priorities: [], lastActivity: 'all' }
+  return {
+    stages: [],
+    outcomes: [],
+    priorities: [],
+    lastActivity: 'all',
+    date: createDefaultListDateFilter(),
+  }
 }
 
 export function countActiveOpportunityFilters(filters: OpportunityFilters): number {
@@ -49,6 +63,7 @@ export function countActiveOpportunityFilters(filters: OpportunityFilters): numb
   if (filters.outcomes.length > 0) n += 1
   if (filters.priorities.length > 0) n += 1
   if (filters.lastActivity !== 'all') n += 1
+  if (isListDateFilterActive(filters.date)) n += 1
   return n
 }
 
@@ -76,7 +91,33 @@ export function matchesOpportunityFilters(
     return false
   }
   if (!matchesLastActivity(opp.lastActivity, filters.lastActivity)) return false
+  if (!listRowMatchesDateFilter(opp.createdAt, filters.date)) return false
   return true
+}
+
+export function opportunityFiltersToServerQuery(
+  filters: OpportunityFilters,
+  options?: { mine?: boolean; ownerName?: string },
+): Record<string, string> {
+  const query: Record<string, string> = {
+    ...listDateFilterToServerQuery(filters.date),
+  }
+  if (filters.stages.length > 0) {
+    query.stage = filters.stages.join(',')
+  }
+  if (filters.outcomes.length > 0) {
+    query.outcome = filters.outcomes.join(',')
+  }
+  if (filters.priorities.length > 0) {
+    query.priority = filters.priorities.join(',')
+  }
+  if (filters.lastActivity !== 'all') {
+    query.lastActivity = filters.lastActivity
+  }
+  if (options?.mine && options.ownerName?.trim()) {
+    query.ownerName = options.ownerName.trim()
+  }
+  return query
 }
 
 export function opportunityRowMatchesFilters(

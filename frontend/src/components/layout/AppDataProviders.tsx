@@ -8,12 +8,15 @@ import { CompaniesRegistryProvider } from '@/contexts/companies-registry'
 import { ContactsRegistryProvider } from '@/contexts/contacts-registry'
 import { InventoryRegistryProvider } from '@/contexts/inventory-registry'
 import { InvoicesRegistryProvider } from '@/contexts/invoices-registry'
+import { BoletasRegistryProvider } from '@/contexts/boletas-registry'
+import { ExpensesRegistryProvider } from '@/contexts/expenses-registry'
 import { OpportunitiesRegistryProvider } from '@/contexts/opportunities-registry'
 import { OrganizationSettingsProvider } from '@/contexts/organization-settings'
 import { ProductsRegistryProvider } from '@/contexts/products-registry'
 import { ProfilesRegistryProvider } from '@/contexts/profiles-registry'
 import { ProjectsRegistryProvider } from '@/contexts/projects-registry'
 import { BitacoraRegistryProvider } from '@/contexts/bitacora-registry'
+import { PruebasSolicitudRegistryProvider } from '@/contexts/pruebas-solicitud-registry'
 import { SolicitudesRegistryProvider } from '@/contexts/solicitudes-registry'
 import { PurchasesRegistryProvider } from '@/contexts/purchases-registry'
 import { QuotesRegistryProvider } from '@/contexts/quotes-registry'
@@ -38,9 +41,12 @@ export function AppDataProviders({ children }: { children?: ReactNode }) {
                     <ActivitiesRegistryProvider>
                       <ProjectsRegistryProvider>
                         <SolicitudesRegistryProvider>
+                        <PruebasSolicitudRegistryProvider>
                         <BitacoraRegistryProvider>
                         <ProductsRegistryProvider>
                           <InvoicesRegistryProvider>
+                            <BoletasRegistryProvider>
+                            <ExpensesRegistryProvider>
                             <ReportsRegistryProvider>
                               <PurchasesRegistryProvider>
                                 <StockReceiptsRegistryProvider>
@@ -52,9 +58,12 @@ export function AppDataProviders({ children }: { children?: ReactNode }) {
                                 </StockReceiptsRegistryProvider>
                               </PurchasesRegistryProvider>
                             </ReportsRegistryProvider>
+                            </ExpensesRegistryProvider>
+                            </BoletasRegistryProvider>
                           </InvoicesRegistryProvider>
                         </ProductsRegistryProvider>
                         </BitacoraRegistryProvider>
+                        </PruebasSolicitudRegistryProvider>
                         </SolicitudesRegistryProvider>
                       </ProjectsRegistryProvider>
                     </ActivitiesRegistryProvider>

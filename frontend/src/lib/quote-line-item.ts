@@ -80,10 +80,12 @@ export function recalcQuoteLine(
   const currency = quoteLineCurrency(li)
   const original = originalAmountFromLine(li)
   const unitClp = unitPriceClpNum({ ...li, unitPriceOriginalNum: original }, rates)
-  const qty = Math.max(1, li.quantity || 1)
+  // 0 permitido mientras se edita; al blur/guardar se normaliza a ≥ 1.
+  const qty = Math.max(0, Math.floor(Number(li.quantity)) || 0)
   const gross = unitClp * qty
   const pct = parseDiscountPercent(li.discount)
   const net = Math.round(gross * (1 - pct / 100))
+  const clpDigits = String(li.unitPrice ?? '').replace(/[^\d]/g, '')
 
   return {
     ...li,
@@ -93,9 +95,20 @@ export function recalcQuoteLine(
     unitPriceOriginal:
       currency !== 'CLP' ? formatForeignAmount(original, currency) : undefined,
     quantity: qty,
-    unitPrice: formatMoneyCLP(unitClp),
+    unitPrice: currency === 'CLP' && !clpDigits ? '' : formatMoneyCLP(unitClp),
     total: formatMoneyCLP(net),
   }
+}
+
+export function recalcQuoteLinesWithRates(
+  items: QuoteLineItem[],
+  rates?: ExchangeRateSnapshot | null,
+  options?: { skipWhileLoading?: boolean },
+): QuoteLineItem[] {
+  if (options?.skipWhileLoading || !rates) return items
+  const hasForeign = items.some((line) => quoteLineCurrency(line) !== 'CLP')
+  if (!hasForeign) return items
+  return items.map((line) => recalcQuoteLine(line, rates))
 }
 
 export function defaultQuoteLineItem(

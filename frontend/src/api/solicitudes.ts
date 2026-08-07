@@ -19,6 +19,8 @@ export type SolicitudApiBody = {
   assigneeUserId?: string | null
   requesterUserId?: string | null
   team?: { userId?: string; userName?: string; roleLabel?: string }[]
+  documentationUrl?: string
+  gitBranchUrl?: string
 }
 
 export function solicitudFormToApiBody(values: CreateSolicitudFormValues): SolicitudApiBody {
@@ -30,6 +32,8 @@ export function solicitudFormToApiBody(values: CreateSolicitudFormValues): Solic
     assigneeName: values.assigneeName.trim() || undefined,
     assigneeUserId: values.assigneeUserId?.trim() || null,
     requesterUserId: values.requesterUserId?.trim() || null,
+    documentationUrl: values.documentationUrl.trim() || undefined,
+    gitBranchUrl: values.gitBranchUrl.trim() || undefined,
   }
 }
 
@@ -42,6 +46,8 @@ export function solicitudDetailToApiBody(detail: SolicitudDetail): SolicitudApiB
     assigneeName: detail.assignee || undefined,
     assigneeUserId: detail.assigneeUserId ?? null,
     team: teamToApiInput(detail.team, detail.assignee),
+    documentationUrl: detail.documentationUrl?.trim() || undefined,
+    gitBranchUrl: detail.gitBranchUrl?.trim() || undefined,
   }
 }
 
@@ -53,6 +59,8 @@ export function solicitudFormValuesToApiBody(values: SolicitudFormValues): Solic
     priority: values.priority,
     assigneeName: values.assigneeName.trim() || undefined,
     assigneeUserId: values.assigneeUserId?.trim() || null,
+    documentationUrl: values.documentationUrl.trim() || undefined,
+    gitBranchUrl: values.gitBranchUrl.trim() || undefined,
   }
 }
 
@@ -64,6 +72,8 @@ export function solicitudPatchToApiBody(patch: Partial<SolicitudListItem>): Soli
   if (patch.priority !== undefined) body.priority = patch.priority
   if (patch.assignee !== undefined) body.assigneeName = patch.assignee
   if (patch.assigneeUserId !== undefined) body.assigneeUserId = patch.assigneeUserId ?? null
+  if (patch.documentationUrl !== undefined) body.documentationUrl = patch.documentationUrl
+  if (patch.gitBranchUrl !== undefined) body.gitBranchUrl = patch.gitBranchUrl
   return body
 }
 

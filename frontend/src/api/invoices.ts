@@ -147,6 +147,18 @@ export async function listInvoicesForCompanyApi(
   })
 }
 
+/** Facturas vinculadas a una cotización (ficha cotización). */
+export async function listInvoicesForQuoteApi(
+  quoteId: string,
+): Promise<InvoiceListItem[]> {
+  const id = quoteId.trim()
+  if (!id) return []
+  return fetchAllPages<InvoiceListItem>(BASE, {
+    quoteId: id,
+    archived: 'false',
+  })
+}
+
 export async function getInvoiceApi(id: string): Promise<InvoiceDetail> {
   const res = await fetchJSON<ApiItemResponse<InvoiceDetail>>(`${BASE}/${id}`)
   return res.data

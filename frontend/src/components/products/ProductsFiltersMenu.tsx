@@ -1,5 +1,6 @@
 import { Check, Filter } from 'lucide-react'
 
+import { CompactPeriodFilter } from '@/components/shared/CompactPeriodFilter'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -16,6 +17,11 @@ import {
   PRODUCT_STATUS_OPTIONS,
   type ProductFilters,
 } from '@/lib/product-filters'
+import {
+  labelForListDateFilter,
+  listDateToCompact,
+  compactToListDate,
+} from '@/lib/list-date-filter'
 import { useProductCategoryOptions } from '@/hooks/use-catalog-options'
 import { cn } from '@/lib/utils'
 
@@ -73,7 +79,25 @@ export function ProductsFiltersMenu({ filters, onFiltersChange }: ProductsFilter
           ) : null}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="max-h-[70vh] w-64 overflow-y-auto">
+      <DropdownMenuContent
+        align="end"
+        className="max-h-[70vh] w-80 overflow-y-auto p-3"
+        onCloseAutoFocus={(e) => e.preventDefault()}
+      >
+        <DropdownMenuLabel>Fecha de creación</DropdownMenuLabel>
+        <p className="mb-2 px-0.5 text-xs text-muted-foreground">
+          {labelForListDateFilter(filters.date)}
+        </p>
+        <CompactPeriodFilter
+          idPrefix="products-filter"
+          modes={['all', 'month', 'year', 'custom']}
+          value={listDateToCompact(filters.date)}
+          onChange={(next) =>
+            onFiltersChange({ ...filters, date: compactToListDate(next) })
+          }
+        />
+
+        <DropdownMenuSeparator className="my-3" />
         <DropdownMenuLabel>Estado</DropdownMenuLabel>
         {PRODUCT_STATUS_OPTIONS.map((status) => (
           <CheckboxRow

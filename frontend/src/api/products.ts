@@ -36,6 +36,9 @@ export type ProductApiBody = {
   trackInventory?: boolean
   minStock?: number
   maxStock?: number
+  parentProductId?: string | null
+  variantOptions?: { name: string; values: string[] }[]
+  variantAttributes?: Record<string, string>
 }
 
 function unitFromForm(values: { unitOfMeasure: string; customUnit?: string }): string {
@@ -149,10 +152,70 @@ export function mergeProductDetailFromListItem(
   }
 }
 
-export async function listProductsApi(archived: boolean): Promise<ProductListItem[]> {
+export async function listProductsApi(
+  archived: boolean,
+  options?: { sellable?: boolean; groupVariants?: boolean; parentId?: string },
+): Promise<ProductListItem[]> {
   return fetchAllPages<ProductListItem>(BASE, {
     archived: archived ? 'true' : 'false',
+    ...(options?.sellable ? { sellable: 'true' } : {}),
+    ...(options?.groupVariants === false ? { groupVariants: 'false' } : {}),
+    ...(options?.groupVariants === true ? { groupVariants: 'true' } : {}),
+    ...(options?.parentId ? { parentId: options.parentId } : {}),
   })
+}
+
+export async function listProductVariantsApi(
+  parentId: string,
+): Promise<ProductListItem[]> {
+  const res = await fetchJSON<ApiItemResponse<ProductListItem[]>>(
+    `${BASE}/${parentId}/variants`,
+  )
+  return res.data
+}
+
+export async function createProductVariantsApi(
+  parentId: string,
+  body: {
+    options?: { name: string; values: string[] }[]
+    variants?: {
+      sku?: string
+      attributes: Record<string, string>
+      priceNum?: number
+      costPriceNum?: number
+      stockNum?: number
+    }[]
+  },
+): Promise<ProductListItem[]> {
+  const res = await fetchJSON<ApiItemResponse<ProductListItem[]>>(
+    `${BASE}/${parentId}/variants`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+  )
+  return res.data
+}
+
+export async function convertProductToParentApi(
+  id: string,
+  body: {
+    options: { name: string; values: string[] }[]
+    firstVariantAttributes: Record<string, string>
+    firstVariantSku?: string
+    firstVariantName?: string
+  },
+): Promise<ProductListItem> {
+  const res = await fetchJSON<ApiItemResponse<ProductListItem>>(
+    `${BASE}/${id}/convert-to-parent`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+  )
+  return res.data
 }
 
 export async function getProductApi(id: string): Promise<ProductListItem> {

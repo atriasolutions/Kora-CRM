@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { listSortAndDateQueryFields } from '../lib/list-query.js'
+
 import { entityImageUrlSchema } from './image-url.schema.js'
 
 const lifecycle = z.enum(['Prospecto', 'Cliente', 'Proveedor'])
@@ -28,9 +30,10 @@ export const listCompaniesQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
   q: z.string().trim().optional(),
-  lifecycle: lifecycle.optional(),
+  lifecycle: z.string().optional(),
   archived: z
     .enum(['true', 'false'])
     .optional()
     .transform((v) => v === 'true'),
+  ...listSortAndDateQueryFields,
 })

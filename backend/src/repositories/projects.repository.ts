@@ -40,6 +40,12 @@ import type {
 import { parseDateInput } from '../utils/format.js'
 import { parseMoneyToCents } from '../utils/money.js'
 import { paginationOffset } from '../utils/pagination.js'
+
+import {
+  parseCommaSeparatedList,
+  pushDateRangeCondition,
+  resolveOrderByClause,
+} from '../lib/list-query.js'
 import { purgeEntityNotesAndFiles } from '../services/entity-purge.service.js'
 
 const PROJECT_COLUMNS = `
@@ -70,6 +76,10 @@ export type ListProjectsParams = {
   archivedOnly?: boolean
   /** Si se define, solo proyectos donde el usuario es gerente o miembro del equipo. */
   memberAccess?: { userId: string; userName: string }
+  sortBy?: string
+  sortDir?: 'asc' | 'desc'
+  dateFrom?: string
+  dateTo?: string
 }
 
 export function userHasProjectTeamAccess(
@@ -393,6 +403,16 @@ async function insertProjectTeam(
   }
 }
 
+
+const PROJECT_SORT_COLUMNS: Record<string, string> = {
+  name: 'name',
+  status: 'status',
+  clientName: 'client_name',
+  manager: 'manager_name',
+  updatedAt: 'updated_at',
+  createdAt: 'created_at',
+}
+
 export async function listProjects(
   params: ListProjectsParams,
 ): Promise<{ items: ProjectListItem[]; total: number }> {
@@ -406,9 +426,15 @@ export async function listProjects(
     conditions.push('archived_at IS NULL')
   }
   idx = pushTenantCondition(conditions, values, idx)
-  if (params.status) {
-    conditions.push(`status = $${idx++}`)
-    values.push(params.status)
+  if (params.status?.trim()) {
+    const statuses = parseCommaSeparatedList(params.status)
+    if (statuses.length === 1) {
+      conditions.push(`status = $${idx++}`)
+      values.push(statuses[0])
+    } else if (statuses.length > 1) {
+      conditions.push(`status = ANY($${idx++}::text[])`)
+      values.push(statuses)
+    }
   }
   if (params.opportunityId) {
     conditions.push(`opportunity_id = $${idx++}`)
@@ -456,6 +482,22 @@ export async function listProjects(
     values.push(userName, userId)
   }
 
+  idx = pushDateRangeCondition(
+    conditions,
+    values,
+    idx,
+    'updated_at',
+    params.dateFrom,
+    params.dateTo,
+  )
+
+  const orderBy = resolveOrderByClause(
+    params.sortBy,
+    params.sortDir,
+    PROJECT_SORT_COLUMNS,
+    'updated_at DESC',
+  )
+
   const where = `WHERE ${conditions.join(' AND ')}`
 
   return withTenantClient(async (client) => {
@@ -471,7 +513,7 @@ export async function listProjects(
       `SELECT ${PROJECT_COLUMNS}
        FROM crm_projects
        ${where}
-       ORDER BY updated_at DESC
+       ORDER BY ${orderBy}
        LIMIT $${idx++} OFFSET $${idx}`,
       listValues,
     )

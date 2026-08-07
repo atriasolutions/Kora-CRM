@@ -38,8 +38,11 @@ import {
   archiveStockReceiptCopy,
   bulkArchiveStockReceiptsCopy,
 } from '@/lib/stock-receipt-lifecycle-messages'
+import { getCurrentUser } from '@/lib/current-user'
 import {
   createDefaultStockReceiptFilters,
+  stockReceiptFiltersToServerQuery,
+  stockReceiptHasClientOnlyFilters,
   stockReceiptRowMatchesFilters,
   type StockReceiptFilters,
 } from '@/lib/stock-receipt-filters'
@@ -82,6 +85,20 @@ export function StockReceiptsPage() {
     () => loadStockReceiptRecentIds(),
     [listRefreshKey, location.key, listScope],
   )
+
+  const serverListQuery = useMemo(
+    () =>
+      stockReceiptFiltersToServerQuery(filters, {
+        mine: listScope === 'mine',
+        ownerName: getCurrentUser().name,
+      }),
+    [filters, listScope],
+  )
+
+  const filtersOnServer =
+    listScope === 'all' &&
+    isApiEnabled() &&
+    !stockReceiptHasClientOnlyFilters(filters)
 
   const rowPredicate = useMemo(
     () => (row: StockReceiptListItem) =>
@@ -239,8 +256,10 @@ export function StockReceiptsPage() {
             listScope === 'recent'
               ? undefined
               : {
-                  fetchPage: (params) => fetchStockReceiptsServerPage(params, false),
-                  resetKey: `${listRefreshKey}-${listScope}`,
+                  fetchPage: (params) =>
+                    fetchStockReceiptsServerPage(params, false, serverListQuery),
+                  resetKey: `${listRefreshKey}-${listScope}-${JSON.stringify(serverListQuery)}`,
+                  filtersOnServer,
                 }
           }
           rowPredicate={rowPredicate}

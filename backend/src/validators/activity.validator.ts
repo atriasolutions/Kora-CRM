@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { listSortAndDateQueryFields } from '../lib/list-query.js'
+
 const relatedTypeSchema = z.enum([
   'contacto',
   'empresa',
@@ -7,6 +9,7 @@ const relatedTypeSchema = z.enum([
   'cotizacion',
   'compra',
   'factura',
+  'boleta',
   'proyecto',
   'solicitud',
   'ingreso',
@@ -32,6 +35,7 @@ export const listActivitiesQuerySchema = z.object({
     .union([z.literal('true'), z.literal('false')])
     .optional()
     .transform((v) => v === 'true'),
+  ...listSortAndDateQueryFields,
 })
 
 export const createActivitySchema = z.object({

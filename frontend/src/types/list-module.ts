@@ -18,6 +18,9 @@ export type ListColumnDef<T extends ListRowBase> =
       kind: 'primary'
       header: string
       sortable?: boolean
+      sortKey?: string
+      sortValue?: (row: T) => string | number
+      defaultHidden?: boolean
       title: (row: T) => string
       subtitle?: (row: T) => string
       avatarUrl?: (row: T) => string | undefined
@@ -30,7 +33,9 @@ export type ListColumnDef<T extends ListRowBase> =
       kind: 'text'
       header: string
       sortable?: boolean
+      sortKey?: string
       sortValue?: (row: T) => string | number
+      defaultHidden?: boolean
       className?: string
       cell: (row: T) => string
       mono?: boolean
@@ -40,7 +45,9 @@ export type ListColumnDef<T extends ListRowBase> =
       kind: 'badge'
       header: string
       sortable?: boolean
+      sortKey?: string
       sortValue?: (row: T) => string | number
+      defaultHidden?: boolean
       className?: string
       label: (row: T) => string
       variant: (row: T) => BadgeVariant
@@ -49,6 +56,7 @@ export type ListColumnDef<T extends ListRowBase> =
       kind: 'custom'
       header: string
       className?: string
+      defaultHidden?: boolean
       render: (row: T) => ReactNode
     }
 

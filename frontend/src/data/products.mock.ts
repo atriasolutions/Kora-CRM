@@ -3,6 +3,11 @@ import { ensureRecordAuditList } from '@/lib/seed-audit'
 
 import type { ProductType } from '@/lib/product-catalog'
 import type { BillingPeriod } from '@/lib/product-catalog'
+import type {
+  ProductVariantKind,
+  VariantAttributes,
+  VariantOption,
+} from '@/lib/product-variants'
 
 export type ProductStatus = 'Activo' | 'Agotado' | 'Borrador'
 
@@ -35,6 +40,14 @@ export type ProductListItem = {
   brand?: string
   publishInIntegration?: boolean
   publishPriceInIntegration?: boolean
+  parentProductId?: string
+  parentName?: string
+  parentSku?: string
+  variantOptions?: VariantOption[]
+  variantAttributes?: VariantAttributes
+  variantKind?: ProductVariantKind
+  variantsCount?: number
+  variants?: ProductListItem[]
 } & RecordAuditFields
 
 export const PRODUCT_LIST_TOTAL_DEMO = 56

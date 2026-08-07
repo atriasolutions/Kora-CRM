@@ -73,8 +73,8 @@ export function ProductsRegistryProvider({ children }: { children: ReactNode }) 
 
   const reloadFromApi = useCallback(async () => {
     const [active, archived] = await Promise.all([
-      listProductsApi(false),
-      listProductsApi(true),
+      listProductsApi(false, { groupVariants: false }),
+      listProductsApi(true, { groupVariants: false }),
     ])
     syncRegistryProducts(active)
     setUserProducts(active)

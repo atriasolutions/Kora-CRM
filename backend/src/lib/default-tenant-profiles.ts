@@ -33,6 +33,13 @@ export function createGuestProfilePermissions(): MenuModulePermission[] {
         flags: { menu: true, view: true, create: false, edit: false, delete: false },
       }
     }
+    if (moduleId === 'pruebas_solicitud') {
+      return {
+        moduleId,
+        label,
+        flags: { menu: true, view: true, create: false, edit: true, delete: false },
+      }
+    }
     return {
       moduleId,
       label,

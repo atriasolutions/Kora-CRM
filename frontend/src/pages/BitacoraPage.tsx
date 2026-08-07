@@ -5,6 +5,7 @@ import { toast } from '@/lib/toast'
 
 import { BitacoraArchivedView } from '@/components/bitacora/BitacoraArchivedView'
 import { BitacoraDashboardView } from '@/components/bitacora/BitacoraDashboardView'
+import { BitacoraMonthlyQuotaDialog } from '@/components/bitacora/BitacoraMonthlyQuotaDialog'
 import { CreateBitacoraDialog } from '@/components/bitacora/CreateBitacoraDialog'
 import {
   BitacoraModuleHeader,
@@ -27,6 +28,7 @@ import type { BitacoraListItem } from '@/data/bitacora.mock'
 import { apiActionErrorMessage } from '@/api/errors'
 import { isApiEnabled } from '@/api/config'
 import { useAuth } from '@/hooks/use-auth'
+import { hasElevatedTenantScope } from '@/lib/access-profile-admin'
 import { useBitacoraDashboard } from '@/hooks/use-bitacora-dashboard'
 import { useBitacoraRegistry } from '@/hooks/use-bitacora-registry'
 import { fetchBitacoraServerPage } from '@/lib/module-server-list'
@@ -83,6 +85,7 @@ export function BitacoraPage() {
   const [listRefreshKey, setListRefreshKey] = useState(0)
   const [archiveTarget, setArchiveTarget] = useState<BitacoraListItem | null>(null)
   const [bulkArchiveIds, setBulkArchiveIds] = useState<string[] | null>(null)
+  const [quotaDialogOpen, setQuotaDialogOpen] = useState(false)
   const { toolbarHost, toolbarSlot } = useEmbeddedListToolbarSlot()
 
   const recentIds = useMemo(
@@ -106,6 +109,8 @@ export function BitacoraPage() {
     [scopedFilters, effectiveListScope],
   )
 
+  const filtersOnServer = listScope !== 'recent' && isApiEnabled()
+
   const dashboardFilters = scopedFilters
 
   const dashboardResetKey = useMemo(
@@ -121,6 +126,12 @@ export function BitacoraPage() {
     rows: allBitacora,
     resetKey: dashboardResetKey,
   })
+
+  const canConfigureMonthlyQuota =
+    isApiEnabled() && hasElevatedTenantScope(profile)
+  const dashboardCompanyId = dashboardFilters.companyId.trim() || stats?.companyId
+  const dashboardCompanyName =
+    dashboardFilters.companyName.trim() || stats?.companyName || ''
 
   const rowPredicate = useMemo(
     () => (row: BitacoraListItem) =>
@@ -243,6 +254,10 @@ export function BitacoraPage() {
             stats={stats}
             loading={loading}
             fromApi={fromApi}
+            canConfigureMonthlyQuota={canConfigureMonthlyQuota && Boolean(dashboardCompanyId)}
+            onConfigureMonthlyQuota={
+              dashboardCompanyId ? () => setQuotaDialogOpen(true) : undefined
+            }
           />
         ) : null}
 
@@ -260,8 +275,9 @@ export function BitacoraPage() {
                 ? undefined
                 : {
                     fetchPage: (params) =>
-                      fetchBitacoraServerPage(params, serverListQuery, false),
+                      fetchBitacoraServerPage(params, false, serverListQuery),
                     resetKey: `${listRefreshKey}-${bitacoraFiltersResetKey(scopedFilters, listScope)}`,
+                    filtersOnServer,
                   }
             }
             rowPredicate={rowPredicate}
@@ -341,6 +357,17 @@ export function BitacoraPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {dashboardCompanyId ? (
+        <BitacoraMonthlyQuotaDialog
+          open={quotaDialogOpen}
+          onOpenChange={setQuotaDialogOpen}
+          companyId={dashboardCompanyId}
+          companyName={dashboardCompanyName || 'Cliente'}
+          currentAssignedHours={stats?.monthlyQuota?.assignedHours ?? null}
+          onSaved={() => setListRefreshKey((k) => k + 1)}
+        />
+      ) : null}
     </div>
   )
 }

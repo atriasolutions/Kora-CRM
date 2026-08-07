@@ -7,6 +7,8 @@ export const SEARCH_ENTITY_MODULE_MAP: Record<GlobalSearchEntityType, MenuModule
   opportunity: 'oportunidades',
   quote: 'cotizaciones',
   invoice: 'facturacion',
+  boleta: 'boletas',
+  gasto: 'gastos',
   activity: 'actividades',
   project: 'proyectos',
   product: 'productos',

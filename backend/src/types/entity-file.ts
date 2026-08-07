@@ -4,10 +4,13 @@ export const ENTITY_FILE_TYPES = [
   'inventario',
   'compra',
   'factura',
+  'boleta',
+  'gasto',
   'cotizacion',
   'oportunidad',
   'proyecto',
   'solicitud',
+  'prueba_caso',
 ] as const
 
 export type EntityFileType = (typeof ENTITY_FILE_TYPES)[number]

@@ -15,6 +15,8 @@ export type EntityNotesScope =
   | 'oportunidad'
   | 'cotizacion'
   | 'factura'
+  | 'boleta'
+  | 'gasto'
   | 'compra'
   | 'producto'
   | 'inventario'
@@ -147,7 +149,12 @@ export async function removeEntityNoteById(
 ): Promise<ContactNote[]> {
   if (isApiEnabled()) {
     await deleteEntityNoteApi(noteId)
-    return currentNotes.filter((n) => n.id !== noteId)
+    // Releer desde API: no confiar en currentNotes (puede llegar vacío por carrera de setState)
+    try {
+      return await listEntityNotesApi(scope, entityId)
+    } catch {
+      return currentNotes.filter((n) => n.id !== noteId)
+    }
   }
   const next = currentNotes.filter((n) => n.id !== noteId)
   persistEntityNotesLocal(scope, entityId, next)

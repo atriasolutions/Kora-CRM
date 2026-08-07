@@ -25,6 +25,10 @@ contactsRouter.get(
         q: query.q,
         status: query.status,
         companyId: query.companyId,
+        sortBy: query.sortBy,
+        sortDir: query.sortDir,
+        dateFrom: query.dateFrom,
+        dateTo: query.dateTo,
         archivedOnly: query.archived === true,
       })
       res.json({

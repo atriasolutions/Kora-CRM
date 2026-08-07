@@ -11,6 +11,13 @@ import {
 } from '@/data/projects.mock'
 import type { ProjectJourneyStage } from '@/lib/project-journey'
 import { PROJECT_JOURNEY_STAGE_OPTIONS } from '@/lib/project-journey'
+import {
+  createDefaultListDateFilter,
+  isListDateFilterActive,
+  listDateFilterToServerQuery,
+  listRowMatchesDateFilter,
+  type ListDateFilter,
+} from '@/lib/list-date-filter'
 
 export type ProjectDeadlineFilter = 'all' | 'month' | 'overdue'
 
@@ -20,6 +27,7 @@ export type ProjectFilters = {
   priorities: ProjectPriority[]
   health: ProjectHealth[]
   deadline: ProjectDeadlineFilter
+  date: ListDateFilter
 }
 
 export {
@@ -39,7 +47,14 @@ export const PROJECT_DEADLINE_OPTIONS: {
 ]
 
 export function createDefaultProjectFilters(): ProjectFilters {
-  return { statuses: [], journeyStages: [], priorities: [], health: [], deadline: 'all' }
+  return {
+    statuses: [],
+    journeyStages: [],
+    priorities: [],
+    health: [],
+    deadline: 'all',
+    date: createDefaultListDateFilter(),
+  }
 }
 
 export function countActiveProjectFilters(filters: ProjectFilters): number {
@@ -49,6 +64,7 @@ export function countActiveProjectFilters(filters: ProjectFilters): number {
   if (filters.priorities.length > 0) n += 1
   if (filters.health.length > 0) n += 1
   if (filters.deadline !== 'all') n += 1
+  if (isListDateFilterActive(filters.date)) n += 1
   return n
 }
 
@@ -76,5 +92,34 @@ export function projectRowMatchesFilters(
   }
   if (filters.health.length > 0 && !filters.health.includes(row.health)) return false
   if (!matchesDeadline(row.deadline, row.health, filters.deadline)) return false
+  if (!listRowMatchesDateFilter(row.createdAt, filters.date)) return false
   return true
+}
+
+export function projectFiltersToServerQuery(
+  filters: ProjectFilters,
+  options?: { mine?: boolean; ownerName?: string },
+): Record<string, string> {
+  const query: Record<string, string> = {
+    ...listDateFilterToServerQuery(filters.date),
+  }
+  if (filters.statuses.length > 0) {
+    query.status = filters.statuses.join(',')
+  }
+  if (filters.journeyStages.length > 0) {
+    query.journeyStage = filters.journeyStages.join(',')
+  }
+  if (filters.priorities.length > 0) {
+    query.priority = filters.priorities.join(',')
+  }
+  if (filters.health.length > 0) {
+    query.health = filters.health.join(',')
+  }
+  if (filters.deadline !== 'all') {
+    query.deadline = filters.deadline
+  }
+  if (options?.mine && options.ownerName?.trim()) {
+    query.ownerName = options.ownerName.trim()
+  }
+  return query
 }

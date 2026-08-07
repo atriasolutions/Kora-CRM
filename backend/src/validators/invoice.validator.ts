@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { listSortAndDateQueryFields } from '../lib/list-query.js'
+
 const invoiceLineSchema = z
   .object({
     id: z.string().optional(),
@@ -50,6 +52,7 @@ export const listInvoicesQuerySchema = z.object({
     .union([z.literal('true'), z.literal('false')])
     .optional()
     .transform((v) => v === 'true'),
+  ...listSortAndDateQueryFields,
 })
 
 export const createInvoiceAdjustmentSchema = z.object({

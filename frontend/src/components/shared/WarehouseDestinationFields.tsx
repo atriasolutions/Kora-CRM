@@ -32,6 +32,8 @@ type WarehouseDestinationFieldsProps = {
   addressHelperText?: string
   /** La dirección solo se muestra; se obtiene de la bodega en Configuración. */
   readOnlyDeliveryAddress?: boolean
+  /** Oculta el texto de ayuda bajo la dirección (p. ej. si el padre lo muestra debajo del grid). */
+  hideAddressHelper?: boolean
 }
 
 export function WarehouseDestinationFields({
@@ -45,6 +47,7 @@ export function WarehouseDestinationFields({
   addressLabel = 'Dirección de entrega',
   addressHelperText = 'Se carga desde Configuración → Direcciones de despacho al elegir la ubicación.',
   readOnlyDeliveryAddress = false,
+  hideAddressHelper = false,
 }: WarehouseDestinationFieldsProps) {
   const { catalog } = useCatalogSettings()
   const warehouses = activeWarehousesOrDefault(catalog.warehouses)
@@ -95,6 +98,7 @@ export function WarehouseDestinationFields({
         label={warehouseLabel}
         value={selectedId}
         onChange={handleWarehouseChange}
+        className="min-w-0"
         options={warehouses.map((w) => ({
           value: w.id,
           label: w.code?.trim() ? `${w.name} (${w.code})` : w.name,
@@ -102,10 +106,12 @@ export function WarehouseDestinationFields({
       />
       {readOnlyDeliveryAddress ? (
         <ContactFormField id={addressFieldId} label={addressLabel}>
-          <p className="truncate rounded-md border border-border bg-muted/40 px-3 py-2 text-sm font-medium text-foreground">
+          <p className="flex h-9 min-w-0 items-center truncate rounded-md border border-border bg-muted/40 px-3 text-sm font-medium text-foreground">
             {displayDeliveryAddress || '—'}
           </p>
-          <p className="text-xs text-muted-foreground">{addressHelperText}</p>
+          {!hideAddressHelper ? (
+            <p className="text-xs text-muted-foreground">{addressHelperText}</p>
+          ) : null}
           {selectedId && !addressFromCatalog ? (
             <p className="text-xs text-amber-700 dark:text-amber-400">
               Esta bodega no tiene dirección, región y comuna configuradas. Complétalas en

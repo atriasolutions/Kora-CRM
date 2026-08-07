@@ -59,15 +59,17 @@ export function ListTableToolbar({
               <span className="ms-1 rounded bg-primary px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground">
                 {columns.length - hiddenCount}/{columns.length}
               </span>
-            ) : null}
+            ) : (
+              <span className="ms-1 text-xs text-muted-foreground">ver más</span>
+            )}
             <ChevronDown aria-hidden className="size-3.5 opacity-70" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-72">
-          <DropdownMenuLabel>Columnas visibles y orden</DropdownMenuLabel>
+          <DropdownMenuLabel>Personalizar columnas</DropdownMenuLabel>
           <p className="px-2 pb-2 text-xs text-muted-foreground">
-            Usa las flechas para reordenar. Arrastra el borde del encabezado para
-            cambiar el ancho.
+            Activa campos adicionales, reordénalos con las flechas y ajusta el
+            ancho arrastrando el borde del encabezado.
           </p>
           {columns.map((col) => (
             <div

@@ -7,11 +7,14 @@ export type RecordModuleKey =
   | 'proyectos'
   | 'solicitudes'
   | 'bitacora'
+  | 'pruebas_solicitud'
   | 'compras'
   | 'ingresos'
   | 'inventario'
   | 'productos'
   | 'facturacion'
+  | 'boletas'
+  | 'gastos'
   | 'usuarios'
   | 'perfiles'
 
@@ -69,6 +72,11 @@ export const RECORD_MODULE_META: Record<RecordModuleKey, RecordModuleMeta> = {
     listPath: '/bitacora',
     listLabel: 'Bitácora',
   },
+  pruebas_solicitud: {
+    entityLabel: 'Prueba de solicitud',
+    listPath: '/pruebas-solicitud',
+    listLabel: 'Pruebas de Solicitud',
+  },
   compras: {
     entityLabel: 'Compra',
     listPath: '/compras',
@@ -93,6 +101,16 @@ export const RECORD_MODULE_META: Record<RecordModuleKey, RecordModuleMeta> = {
     entityLabel: 'Factura',
     listPath: '/facturacion',
     listLabel: 'Facturación',
+  },
+  boletas: {
+    entityLabel: 'Boleta',
+    listPath: '/boletas',
+    listLabel: 'Boletas',
+  },
+  gastos: {
+    entityLabel: 'Gasto',
+    listPath: '/gastos',
+    listLabel: 'Gastos',
   },
   usuarios: {
     entityLabel: 'Usuario',

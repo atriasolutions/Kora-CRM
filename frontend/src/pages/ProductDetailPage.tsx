@@ -4,6 +4,7 @@ import {
   Boxes,
   ChevronRight,
   FileText,
+  Layers,
   LayoutList,
   ShoppingCart,
   StickyNote,
@@ -18,6 +19,7 @@ import { mergeProductDetailFromListItem } from '@/api/products'
 import { useModulePermissions } from '@/hooks/use-module-permissions'
 import { getCurrentUser } from '@/lib/current-user'
 
+import { ConvertToParentDialog } from '@/components/products/ConvertToParentDialog'
 import { EditProductDialog } from '@/components/products/EditProductDialog'
 import { ProductDetailHeader } from '@/components/products/ProductDetailHeader'
 import { ProductDetailSidebar } from '@/components/products/ProductDetailSidebar'
@@ -25,6 +27,7 @@ import { ProductRelatedInventoryPanel } from '@/components/products/ProductRelat
 import { ProductRelatedInvoicesPanel } from '@/components/products/ProductRelatedInvoicesPanel'
 import { ProductRelatedPurchasesPanel } from '@/components/products/ProductRelatedPurchasesPanel'
 import { ProductRelatedStockReceiptsPanel } from '@/components/products/ProductRelatedStockReceiptsPanel'
+import { ProductVariantsPanel } from '@/components/products/ProductVariantsPanel'
 import { RegisterActivityDialog } from '@/components/contacts/RegisterActivityDialog'
 import { EntityActivitiesSection } from '@/components/shared/EntityActivitiesSection'
 import { EntityNotesPanel } from '@/components/shared/EntityNotesPanel'
@@ -57,10 +60,12 @@ import {
   parseProductDetailTab,
   type ProductDetailTab,
 } from '@/lib/product-routes'
+import { formatAttributesChips, resolveVariantKind } from '@/lib/product-variants'
 import { cn } from '@/lib/utils'
 
 const tabs: { id: ProductDetailTab; label: string; Icon: typeof LayoutList }[] = [
   { id: 'detalle', label: 'Detalle', Icon: LayoutList },
+  { id: 'variedades', label: 'Variedades', Icon: Layers },
   { id: 'actividad', label: 'Actividad', Icon: Zap },
   { id: 'inventario', label: 'Inventario', Icon: Boxes },
   { id: 'ingresos', label: 'Ingresos', Icon: ArrowDownToLine },
@@ -75,9 +80,11 @@ export function ProductDetailPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const tab: ProductDetailTab = parseProductDetailTab(searchParams) ?? 'detalle'
   const { canEdit, canDelete } = useModulePermissions('productos')
-  const { archiveProduct, isArchived, updateProductFromDetail } = useProductsRegistry()
+  const { archiveProduct, isArchived, updateProductFromDetail, reloadFromApi } =
+    useProductsRegistry()
   const stockVersion = useStockSync()
   const [product, setProduct] = useState<ProductDetail | null>(null)
+  const [convertOpen, setConvertOpen] = useState(false)
   const { loadState, reason, unavailableDetail, reload } = useRecordDetail({
     id: productId,
     load: loadProductDetail,
@@ -243,9 +250,46 @@ export function ProductDetailPage() {
             Productos
           </Link>
         </Button>
+        {product.parentProductId ? (
+          <>
+            <ChevronRight aria-hidden className="size-4 text-muted-foreground" />
+            <Link
+              to={`/productos/${product.parentProductId}`}
+              className="truncate text-muted-foreground hover:text-foreground hover:underline"
+            >
+              {product.parentName ?? 'Producto padre'}
+            </Link>
+          </>
+        ) : null}
         <ChevronRight aria-hidden className="size-4 text-muted-foreground" />
         <span className="truncate font-medium text-foreground">{product.name}</span>
       </nav>
+
+      {resolveVariantKind(product) === 'variant' ? (
+        <div className="flex flex-wrap gap-1.5">
+          {formatAttributesChips(
+            product.variantAttributes,
+            product.variantOptions?.map((o) => o.name),
+          ).map((chip) => (
+            <Badge key={chip} variant="secondary">
+              {chip}
+            </Badge>
+          ))}
+        </div>
+      ) : null}
+
+      {resolveVariantKind(product) === 'simple' && canEdit ? (
+        <div className="flex justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setConvertOpen(true)}
+          >
+            Convertir en producto con variedades
+          </Button>
+        </div>
+      ) : null}
 
       <ProductDetailHeader
         product={product}
@@ -253,6 +297,19 @@ export function ProductDetailPage() {
         onRegisterActivity={openRegisterActivity}
         onArchive={canDelete ? () => setArchiveOpen(true) : undefined}
       />
+
+      {canEdit && resolveVariantKind(product) === 'simple' ? (
+        <ConvertToParentDialog
+          open={convertOpen}
+          onOpenChange={setConvertOpen}
+          product={product}
+          onConverted={async () => {
+            await reloadFromApi()
+            await reload()
+            selectTab('variedades')
+          }}
+        />
+      ) : null}
 
       <RegisterActivityDialog
         open={activityDialogOpen}
@@ -307,8 +364,19 @@ export function ProductDetailPage() {
           role="tablist"
           aria-label="Secciones del producto"
         >
-          {tabs.map(({ id, label, Icon }) => {
-            const count = tabCount(id)
+          {tabs
+            .filter((t) => {
+              const kind = resolveVariantKind(product)
+              if (t.id === 'variedades') {
+                return kind === 'parent' || kind === 'simple'
+              }
+              return true
+            })
+            .map(({ id, label, Icon }) => {
+            const count =
+              id === 'variedades'
+                ? product.variantsCount ?? product.variants?.length
+                : tabCount(id)
             return (
               <button
                 key={id}
@@ -337,6 +405,17 @@ export function ProductDetailPage() {
 
         {tab === 'detalle' ? (
           <ProductDetailSidebar product={product} />
+        ) : null}
+
+        {tab === 'variedades' ? (
+          <ProductVariantsPanel
+            product={product}
+            canEdit={canEdit}
+            onChanged={async () => {
+              await reloadFromApi()
+              await reload()
+            }}
+          />
         ) : null}
 
         {tab === 'actividad' ? (
