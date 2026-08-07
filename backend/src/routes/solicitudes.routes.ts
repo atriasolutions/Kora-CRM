@@ -30,6 +30,7 @@ solicitudesRouter.get(
         pageSize: query.pageSize,
         q: query.q,
         status: query.status,
+        priority: query.priority,
         archivedOnly: query.archived === true,
         memberAccess:
           hasElevatedTenantScope(profile) || actor.isPlatformOperator

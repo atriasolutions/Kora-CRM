@@ -33,7 +33,7 @@ import { parseMoneyToCents } from '../utils/money.js'
 import { paginationOffset } from '../utils/pagination.js'
 
 import {
-  parseCommaSeparatedList,
+  pushInListCondition,
   pushDateRangeCondition,
   resolveOrderByClause,
 } from '../lib/list-query.js'
@@ -255,16 +255,7 @@ export async function listPurchases(
     conditions.push('archived_at IS NULL')
   }
   idx = pushTenantCondition(conditions, values, idx)
-  if (params.status?.trim()) {
-    const statuses = parseCommaSeparatedList(params.status)
-    if (statuses.length === 1) {
-      conditions.push(`status = $${idx++}`)
-      values.push(statuses[0])
-    } else if (statuses.length > 1) {
-      conditions.push(`status = ANY($${idx++}::text[])`)
-      values.push(statuses)
-    }
-  }
+  idx = pushInListCondition(conditions, values, idx, 'status', params.status)
   if (params.q) {
     conditions.push(
       `(reference ILIKE $${idx} OR supplier_name ILIKE $${idx} OR product_summary ILIKE $${idx})`,

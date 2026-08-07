@@ -25,7 +25,7 @@ import { parseDateInput } from '../utils/format.js'
 import { parseMoneyToCents } from '../utils/money.js'
 import { paginationOffset } from '../utils/pagination.js'
 import {
-  parseCommaSeparatedList,
+  pushInListCondition,
   pushDateRangeCondition,
   resolveOrderByClause,
 } from '../lib/list-query.js'
@@ -151,38 +151,11 @@ export async function listExpenses(
   pushTenantCondition(conditions, values, idx)
   idx = values.length + 1
 
-  if (params.status?.trim()) {
-    const statuses = parseCommaSeparatedList(params.status)
-    if (statuses.length === 1) {
-      conditions.push(`status = $${idx++}`)
-      values.push(statuses[0])
-    } else if (statuses.length > 1) {
-      conditions.push(`status = ANY($${idx++}::text[])`)
-      values.push(statuses)
-    }
-  }
+  idx = pushInListCondition(conditions, values, idx, 'status', params.status)
 
-  if (params.category?.trim()) {
-    const categories = parseCommaSeparatedList(params.category)
-    if (categories.length === 1) {
-      conditions.push(`category = $${idx++}`)
-      values.push(categories[0])
-    } else if (categories.length > 1) {
-      conditions.push(`category = ANY($${idx++}::text[])`)
-      values.push(categories)
-    }
-  }
+  idx = pushInListCondition(conditions, values, idx, 'category', params.category)
 
-  if (params.paymentMethod?.trim()) {
-    const methods = parseCommaSeparatedList(params.paymentMethod)
-    if (methods.length === 1) {
-      conditions.push(`payment_method = $${idx++}`)
-      values.push(methods[0])
-    } else if (methods.length > 1) {
-      conditions.push(`payment_method = ANY($${idx++}::text[])`)
-      values.push(methods)
-    }
-  }
+  idx = pushInListCondition(conditions, values, idx, 'payment_method', params.paymentMethod)
 
   if (params.supplierId?.trim()) {
     conditions.push(`supplier_id = $${idx++}`)

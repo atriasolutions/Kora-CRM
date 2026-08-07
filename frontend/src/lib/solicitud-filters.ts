@@ -29,8 +29,18 @@ export function createDefaultSolicitudFilters(): SolicitudFilters {
 
 export function countActiveSolicitudFilters(filters: SolicitudFilters): number {
   let n = 0
-  if (filters.statuses.length > 0) n += 1
-  if (filters.priorities.length > 0) n += 1
+  if (
+    filters.statuses.length > 0 &&
+    filters.statuses.length < SOLICITUD_STATUS_OPTIONS.length
+  ) {
+    n += 1
+  }
+  if (
+    filters.priorities.length > 0 &&
+    filters.priorities.length < SOLICITUD_PRIORITY_OPTIONS.length
+  ) {
+    n += 1
+  }
   if (isListDateFilterActive(filters.date)) n += 1
   return n
 }
@@ -39,8 +49,19 @@ export function solicitudRowMatchesFilters(
   row: SolicitudListItem,
   filters: SolicitudFilters,
 ): boolean {
-  if (filters.statuses.length > 0 && !filters.statuses.includes(row.status)) return false
-  if (filters.priorities.length > 0 && !filters.priorities.includes(row.priority)) {
+  // OR dentro de estado / prioridad; AND entre dimensiones.
+  if (
+    filters.statuses.length > 0 &&
+    filters.statuses.length < SOLICITUD_STATUS_OPTIONS.length &&
+    !filters.statuses.includes(row.status)
+  ) {
+    return false
+  }
+  if (
+    filters.priorities.length > 0 &&
+    filters.priorities.length < SOLICITUD_PRIORITY_OPTIONS.length &&
+    !filters.priorities.includes(row.priority)
+  ) {
     return false
   }
   if (!listRowMatchesDateFilter(row.createdAt, filters.date)) return false
@@ -54,10 +75,17 @@ export function solicitudFiltersToServerQuery(
   const query: Record<string, string> = {
     ...listDateFilterToServerQuery(filters.date),
   }
-  if (filters.statuses.length > 0) {
+  // OR dentro de cada dimensión. Si están todas las opciones, no filtrar.
+  if (
+    filters.statuses.length > 0 &&
+    filters.statuses.length < SOLICITUD_STATUS_OPTIONS.length
+  ) {
     query.status = filters.statuses.join(',')
   }
-  if (filters.priorities.length > 0) {
+  if (
+    filters.priorities.length > 0 &&
+    filters.priorities.length < SOLICITUD_PRIORITY_OPTIONS.length
+  ) {
     query.priority = filters.priorities.join(',')
   }
   if (options?.mine && options.ownerName?.trim()) {

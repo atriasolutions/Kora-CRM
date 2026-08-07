@@ -13,7 +13,7 @@ import type {
 import { paginationOffset } from '../utils/pagination.js'
 
 import {
-  parseCommaSeparatedList,
+  pushInListCondition,
   pushDateRangeCondition,
   resolveOrderByClause,
 } from '../lib/list-query.js'
@@ -71,16 +71,7 @@ export async function listCompanies(
   } else {
     conditions.push('archived_at IS NULL')
   }
-  if (params.lifecycle?.trim()) {
-    const lifecycles = parseCommaSeparatedList(params.lifecycle)
-    if (lifecycles.length === 1) {
-      conditions.push(`lifecycle = $${idx++}`)
-      values.push(lifecycles[0])
-    } else if (lifecycles.length > 1) {
-      conditions.push(`lifecycle = ANY($${idx++}::text[])`)
-      values.push(lifecycles)
-    }
-  }
+  idx = pushInListCondition(conditions, values, idx, 'lifecycle', params.lifecycle)
   if (params.q) {
     conditions.push(
       `(name ILIKE $${idx} OR rut ILIKE $${idx} OR industry ILIKE $${idx} OR city ILIKE $${idx})`,

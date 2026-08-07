@@ -28,7 +28,7 @@ import { normalizeProductCurrency } from '../types/currency.js'
 import { paginationOffset } from '../utils/pagination.js'
 
 import {
-  parseCommaSeparatedList,
+  pushInListCondition,
   pushDateRangeCondition,
   resolveOrderByClause,
 } from '../lib/list-query.js'
@@ -445,16 +445,7 @@ export async function listProductRows(
   } else {
     conditions.push('p.archived_at IS NULL')
   }
-  if (params.status?.trim()) {
-    const statuses = parseCommaSeparatedList(params.status)
-    if (statuses.length === 1) {
-      conditions.push(`p.status = $${idx++}`)
-      values.push(statuses[0])
-    } else if (statuses.length > 1) {
-      conditions.push(`p.status = ANY($${idx++}::text[])`)
-      values.push(statuses)
-    }
-  }
+  idx = pushInListCondition(conditions, values, idx, 'p.status', params.status)
   if (params.categoryId) {
     const scopeIds = await getProductCategoryScopeIds(params.categoryId)
     conditions.push(`p.category_id = ANY($${idx++}::uuid[])`)

@@ -34,7 +34,7 @@ import {
 import { paginationOffset } from '../utils/pagination.js'
 
 import {
-  parseCommaSeparatedList,
+  pushInListCondition,
   pushDateRangeCondition,
   resolveOrderByClause,
 } from '../lib/list-query.js'
@@ -145,16 +145,7 @@ export async function listOpportunities(
     conditions.push('archived_at IS NULL')
   }
   idx = pushTenantCondition(conditions, values, idx)
-  if (params.stage?.trim()) {
-    const stages = parseCommaSeparatedList(params.stage)
-    if (stages.length === 1) {
-      conditions.push(`stage = $${idx++}`)
-      values.push(stages[0])
-    } else if (stages.length > 1) {
-      conditions.push(`stage = ANY($${idx++}::text[])`)
-      values.push(stages)
-    }
-  }
+  idx = pushInListCondition(conditions, values, idx, 'stage', params.stage)
   if (params.outcome) {
     conditions.push(`outcome = $${idx++}`)
     values.push(params.outcome)

@@ -100,6 +100,9 @@ export function SolicitudesFiltersMenu({
 
         <DropdownMenuSeparator className="my-3" />
         <DropdownMenuLabel>Estado</DropdownMenuLabel>
+        <p className="mb-1 px-0.5 text-xs text-muted-foreground">
+          Varias opciones: coincide con cualquiera (OR).
+        </p>
         {SOLICITUD_STATUS_OPTIONS.map((status) => (
           <CheckboxRow
             key={status}
@@ -115,6 +118,9 @@ export function SolicitudesFiltersMenu({
         ))}
         <DropdownMenuSeparator />
         <DropdownMenuLabel>Prioridad</DropdownMenuLabel>
+        <p className="mb-1 px-0.5 text-xs text-muted-foreground">
+          Varias opciones: coincide con cualquiera (OR).
+        </p>
         {SOLICITUD_PRIORITY_OPTIONS.map((priority) => (
           <CheckboxRow
             key={priority}

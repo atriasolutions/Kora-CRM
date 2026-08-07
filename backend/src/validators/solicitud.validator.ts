@@ -26,6 +26,7 @@ export const listSolicitudesQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(200).default(50),
   q: z.string().optional(),
   status: z.string().optional(),
+  priority: z.string().optional(),
   archived: z
     .union([z.literal('true'), z.literal('false')])
     .optional()

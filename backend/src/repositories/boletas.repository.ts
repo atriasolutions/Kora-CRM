@@ -41,7 +41,7 @@ import { parseMoneyToCents, parsePercentToInt } from '../utils/money.js'
 import { paginationOffset } from '../utils/pagination.js'
 
 import {
-  parseCommaSeparatedList,
+  pushInListCondition,
   pushDateRangeCondition,
   resolveOrderByClause,
 } from '../lib/list-query.js'
@@ -230,27 +230,9 @@ export async function listBoletas(
   pushTenantCondition(conditions, values, idx)
   idx = values.length + 1
 
-  if (params.status?.trim()) {
-    const statuses = parseCommaSeparatedList(params.status)
-    if (statuses.length === 1) {
-      conditions.push(`status = $${idx++}`)
-      values.push(statuses[0])
-    } else if (statuses.length > 1) {
-      conditions.push(`status = ANY($${idx++}::text[])`)
-      values.push(statuses)
-    }
-  }
+  idx = pushInListCondition(conditions, values, idx, 'status', params.status)
 
-  if (params.paymentMethod?.trim()) {
-    const methods = parseCommaSeparatedList(params.paymentMethod)
-    if (methods.length === 1) {
-      conditions.push(`payment_method = $${idx++}`)
-      values.push(methods[0])
-    } else if (methods.length > 1) {
-      conditions.push(`payment_method = ANY($${idx++}::text[])`)
-      values.push(methods)
-    }
-  }
+  idx = pushInListCondition(conditions, values, idx, 'payment_method', params.paymentMethod)
 
   if (params.companyId?.trim()) {
     conditions.push(`company_id = $${idx++}`)

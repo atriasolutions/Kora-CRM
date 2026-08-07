@@ -36,7 +36,7 @@ import type {
 import { paginationOffset } from '../utils/pagination.js'
 
 import {
-  parseCommaSeparatedList,
+  pushInListCondition,
   pushDateRangeCondition,
   resolveOrderByClause,
 } from '../lib/list-query.js'
@@ -291,16 +291,7 @@ export async function listUsers(
   const values: unknown[] = [tenantId]
   let idx = 2
 
-  if (params.status?.trim()) {
-    const statuses = parseCommaSeparatedList(params.status)
-    if (statuses.length === 1) {
-      conditions.push(`u.status = $${idx++}`)
-      values.push(statuses[0])
-    } else if (statuses.length > 1) {
-      conditions.push(`u.status = ANY($${idx++}::text[])`)
-      values.push(statuses)
-    }
-  }
+  idx = pushInListCondition(conditions, values, idx, 'u.status', params.status)
   if (params.q) {
     conditions.push(
       `(u.name ILIKE $${idx} OR u.email ILIKE $${idx} OR u.role ILIKE $${idx} OR p.name ILIKE $${idx})`,

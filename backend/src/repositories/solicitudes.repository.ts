@@ -45,8 +45,8 @@ import type {
 import { paginationOffset } from '../utils/pagination.js'
 
 import {
-  parseCommaSeparatedList,
   pushDateRangeCondition,
+  pushInListCondition,
   resolveOrderByClause,
 } from '../lib/list-query.js'
 
@@ -70,6 +70,7 @@ export type ListSolicitudesParams = {
   pageSize: number
   q?: string
   status?: string
+  priority?: string
   archivedOnly?: boolean
   memberAccess?: { userId: string; userName: string }
   sortBy?: string
@@ -359,16 +360,8 @@ export async function listSolicitudes(
   }
   idx = pushTenantCondition(conditions, values, idx)
 
-  if (params.status?.trim()) {
-    const statuses = parseCommaSeparatedList(params.status)
-    if (statuses.length === 1) {
-      conditions.push(`status = $${idx++}`)
-      values.push(statuses[0])
-    } else if (statuses.length > 1) {
-      conditions.push(`status = ANY($${idx++}::text[])`)
-      values.push(statuses)
-    }
-  }
+  idx = pushInListCondition(conditions, values, idx, 'status', params.status)
+  idx = pushInListCondition(conditions, values, idx, 'priority', params.priority)
   if (params.q) {
     conditions.push(
       `(code ILIKE $${idx} OR title ILIKE $${idx} OR description ILIKE $${idx} OR assignee_name ILIKE $${idx} OR company_name ILIKE $${idx})`,
@@ -402,7 +395,7 @@ export async function listSolicitudes(
     conditions,
     values,
     idx,
-    'updated_at',
+    'created_at',
     params.dateFrom,
     params.dateTo,
   )

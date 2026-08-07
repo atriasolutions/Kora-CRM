@@ -52,6 +52,29 @@ export function parseCommaSeparatedList(value?: string | null): string[] {
   ]
 }
 
+/**
+ * Filtro multi-valor con lógica OR: `column IN (...)`.
+ * Usa `column::text` para funcionar con enums PostgreSQL y varchar.
+ */
+export function pushInListCondition(
+  conditions: string[],
+  values: unknown[],
+  idx: number,
+  columnSql: string,
+  raw?: string | null,
+): number {
+  const items = parseCommaSeparatedList(raw)
+  if (items.length === 0) return idx
+  if (items.length === 1) {
+    conditions.push(`${columnSql}::text = $${idx++}`)
+    values.push(items[0])
+    return idx
+  }
+  conditions.push(`${columnSql}::text = ANY($${idx++}::text[])`)
+  values.push(items)
+  return idx
+}
+
 /** Añade condición de rango sobre una columna DATE / timestamp. */
 export function pushDateRangeCondition(
   conditions: string[],
