@@ -114,8 +114,29 @@ function formatCompactMoney(cents: number): string {
 }
 
 function pctChange(current: number, previous: number): number {
-  if (previous <= 0) return current > 0 ? 100 : 0
+  if (previous <= 0) return 0
   return Math.round(((current - previous) / previous) * 100)
+}
+
+/** Altas reales del periodo: empresa o contacto creados como Cliente. */
+function newClientsSql(fromTs: string, toTsExclusive: string): string {
+  return `(
+    SELECT count(*)::int FROM (
+      SELECT c.id
+      FROM crm_companies c
+      WHERE c.deleted_at IS NULL AND c.archived_at IS NULL
+        AND lower(trim(c.lifecycle::text)) = 'cliente'
+        AND c.created_at >= ${fromTs} AND c.created_at < ${toTsExclusive}
+        AND ${dashTenantFilter('c')}
+      UNION
+      SELECT ct.id
+      FROM crm_contacts ct
+      WHERE ct.deleted_at IS NULL AND ct.archived_at IS NULL
+        AND lower(trim(ct.status::text)) = 'cliente'
+        AND ct.created_at >= ${fromTs} AND ct.created_at < ${toTsExclusive}
+        AND ${dashTenantFilter('ct')}
+    ) altas
+  )`
 }
 
 function activityIcon(type: string | null): DashboardPendingActivity['icon'] {
@@ -195,6 +216,7 @@ async function loadRevenueExpenseSeries(
            SELECT extract(year from order_date)::int AS year, amount_cents
            FROM crm_purchases
            WHERE deleted_at IS NULL AND archived_at IS NULL
+             AND status::text IN ('Emitida', 'Confirmada')
              AND order_date >= $1::date AND order_date <= $2::date
              AND ${dashTenantFilter()}
            UNION ALL
@@ -243,6 +265,7 @@ async function loadRevenueExpenseSeries(
            SELECT date_trunc('month', order_date)::date AS month, amount_cents
            FROM crm_purchases
            WHERE deleted_at IS NULL AND archived_at IS NULL
+             AND status::text IN ('Emitida', 'Confirmada')
              AND order_date >= $1::date AND order_date <= $2::date
              AND ${dashTenantFilter()}
            UNION ALL
@@ -295,6 +318,7 @@ async function loadRevenueExpenseSeries(
          SELECT order_date::date AS bucket, amount_cents
          FROM crm_purchases
          WHERE deleted_at IS NULL AND archived_at IS NULL
+           AND status::text IN ('Emitida', 'Confirmada')
            AND order_date >= $1::date AND order_date <= $2::date
            AND ${dashTenantFilter()}
          UNION ALL
@@ -397,56 +421,8 @@ async function getVentasDashboardSnapshot(
     ),
     tenantQuery<{ current: string; previous: string }>(
       `SELECT
-        (
-          SELECT count(*)::int FROM (
-            SELECT c.id::text AS kid
-            FROM crm_companies c
-            WHERE c.deleted_at IS NULL AND c.archived_at IS NULL
-              AND lower(trim(c.lifecycle::text)) = 'cliente'
-              AND c.created_at >= $1 AND c.created_at < $2
-              AND ${dashTenantFilter('c')}
-            UNION
-            SELECT ct.id::text
-            FROM crm_contacts ct
-            WHERE ct.deleted_at IS NULL AND ct.archived_at IS NULL
-              AND lower(trim(ct.status::text)) = 'cliente'
-              AND ct.created_at >= $1 AND ct.created_at < $2
-              AND ${dashTenantFilter('ct')}
-            UNION
-            SELECT DISTINCT o.company_id::text
-            FROM crm_opportunities o
-            WHERE o.deleted_at IS NULL AND o.archived_at IS NULL
-              AND o.company_id IS NOT NULL
-              AND coalesce(o.outcome::text, '') = 'Ganada'
-              AND o.updated_at >= $1 AND o.updated_at < $2
-              AND ${dashTenantFilter('o')}
-          ) nuevos
-        )::text AS current,
-        (
-          SELECT count(*)::int FROM (
-            SELECT c.id::text AS kid
-            FROM crm_companies c
-            WHERE c.deleted_at IS NULL AND c.archived_at IS NULL
-              AND lower(trim(c.lifecycle::text)) = 'cliente'
-              AND c.created_at >= $3 AND c.created_at < $4
-              AND ${dashTenantFilter('c')}
-            UNION
-            SELECT ct.id::text
-            FROM crm_contacts ct
-            WHERE ct.deleted_at IS NULL AND ct.archived_at IS NULL
-              AND lower(trim(ct.status::text)) = 'cliente'
-              AND ct.created_at >= $3 AND ct.created_at < $4
-              AND ${dashTenantFilter('ct')}
-            UNION
-            SELECT DISTINCT o.company_id::text
-            FROM crm_opportunities o
-            WHERE o.deleted_at IS NULL AND o.archived_at IS NULL
-              AND o.company_id IS NOT NULL
-              AND coalesce(o.outcome::text, '') = 'Ganada'
-              AND o.updated_at >= $3 AND o.updated_at < $4
-              AND ${dashTenantFilter('o')}
-          ) nuevos_prev
-        )::text AS previous`,
+        ${newClientsSql('$1', '$2')}::text AS current,
+        ${newClientsSql('$3', '$4')}::text AS previous`,
       [rangeStart, rangeEndExclusive, prevRangeStart, prevRangeEndExclusive],
     ),
     tenantQuery<{ current: string; previous: string }>(
@@ -513,6 +489,7 @@ async function getVentasDashboardSnapshot(
             SELECT sum(amount_cents)
             FROM crm_purchases
             WHERE deleted_at IS NULL AND archived_at IS NULL
+              AND status::text IN ('Emitida', 'Confirmada')
               AND order_date >= $1::date AND order_date <= $2::date
               AND ${dashTenantFilter()}
           ), 0)
@@ -531,6 +508,7 @@ async function getVentasDashboardSnapshot(
             SELECT sum(amount_cents)
             FROM crm_purchases
             WHERE deleted_at IS NULL AND archived_at IS NULL
+              AND status::text IN ('Emitida', 'Confirmada')
               AND order_date >= $3::date AND order_date <= $4::date
               AND ${dashTenantFilter()}
           ), 0)
@@ -676,7 +654,9 @@ async function getVentasDashboardSnapshot(
       title: 'Gastos',
       value: formatCompactMoney(expCurrent),
       changePercent: pctChange(expCurrent, expPrevious),
-      subtitle: `Compras + gastos · ${compareLabel}`,
+      subtitle: expPrevious > 0
+        ? `Compras + gastos · ${formatCompactMoney(expPrevious)} el periodo anterior`
+        : `Compras + gastos · ${compareLabel}`,
       accent: 'rose',
     },
     {
@@ -692,7 +672,7 @@ async function getVentasDashboardSnapshot(
       title: 'Clientes nuevos',
       value: String(clientCurrent),
       changePercent: pctChange(clientCurrent, clientPrevious),
-      subtitle: compareLabel,
+      subtitle: `Creados en el periodo · ${compareLabel}`,
       accent: 'violet',
     },
   ]
