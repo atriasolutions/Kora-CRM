@@ -1331,5 +1331,8 @@ export function getDefaultColumnIds(
 }
 
 export function getCellValue(row: ReportTableRow, fieldId: string): string {
-  return (row[fieldId] ?? '').trim()
+  // Preferir companion ISO (p. ej. expenseDateIso) para filtros de fecha.
+  const iso = row[`${fieldId}Iso`]
+  if (iso != null && String(iso).trim()) return String(iso).trim()
+  return (row[fieldId] ?? '').toString().trim()
 }
