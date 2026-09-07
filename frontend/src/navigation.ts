@@ -11,6 +11,7 @@ import {
   FileSpreadsheet,
   Receipt,
   UsersRound,
+  Users,
   ShoppingCart,
   ArrowDownToLine,
   Wallet,
@@ -91,6 +92,13 @@ export const navSections: NavSectionDef[] = [
       { label: 'Ingresos', path: '/ingresos', icon: ArrowDownToLine, moduleId: 'ingresos' },
       { label: 'Inventario', path: '/inventario', icon: Warehouse, moduleId: 'inventario' },
       { label: 'Productos', path: '/productos', icon: Boxes, moduleId: 'productos' },
+    ],
+  },
+  {
+    type: 'group',
+    heading: 'Personas',
+    items: [
+      { label: 'Trabajadores', path: '/trabajadores', icon: Users, moduleId: 'trabajadores' },
     ],
   },
   {

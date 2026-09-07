@@ -30,10 +30,11 @@ export function createDefaultReportFormValues(
 }
 
 export function reportToFormValues(report: ReportItem): ReportFormValues {
+  const kind = report.templateId ?? 'tabla-dinamica'
   return {
     name: report.name,
     folderId: report.folderId,
-    templateKind: 'tabla-dinamica',
+    templateKind: kind,
     reportType: report.reportType,
     author: report.author,
     description: report.description,
@@ -42,15 +43,21 @@ export function reportToFormValues(report: ReportItem): ReportFormValues {
 }
 
 export function reportFormToInput(values: ReportFormValues): ReportItemInput {
+  const isTable = values.templateKind === 'tabla-dinamica'
+  const isFinancial = values.templateKind === 'estados-financieros'
   return {
     name: values.name.trim(),
     folderId: values.folderId,
-    reportType: values.reportType.trim() || 'Tabla dinámica',
+    reportType:
+      values.reportType.trim() ||
+      (isFinancial ? 'Estados financieros' : isTable ? 'Tabla dinámica' : values.templateKind),
     author: values.author.trim(),
     schedule: 'Manual',
     description: values.description.trim(),
-    templateId: 'tabla-dinamica',
-    tableConfig: values.tableConfig ?? createDefaultReportTableConfig(),
+    templateId: values.templateKind,
+    tableConfig: isTable
+      ? values.tableConfig ?? createDefaultReportTableConfig()
+      : undefined,
   }
 }
 
@@ -62,4 +69,6 @@ export function validateReportForm(values: ReportFormValues): string | null {
 
 export const REPORT_TEMPLATE_KIND_OPTIONS: { value: ReportTemplateId; label: string }[] = [
   { value: 'tabla-dinamica', label: 'Tabla dinámica' },
+  { value: 'estados-financieros', label: 'Estados financieros (EE.FF.)' },
+  { value: 'nps-clientes', label: 'NPS clientes' },
 ]

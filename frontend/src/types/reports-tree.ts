@@ -3,7 +3,11 @@ import type { ReportTableConfig } from '@/types/report-table'
 export type ReportSchedule = 'Diario' | 'Semanal' | 'Mensual' | 'Trimestral' | 'Manual'
 
 /** Plantilla de ejecución del reporte (define qué vista se renderiza al pulsar Ejecutar). */
-export type ReportTemplateId = 'tabla-dinamica' | 'nps-clientes' | 'generic'
+export type ReportTemplateId =
+  | 'tabla-dinamica'
+  | 'nps-clientes'
+  | 'generic'
+  | 'estados-financieros'
 
 export type ReportItem = {
   id: string

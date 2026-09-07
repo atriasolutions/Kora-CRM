@@ -14,6 +14,7 @@ export type MenuModuleId =
   | 'pruebas_solicitud'
   | 'compras'
   | 'gastos'
+  | 'trabajadores'
   | 'ingresos'
   | 'inventario'
   | 'productos'
@@ -47,6 +48,7 @@ export const MODULE_LABELS: Record<MenuModuleId, string> = {
   pruebas_solicitud: 'Pruebas de Solicitud',
   compras: 'Compras',
   gastos: 'Gastos',
+  trabajadores: 'Trabajadores',
   ingresos: 'Ingresos',
   inventario: 'Inventario',
   productos: 'Productos',

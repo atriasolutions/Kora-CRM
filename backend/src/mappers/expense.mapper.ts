@@ -16,6 +16,8 @@ export type ExpenseRow = {
   supplier_name: string
   notes: string | null
   receipt_urls: unknown
+  document_type: string | null
+  document_folio: string | null
   is_partner_loan: boolean | null
   partner_user_id: string | null
   partner_name: string | null
@@ -53,6 +55,8 @@ export function mapExpenseRow(row: ExpenseRow): ExpenseListItem {
     owner: row.owner_name?.trim() || '—',
     notes,
     receiptUrls,
+    documentType: row.document_type?.trim() || '',
+    documentFolio: row.document_folio?.trim() || '',
     isPartnerLoan,
     partnerUserId: isPartnerLoan ? row.partner_user_id ?? undefined : undefined,
     partnerName: isPartnerLoan

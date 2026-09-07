@@ -1071,6 +1071,8 @@ const SOURCE_FIELD_TEMPLATES: Record<ReportDataSourceId, string[]> = {
     'currency',
     'paymentMethod',
     'status',
+    'documentType',
+    'documentFolio',
     'supplierId',
     'supplierName',
     'owner',

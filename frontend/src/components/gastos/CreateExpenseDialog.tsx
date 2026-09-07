@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/dialog'
 import {
   EXPENSE_CATEGORY_OPTIONS,
+  EXPENSE_DOCUMENT_TYPE_OPTIONS,
   EXPENSE_PAYMENT_METHOD_OPTIONS,
   EXPENSE_STATUS_OPTIONS,
   type ExpenseCategory,
@@ -197,6 +198,22 @@ export function CreateExpenseDialog({
           <p className="-mt-2 text-xs text-muted-foreground">
             Ingresa una URL por línea. Puedes agregar hasta 20 enlaces.
           </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <ContactFormSelect
+              id="create-gas-doc-type"
+              label="Tipo documento"
+              value={form.documentType}
+              onChange={(documentType) => patch({ documentType })}
+              options={[...EXPENSE_DOCUMENT_TYPE_OPTIONS]}
+            />
+            <ContactFormInput
+              id="create-gas-doc-folio"
+              label="Folio documento"
+              value={form.documentFolio}
+              onChange={(documentFolio) => patch({ documentFolio })}
+              placeholder="Ej. 12345"
+            />
+          </div>
           <ContactFormTextarea
             id="create-gas-notes"
             label="Notas"

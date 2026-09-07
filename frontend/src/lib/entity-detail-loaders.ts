@@ -8,6 +8,7 @@ import { normalizeQuoteDetailFromApi } from '@/lib/quote-detail-normalize'
 import { getInvoiceApi } from '@/api/invoices'
 import { getBoletaApi } from '@/api/boletas'
 import { getExpenseApi } from '@/api/expenses'
+import { getWorkerApi } from '@/api/workers'
 import { getProjectApi } from '@/api/projects'
 import { getSolicitudApi } from '@/api/solicitudes'
 import { getActivityApi } from '@/api/activities'
@@ -31,6 +32,7 @@ import type { QuoteDetail } from '@/data/quote-detail.mock'
 import type { InvoiceDetail } from '@/data/invoice-detail.mock'
 import type { BoletaDetail } from '@/data/boleta-detail.mock'
 import type { ExpenseDetail } from '@/data/expenses.mock'
+import type { WorkerDetail } from '@/data/workers.mock'
 import type { ProjectDetail } from '@/data/project-detail.mock'
 import type { SolicitudDetail } from '@/data/solicitudes.mock'
 import type { ActivityDetail } from '@/data/activity-detail.mock'
@@ -559,6 +561,24 @@ export async function loadExpenseDetail(id: string): Promise<ExpenseDetail> {
   const detail = getExpenseDetail(id)
   detail.notes = await mergeEntityNotes('gasto', id, detail.notes ?? [])
   detail.files = await mergeEntityFiles('gasto', id, getExpenseFiles(id, detail.owner))
+  return detail
+}
+
+export async function loadWorkerDetail(id: string): Promise<WorkerDetail> {
+  if (isApiEnabled()) {
+    const api = await getWorkerApi(id)
+    return {
+      ...api,
+      id: api.id,
+      notes: await mergeEntityNotes('trabajador', id, Array.isArray(api.notes) ? api.notes : []),
+      files: await mergeEntityFiles('trabajador', id, []),
+    }
+  }
+
+  const { getWorkerDetail } = await import('@/data/workers.mock')
+  const detail = getWorkerDetail(id)
+  detail.notes = await mergeEntityNotes('trabajador', id, detail.notes ?? [])
+  detail.files = await mergeEntityFiles('trabajador', id, [])
   return detail
 }
 

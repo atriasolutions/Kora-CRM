@@ -34,6 +34,8 @@ export function expenseDetailToFormValues(expense: ExpenseDetail): ExpenseFormVa
     ownerName: expense.owner,
     notes: expense.internalNotes ?? '',
     receiptUrlsText: (expense.receiptUrls ?? []).join('\n'),
+    documentType: expense.documentType ?? '',
+    documentFolio: expense.documentFolio ?? '',
     isPartnerLoan: Boolean(expense.isPartnerLoan),
     partnerUserId: expense.partnerUserId ?? '',
     partnerName: expense.partnerName ?? '',
@@ -60,6 +62,8 @@ export function applyFormValuesToExpense(
     owner: values.ownerName.trim(),
     internalNotes: values.notes.trim(),
     receiptUrls: normalizeExpenseReceiptUrls(values.receiptUrlsText),
+    documentType: values.documentType.trim() || '',
+    documentFolio: values.documentFolio.trim() || '',
     isPartnerLoan: values.isPartnerLoan,
     partnerUserId: values.isPartnerLoan
       ? values.partnerUserId.trim() || undefined

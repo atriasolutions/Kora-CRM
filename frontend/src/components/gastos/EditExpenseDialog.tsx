@@ -23,6 +23,7 @@ import {
 import type { ExpenseDetail } from '@/data/expenses.mock'
 import {
   EXPENSE_CATEGORY_OPTIONS,
+  EXPENSE_DOCUMENT_TYPE_OPTIONS,
   EXPENSE_PAYMENT_METHOD_OPTIONS,
   EXPENSE_STATUS_OPTIONS,
   type ExpenseCategory,
@@ -196,6 +197,22 @@ export function EditExpenseDialog({
           <p className="-mt-2 text-xs text-muted-foreground">
             Ingresa una URL por línea. Puedes agregar hasta 20 enlaces.
           </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <ContactFormSelect
+              id="edit-gas-doc-type"
+              label="Tipo documento"
+              value={form.documentType}
+              onChange={(documentType) => patch({ documentType })}
+              options={[...EXPENSE_DOCUMENT_TYPE_OPTIONS]}
+            />
+            <ContactFormInput
+              id="edit-gas-doc-folio"
+              label="Folio documento"
+              value={form.documentFolio}
+              onChange={(documentFolio) => patch({ documentFolio })}
+              placeholder="Ej. 12345"
+            />
+          </div>
           <ContactFormTextarea
             id="edit-gas-notes"
             label="Notas"

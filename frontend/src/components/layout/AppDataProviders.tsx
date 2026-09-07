@@ -10,6 +10,7 @@ import { InventoryRegistryProvider } from '@/contexts/inventory-registry'
 import { InvoicesRegistryProvider } from '@/contexts/invoices-registry'
 import { BoletasRegistryProvider } from '@/contexts/boletas-registry'
 import { ExpensesRegistryProvider } from '@/contexts/expenses-registry'
+import { WorkersRegistryProvider } from '@/contexts/workers-registry'
 import { OpportunitiesRegistryProvider } from '@/contexts/opportunities-registry'
 import { OrganizationSettingsProvider } from '@/contexts/organization-settings'
 import { ProductsRegistryProvider } from '@/contexts/products-registry'
@@ -47,6 +48,7 @@ export function AppDataProviders({ children }: { children?: ReactNode }) {
                           <InvoicesRegistryProvider>
                             <BoletasRegistryProvider>
                             <ExpensesRegistryProvider>
+                            <WorkersRegistryProvider>
                             <ReportsRegistryProvider>
                               <PurchasesRegistryProvider>
                                 <StockReceiptsRegistryProvider>
@@ -58,6 +60,7 @@ export function AppDataProviders({ children }: { children?: ReactNode }) {
                                 </StockReceiptsRegistryProvider>
                               </PurchasesRegistryProvider>
                             </ReportsRegistryProvider>
+                            </WorkersRegistryProvider>
                             </ExpensesRegistryProvider>
                             </BoletasRegistryProvider>
                           </InvoicesRegistryProvider>

@@ -30,6 +30,7 @@ export const listPurchasesQuerySchema = z.object({
 })
 
 const purchaseStatusSchema = z.enum(['Borrador', 'Emitida', 'Confirmada'])
+const purchasePaymentStatusSchema = z.enum(['Pendiente', 'Pagada'])
 
 const purchaseDetailFieldsSchema = z.object({
   description: z.string().max(10000).optional(),
@@ -54,6 +55,8 @@ export const createPurchaseSchema = purchaseDetailFieldsSchema.extend({
   amountNum: z.number().optional(),
   amountCents: z.number().optional(),
   status: purchaseStatusSchema.optional(),
+  paymentStatus: purchasePaymentStatusSchema.optional(),
+  paidAt: z.string().optional().nullable(),
   ownerName: z.string().optional(),
   lineItems: z.array(purchaseLineSchema).optional(),
 })

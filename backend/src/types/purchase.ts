@@ -1,5 +1,7 @@
 export type PurchaseStatus = 'Borrador' | 'Emitida' | 'Confirmada'
 
+export type PurchasePaymentStatus = 'Pendiente' | 'Pagada'
+
 export type PurchaseLineItemInput = {
   id?: string
   productId?: string
@@ -25,6 +27,8 @@ export type PurchaseListItem = {
   amount: string
   amountNum: number
   status: PurchaseStatus
+  paymentStatus: PurchasePaymentStatus
+  paidAt?: string
   owner: string
   createdAt: string
   createdById: string
@@ -80,6 +84,8 @@ export type CreatePurchaseInput = PurchaseDetailFields & {
   amountNum?: number
   amountCents?: number
   status?: PurchaseStatus
+  paymentStatus?: PurchasePaymentStatus
+  paidAt?: string | null
   ownerName?: string
   lineItems?: PurchaseLineItemInput[]
 }

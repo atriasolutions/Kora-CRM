@@ -14,6 +14,7 @@ export type MenuModuleId =
   | 'pruebas_solicitud'
   | 'compras'
   | 'gastos'
+  | 'trabajadores'
   | 'ingresos'
   | 'inventario'
   | 'productos'
@@ -44,6 +45,7 @@ export const MENU_MODULE_DEFINITIONS: MenuModuleDef[] = [
   { id: 'pruebas_solicitud', label: 'Pruebas de Solicitud', pathSegment: 'pruebas-solicitud' },
   { id: 'compras', label: 'Compras', pathSegment: 'compras' },
   { id: 'gastos', label: 'Gastos', pathSegment: 'gastos' },
+  { id: 'trabajadores', label: 'Trabajadores', pathSegment: 'trabajadores' },
   { id: 'ingresos', label: 'Ingresos', pathSegment: 'ingresos' },
   { id: 'inventario', label: 'Inventario', pathSegment: 'inventario' },
   { id: 'productos', label: 'Productos', pathSegment: 'productos' },

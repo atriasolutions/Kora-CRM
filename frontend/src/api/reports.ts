@@ -121,3 +121,16 @@ export async function executeReportTableApi(
   })
   return res.data
 }
+
+export async function executeFinancialStatementsApi(
+  body: import('@/types/financial-statements').FinancialStatementsRequest,
+): Promise<import('@/types/financial-statements').FinancialStatementsResult> {
+  const res = await fetchJSON<
+    ApiItemResponse<import('@/types/financial-statements').FinancialStatementsResult>
+  >(`${BASE}/execute-financial-statements`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  return res.data
+}

@@ -28,6 +28,7 @@ const MODULE_BY_ENTITY: Record<EntityNoteType, MenuModuleId> = {
   factura: 'facturacion',
   boleta: 'boletas',
   gasto: 'gastos',
+  trabajador: 'trabajadores',
   compra: 'compras',
   producto: 'productos',
   inventario: 'inventario',

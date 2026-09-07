@@ -2,7 +2,12 @@ import { z } from 'zod'
 
 const scheduleSchema = z.enum(['Diario', 'Semanal', 'Mensual', 'Trimestral', 'Manual'])
 
-const templateIdSchema = z.enum(['tabla-dinamica', 'nps-clientes', 'generic'])
+const templateIdSchema = z.enum([
+  'tabla-dinamica',
+  'nps-clientes',
+  'generic',
+  'estados-financieros',
+])
 
 const tableConfigSchema = z
   .object({

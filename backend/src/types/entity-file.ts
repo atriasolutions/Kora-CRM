@@ -6,6 +6,7 @@ export const ENTITY_FILE_TYPES = [
   'factura',
   'boleta',
   'gasto',
+  'trabajador',
   'cotizacion',
   'oportunidad',
   'proyecto',

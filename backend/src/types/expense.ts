@@ -1,4 +1,5 @@
 export const EXPENSE_CATEGORIES = [
+  // Operativas
   'Impuestos',
   'Arriendo',
   'Servicios',
@@ -11,9 +12,78 @@ export const EXPENSE_CATEGORIES = [
   'Seguros',
   'Mantención',
   'Otros',
+  // Planilla gastos menores (contador)
+  'Peajes',
+  'Viáticos',
+  'Permisos de circulación',
+  'Seguros SOAP',
+  'Contribuciones',
+  'Patente Comercial',
+  'Gastos menores con boletas',
+  'Arriendos sin factura',
+  'Fletes',
+  'Finiquitos',
+  'Pagos o Gastos Judiciales',
+  'Retiros Socios',
 ] as const
 
 export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number]
+
+/** Categorías típicas de la planilla de gastos menores (requieren respaldo). */
+export const EXPENSE_MINOR_CATEGORIES = [
+  'Peajes',
+  'Viáticos',
+  'Permisos de circulación',
+  'Seguros SOAP',
+  'Contribuciones',
+  'Patente Comercial',
+  'Gastos menores con boletas',
+  'Arriendos sin factura',
+  'Fletes',
+  'Finiquitos',
+  'Pagos o Gastos Judiciales',
+  'Retiros Socios',
+] as const
+
+export const EXPENSE_DOCUMENT_TYPES = [
+  '',
+  'Boleta',
+  'Factura',
+  'Recibo',
+  'Otro',
+] as const
+
+export type ExpenseDocumentType = (typeof EXPENSE_DOCUMENT_TYPES)[number]
+
+/** Mapeo categoría → función contable (Estado de Resultados por función). */
+export type ExpenseAccountingFunction = 'ventas' | 'administracion' | 'otro' | 'socios'
+
+export const EXPENSE_CATEGORY_FUNCTION: Record<string, ExpenseAccountingFunction> = {
+  Marketing: 'ventas',
+  Fletes: 'ventas',
+  Viáticos: 'ventas',
+  Peajes: 'ventas',
+  Transporte: 'ventas',
+  Impuestos: 'administracion',
+  Arriendo: 'administracion',
+  'Arriendos sin factura': 'administracion',
+  Servicios: 'administracion',
+  Software: 'administracion',
+  Salarios: 'administracion',
+  Seguros: 'administracion',
+  'Seguros SOAP': 'administracion',
+  Mantención: 'administracion',
+  Contribuciones: 'administracion',
+  'Patente Comercial': 'administracion',
+  'Permisos de circulación': 'administracion',
+  'Gastos menores con boletas': 'administracion',
+  'Pagos o Gastos Judiciales': 'administracion',
+  Finiquitos: 'administracion',
+  Equipos: 'otro',
+  Otros: 'otro',
+  Retiros: 'socios',
+  'Retiros Socios': 'socios',
+}
 
 export const EXPENSE_STATUSES = ['Borrador', 'Registrado', 'Anulado'] as const
 
@@ -48,6 +118,8 @@ export type ExpenseListItem = {
   owner: string
   notes?: string
   receiptUrls: string[]
+  documentType: string
+  documentFolio: string
   isPartnerLoan: boolean
   partnerUserId?: string
   partnerName?: string
@@ -79,6 +151,8 @@ export type CreateExpenseInput = {
   supplierName?: string
   notes?: string
   receiptUrls?: string[]
+  documentType?: string
+  documentFolio?: string
   isPartnerLoan?: boolean
   partnerUserId?: string | null
   partnerName?: string

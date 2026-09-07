@@ -17,6 +17,7 @@ export type EntityNotesScope =
   | 'factura'
   | 'boleta'
   | 'gasto'
+  | 'trabajador'
   | 'compra'
   | 'producto'
   | 'inventario'

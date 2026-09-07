@@ -13,7 +13,9 @@ import {
   updateReportSchema,
 } from '../validators/report.validator.js'
 import { executeReportTable } from '../services/report-table-run.service.js'
+import { buildFinancialStatements } from '../services/estados-financieros.service.js'
 import type { ReportTableConfig } from '../types/report-table.js'
+import { executeFinancialStatementsSchema } from '../validators/financial-statements.validator.js'
 
 export const reportsRouter = Router()
 
@@ -37,6 +39,20 @@ reportsRouter.post(
     try {
       const body = executeReportTableSchema.parse(req.body)
       const data = await executeReportTable(body.tableConfig as ReportTableConfig)
+      res.json({ data })
+    } catch (e) {
+      next(e)
+    }
+  },
+)
+
+reportsRouter.post(
+  '/execute-financial-statements',
+  requirePermission('reportes', 'view'),
+  async (req, res, next) => {
+    try {
+      const body = executeFinancialStatementsSchema.parse(req.body)
+      const data = await buildFinancialStatements(body)
       res.json({ data })
     } catch (e) {
       next(e)

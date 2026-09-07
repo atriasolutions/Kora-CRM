@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { listSortAndDateQueryFields } from '../lib/list-query.js'
 import {
   EXPENSE_CATEGORIES,
+  EXPENSE_DOCUMENT_TYPES,
   EXPENSE_PAYMENT_METHODS,
   EXPENSE_STATUSES,
 } from '../types/expense.js'
@@ -10,6 +11,7 @@ import {
 const expenseStatusSchema = z.enum(EXPENSE_STATUSES)
 const expenseCategorySchema = z.enum(EXPENSE_CATEGORIES)
 const paymentMethodSchema = z.enum(EXPENSE_PAYMENT_METHODS)
+const documentTypeSchema = z.enum(EXPENSE_DOCUMENT_TYPES)
 const receiptUrlsSchema = z
   .array(z.string().trim().url('La URL del comprobante no es válida.').max(2048))
   .max(20, 'Puedes agregar hasta 20 comprobantes.')
@@ -73,6 +75,8 @@ export const createExpenseSchema = z
     supplierName: z.string().max(255).optional(),
     notes: z.string().max(2000).optional(),
     receiptUrls: receiptUrlsSchema.optional(),
+    documentType: documentTypeSchema.optional(),
+    documentFolio: z.string().max(64).optional(),
     ownerName: z.string().max(255).optional(),
     ...partnerLoanFields,
   })
@@ -118,6 +122,8 @@ export const updateExpenseSchema = z
     supplierName: z.string().max(255).optional(),
     notes: z.string().max(2000).optional(),
     receiptUrls: receiptUrlsSchema.optional(),
+    documentType: documentTypeSchema.optional(),
+    documentFolio: z.string().max(64).optional(),
     ownerName: z.string().max(255).optional(),
     ...partnerLoanFields,
   })

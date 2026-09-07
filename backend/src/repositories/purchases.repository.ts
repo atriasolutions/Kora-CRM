@@ -41,7 +41,7 @@ import { purgeEntityNotesAndFiles } from '../services/entity-purge.service.js'
 
 const PURCHASE_COLUMNS = `
   id, reference, supplier_id, supplier_name, product_summary, order_date,
-  amount_cents, status,
+  amount_cents, status, payment_status, paid_at,
   description, expected_delivery, payment_terms,
   warehouse_id, warehouse_name, delivery_address,
   supplier_contact_id, supplier_contact_name, supplier_email, supplier_phone,
@@ -351,7 +351,7 @@ export async function createPurchase(
     const result = await client.query<PurchaseRow>(
       `INSERT INTO crm_purchases (
         reference, supplier_id, supplier_name, product_summary, order_date,
-        amount_cents, status,
+        amount_cents, status, payment_status, paid_at,
         description, expected_delivery, payment_terms,
         warehouse_id, warehouse_name, delivery_address,
         supplier_contact_id, supplier_contact_name, supplier_email, supplier_phone,
@@ -359,10 +359,10 @@ export async function createPurchase(
         exchange_rate_uf, exchange_rate_usd, exchange_rate_eur, exchange_rate_date,
         created_by_id, created_by_name, updated_by_id, updated_by_name, tenant_id
       ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7,
-        $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
-        $18, $19, $20, $21, $22,
-        $23, $24, $23, $24, $25
+        $1, $2, $3, $4, $5, $6, $7, $8, $9,
+        $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
+        $20, $21, $22, $23, $24,
+        $25, $26, $25, $26, $27
       )
       RETURNING ${PURCHASE_COLUMNS}`,
       [
@@ -373,6 +373,11 @@ export async function createPurchase(
         orderDate,
         amountCents,
         input.status ?? 'Borrador',
+        input.paymentStatus ?? 'Pendiente',
+        input.paymentStatus === 'Pagada'
+          ? (parseDateInput(input.paidAt ?? undefined) ??
+            new Date().toISOString().slice(0, 10))
+          : parseDateInput(input.paidAt ?? undefined),
         detail.description,
         detail.expectedDelivery,
         detail.paymentTerms,
@@ -481,25 +486,27 @@ export async function updatePurchase(
         order_date = COALESCE($6, order_date),
         amount_cents = $7,
         status = COALESCE($8, status),
-        description = COALESCE($9, description),
-        expected_delivery = COALESCE($10, expected_delivery),
-        payment_terms = COALESCE($11, payment_terms),
-        warehouse_id = COALESCE($12, warehouse_id),
-        warehouse_name = COALESCE($13, warehouse_name),
-        delivery_address = COALESCE($14, delivery_address),
-        supplier_contact_id = COALESCE($15, supplier_contact_id),
-        supplier_contact_name = COALESCE($16, supplier_contact_name),
-        supplier_email = COALESCE($17, supplier_email),
-        supplier_phone = COALESCE($18, supplier_phone),
-        owner_name = COALESCE($19, owner_name),
-        exchange_rate_uf = COALESCE($20, exchange_rate_uf),
-        exchange_rate_usd = COALESCE($21, exchange_rate_usd),
-        exchange_rate_eur = COALESCE($22, exchange_rate_eur),
-        exchange_rate_date = COALESCE($23, exchange_rate_date),
-        updated_by_id = $24,
-        updated_by_name = $25,
+        payment_status = COALESCE($9, payment_status),
+        paid_at = COALESCE($10, paid_at),
+        description = COALESCE($11, description),
+        expected_delivery = COALESCE($12, expected_delivery),
+        payment_terms = COALESCE($13, payment_terms),
+        warehouse_id = COALESCE($14, warehouse_id),
+        warehouse_name = COALESCE($15, warehouse_name),
+        delivery_address = COALESCE($16, delivery_address),
+        supplier_contact_id = COALESCE($17, supplier_contact_id),
+        supplier_contact_name = COALESCE($18, supplier_contact_name),
+        supplier_email = COALESCE($19, supplier_email),
+        supplier_phone = COALESCE($20, supplier_phone),
+        owner_name = COALESCE($21, owner_name),
+        exchange_rate_uf = COALESCE($22, exchange_rate_uf),
+        exchange_rate_usd = COALESCE($23, exchange_rate_usd),
+        exchange_rate_eur = COALESCE($24, exchange_rate_eur),
+        exchange_rate_date = COALESCE($25, exchange_rate_date),
+        updated_by_id = $26,
+        updated_by_name = $27,
         updated_at = now()
-      WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(26)}
+      WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(28)}
       RETURNING ${PURCHASE_COLUMNS}`,
       [
         id,
@@ -512,6 +519,12 @@ export async function updatePurchase(
         parseDateInput(input.orderDate),
         amountCents,
         input.status ?? null,
+        input.paymentStatus ?? null,
+        input.paidAt !== undefined
+          ? parseDateInput(input.paidAt ?? undefined)
+          : input.paymentStatus === 'Pagada'
+            ? new Date().toISOString().slice(0, 10)
+            : null,
         detailPatch?.description ?? null,
         detailPatch?.expectedDelivery ?? null,
         detailPatch?.paymentTerms ?? null,

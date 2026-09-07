@@ -13,6 +13,7 @@ export type EntityFilesScope =
   | 'factura'
   | 'boleta'
   | 'gasto'
+  | 'trabajador'
   | 'cotizacion'
   | 'oportunidad'
   | 'proyecto'

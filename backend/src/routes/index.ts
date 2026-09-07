@@ -9,6 +9,7 @@ import { dashboardRouter } from './dashboard.routes.js'
 import { inventoryRouter } from './inventory.routes.js'
 import { boletasRouter } from './boletas.routes.js'
 import { expensesRouter } from './expenses.routes.js'
+import { workersRouter } from './workers.routes.js'
 import { invoicesRouter } from './invoices.routes.js'
 import { siiRouter } from './sii.routes.js'
 import { opportunitiesRouter } from './opportunities.routes.js'
@@ -65,6 +66,7 @@ apiRouter.use('/quotes', quotesRouter)
 apiRouter.use('/invoices', invoicesRouter)
 apiRouter.use('/boletas', boletasRouter)
 apiRouter.use('/expenses', expensesRouter)
+apiRouter.use('/workers', workersRouter)
 apiRouter.use('/sii', siiRouter)
 apiRouter.use('/projects', projectsRouter)
 apiRouter.use('/solicitudes', solicitudesRouter)

@@ -17,9 +17,11 @@ import {
 } from '@/components/ui/dialog'
 import {
   createDefaultReportFormValues,
+  REPORT_TEMPLATE_KIND_OPTIONS,
   validateReportForm,
   type ReportFormValues,
 } from '@/lib/report-item-form'
+import type { ReportTemplateId } from '@/types/reports-tree'
 import { UserLookupField } from '@/components/shared/UserLookupField'
 import type { ReportFolder } from '@/types/reports-tree'
 
@@ -79,7 +81,7 @@ export function ReportItemDialog({
         <DialogHeader>
           <DialogTitle>{mode === 'create' ? 'Nuevo reporte' : 'Editar reporte'}</DialogTitle>
           <DialogDescription>
-            Crea un reporte de tabla dinámica: elige columnas, filtros y exporta a Excel.
+            Elige la plantilla (tabla dinámica o estados financieros) y guarda el reporte.
           </DialogDescription>
         </DialogHeader>
         <form className="space-y-4" onSubmit={handleSubmit}>
@@ -88,6 +90,23 @@ export function ReportItemDialog({
             label="Nombre"
             value={form.name}
             onChange={(name) => patch({ name })}
+          />
+          <ContactFormSelect
+            id="rpt-template"
+            label="Plantilla"
+            value={form.templateKind}
+            onChange={(templateKind) =>
+              patch({
+                templateKind: templateKind as ReportTemplateId,
+                reportType:
+                  REPORT_TEMPLATE_KIND_OPTIONS.find((o) => o.value === templateKind)
+                    ?.label ?? form.reportType,
+              })
+            }
+            options={REPORT_TEMPLATE_KIND_OPTIONS.map((o) => ({
+              value: o.value,
+              label: o.label,
+            }))}
           />
           <ContactFormSelect
             id="rpt-folder"

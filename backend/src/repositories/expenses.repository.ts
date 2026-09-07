@@ -35,6 +35,7 @@ import { getCompanyLinkById } from './companies.repository.js'
 const EXPENSE_COLUMNS = `
   id, number, concept, category, expense_date, amount_cents, currency,
   payment_method, status, supplier_id, supplier_name, notes, receipt_urls,
+  document_type, document_folio,
   is_partner_loan, partner_user_id, partner_name, partner_loan_returned, owner_name,
   created_at, created_by_id, created_by_name,
   updated_at, updated_by_id, updated_by_name
@@ -256,13 +257,15 @@ export async function createExpense(
     `INSERT INTO crm_expenses (
       number, concept, category, expense_date, amount_cents, currency,
       payment_method, status, supplier_id, supplier_name, notes, receipt_urls,
+      document_type, document_folio,
       is_partner_loan, partner_user_id, partner_name, partner_loan_returned, owner_name,
       created_by_id, created_by_name, updated_by_id, updated_by_name, tenant_id
     ) VALUES (
       $1, $2, $3, $4, $5, $6,
       $7, $8, $9, $10, $11, $12,
-      $13, $14, $15, $16, $17,
-      $18, $19, $18, $19, $20
+      $13, $14,
+      $15, $16, $17, $18, $19,
+      $20, $21, $20, $21, $22
     )
     RETURNING ${EXPENSE_COLUMNS}`,
     [
@@ -278,6 +281,8 @@ export async function createExpense(
       supplier.supplierName,
       input.notes?.trim() || null,
       JSON.stringify(input.receiptUrls ?? []),
+      input.documentType?.trim() || '',
+      input.documentFolio?.trim() || '',
       partnerLoan.isPartnerLoan,
       partnerLoan.partnerUserId,
       partnerLoan.partnerName,
@@ -376,15 +381,17 @@ export async function updateExpense(
       supplier_name = $11,
       notes = $12,
       receipt_urls = $13,
-      is_partner_loan = $14,
-      partner_user_id = $15,
-      partner_name = $16,
-      partner_loan_returned = $17,
-      owner_name = $18,
-      updated_by_id = $19,
-      updated_by_name = $20,
+      document_type = $14,
+      document_folio = $15,
+      is_partner_loan = $16,
+      partner_user_id = $17,
+      partner_name = $18,
+      partner_loan_returned = $19,
+      owner_name = $20,
+      updated_by_id = $21,
+      updated_by_name = $22,
       updated_at = now()
-     WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(21)}
+     WHERE id = $1 AND deleted_at IS NULL AND ${tenantWhereParam(23)}
      RETURNING ${EXPENSE_COLUMNS}`,
     [
       id,
@@ -409,6 +416,12 @@ export async function updateExpense(
       input.receiptUrls !== undefined
         ? JSON.stringify(input.receiptUrls)
         : JSON.stringify(existing.receipt_urls),
+      input.documentType !== undefined
+        ? input.documentType.trim()
+        : existing.document_type ?? '',
+      input.documentFolio !== undefined
+        ? input.documentFolio.trim()
+        : existing.document_folio ?? '',
       partnerLoan.isPartnerLoan,
       partnerLoan.partnerUserId,
       partnerLoan.partnerName,

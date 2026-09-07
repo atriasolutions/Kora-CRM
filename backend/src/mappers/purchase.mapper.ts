@@ -20,6 +20,8 @@ export type PurchaseRow = {
   order_date: Date | string | null
   amount_cents: string | number
   status: PurchaseListItem['status']
+  payment_status: PurchaseListItem['paymentStatus'] | null
+  paid_at: Date | string | null
   description: string | null
   expected_delivery: Date | string | null
   payment_terms: string | null
@@ -72,6 +74,8 @@ export function mapPurchaseRow(row: PurchaseRow): PurchaseListItem {
     amount: formatCentsToMoney(amountCents),
     amountNum: Math.round(amountCents / 100),
     status: row.status,
+    paymentStatus: row.payment_status === 'Pagada' ? 'Pagada' : 'Pendiente',
+    paidAt: row.paid_at ? formatDateLabel(row.paid_at) : undefined,
     owner: row.owner_name ?? '',
     createdAt: toIsoString(row.created_at),
     createdById: row.created_by_id ?? '',

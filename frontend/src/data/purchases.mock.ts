@@ -2,6 +2,7 @@ import type { RecordAuditFields } from '@/lib/record-audit'
 import { ensureRecordAuditList } from '@/lib/seed-audit'
 
 export type PurchaseStatus = 'Borrador' | 'Emitida' | 'Confirmada'
+export type PurchasePaymentStatus = 'Pendiente' | 'Pagada'
 
 export type PurchaseListItem = {
   id: string
@@ -13,6 +14,8 @@ export type PurchaseListItem = {
   amount: string
   amountNum: number
   status: PurchaseStatus
+  paymentStatus?: PurchasePaymentStatus
+  paidAt?: string
   owner: string
 } & RecordAuditFields
 
@@ -22,6 +25,11 @@ export const PURCHASE_STATUS_OPTIONS: PurchaseStatus[] = [
   'Borrador',
   'Emitida',
   'Confirmada',
+]
+
+export const PURCHASE_PAYMENT_STATUS_OPTIONS: PurchasePaymentStatus[] = [
+  'Pendiente',
+  'Pagada',
 ]
 
 const purchaseListSeedRaw: Omit<PurchaseListItem, keyof RecordAuditFields>[] = [

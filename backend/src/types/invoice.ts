@@ -69,6 +69,10 @@ export type InvoiceListItem = {
   taxableAmount?: string
   exemptAmount?: string
   taxAmount?: string
+  /** Suma de abonos Confirmado (pesos). */
+  paidAmountNum?: number
+  /** Saldo pendiente de cobro (pesos). */
+  balanceDueNum?: number
   createdAt: string
   createdById: string
   createdByName: string

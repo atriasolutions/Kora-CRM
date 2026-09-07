@@ -15,6 +15,7 @@ export type RecordModuleKey =
   | 'facturacion'
   | 'boletas'
   | 'gastos'
+  | 'trabajadores'
   | 'usuarios'
   | 'perfiles'
 
@@ -111,6 +112,11 @@ export const RECORD_MODULE_META: Record<RecordModuleKey, RecordModuleMeta> = {
     entityLabel: 'Gasto',
     listPath: '/gastos',
     listLabel: 'Gastos',
+  },
+  trabajadores: {
+    entityLabel: 'Trabajador',
+    listPath: '/trabajadores',
+    listLabel: 'Trabajadores',
   },
   usuarios: {
     entityLabel: 'Usuario',

@@ -17,9 +17,31 @@ export const EXPENSE_CATEGORIES = [
   'Seguros',
   'Mantención',
   'Otros',
+  'Peajes',
+  'Viáticos',
+  'Permisos de circulación',
+  'Seguros SOAP',
+  'Contribuciones',
+  'Patente Comercial',
+  'Gastos menores con boletas',
+  'Arriendos sin factura',
+  'Fletes',
+  'Finiquitos',
+  'Pagos o Gastos Judiciales',
+  'Retiros Socios',
 ] as const
 
 export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number]
+
+export const EXPENSE_DOCUMENT_TYPES = [
+  '',
+  'Boleta',
+  'Factura',
+  'Recibo',
+  'Otro',
+] as const
+
+export type ExpenseDocumentType = (typeof EXPENSE_DOCUMENT_TYPES)[number]
 
 export type ExpenseStatus = 'Borrador' | 'Registrado' | 'Anulado'
 
@@ -49,6 +71,8 @@ export type ExpenseListItem = {
   owner: string
   notes?: string
   receiptUrls: string[]
+  documentType?: string
+  documentFolio?: string
   isPartnerLoan: boolean
   partnerUserId?: string
   partnerName?: string
@@ -79,6 +103,14 @@ export const EXPENSE_PAYMENT_METHOD_OPTIONS: ExpensePaymentMethod[] = [
 
 export const EXPENSE_CATEGORY_OPTIONS: ExpenseCategory[] = [...EXPENSE_CATEGORIES]
 
+export const EXPENSE_DOCUMENT_TYPE_OPTIONS = [
+  { value: '', label: 'Sin tipo' },
+  { value: 'Boleta', label: 'Boleta' },
+  { value: 'Factura', label: 'Factura' },
+  { value: 'Recibo', label: 'Recibo' },
+  { value: 'Otro', label: 'Otro' },
+] as const
+
 const expenseListSeedRaw: Omit<ExpenseListItem, keyof RecordAuditFields>[] = [
   {
     id: 'gas1',
@@ -94,6 +126,8 @@ const expenseListSeedRaw: Omit<ExpenseListItem, keyof RecordAuditFields>[] = [
     supplierName: 'Inmobiliaria Centro',
     owner: 'Ana Ruiz',
     receiptUrls: [],
+    documentType: '',
+    documentFolio: '',
     isPartnerLoan: false,
     partnerLoanReturned: false,
   },
@@ -110,6 +144,8 @@ const expenseListSeedRaw: Omit<ExpenseListItem, keyof RecordAuditFields>[] = [
     status: 'Registrado',
     owner: 'María López',
     receiptUrls: [],
+    documentType: '',
+    documentFolio: '',
     isPartnerLoan: false,
     partnerLoanReturned: false,
   },
@@ -126,6 +162,8 @@ const expenseListSeedRaw: Omit<ExpenseListItem, keyof RecordAuditFields>[] = [
     status: 'Borrador',
     owner: 'Carlos Vega',
     receiptUrls: [],
+    documentType: '',
+    documentFolio: '',
     isPartnerLoan: false,
     partnerLoanReturned: false,
   },
@@ -154,6 +192,8 @@ export function resolveExpenseListItem(id: string): ExpenseListItem {
     status: 'Borrador',
     owner: '—',
     receiptUrls: [],
+    documentType: '',
+    documentFolio: '',
     isPartnerLoan: false,
     partnerLoanReturned: false,
     createdAt: '',

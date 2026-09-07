@@ -134,6 +134,8 @@ export const REPORT_FIELD_LABELS: Record<string, string> = {
   updatedByName: 'Modificado por',
   concept: 'Concepto',
   expenseDate: 'Fecha gasto',
+  documentType: 'Tipo documento',
+  documentFolio: 'Folio documento',
   currency: 'Moneda',
   supplierName: 'Proveedor',
   isPartnerLoan: 'Préstamo de socio',

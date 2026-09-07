@@ -197,8 +197,17 @@ export function mapInvoiceDetail(
   },
 ): InvoiceDetail {
   const exchange = mapDocumentExchangeRates(row)
+  const base = mapInvoiceRow(row)
+  const amountCents = Number(row.amount_cents ?? 0)
+  const paidCents = payments
+    .filter((p) => p.status === 'Confirmado')
+    .reduce((sum, p) => sum + Number(p.amount_cents ?? 0), 0)
+  const balanceCents =
+    row.status === 'Pagada' ? 0 : Math.max(0, amountCents - paidCents)
   return {
-    ...mapInvoiceRow(row),
+    ...base,
+    paidAmountNum: Math.round(paidCents / 100),
+    balanceDueNum: Math.round(balanceCents / 100),
     quoteCode: row.quote_code || undefined,
     globalDiscount: formatDiscountPct(row.global_discount_pct),
     lineItems: lineItems.map(mapInvoiceLineRow),

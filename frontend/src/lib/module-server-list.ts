@@ -9,6 +9,7 @@ import type { InventoryListItem } from '@/data/inventory.mock'
 import type { InvoiceListItem } from '@/data/invoices.mock'
 import type { BoletaListItem } from '@/data/boletas.mock'
 import type { ExpenseListItem } from '@/data/expenses.mock'
+import type { WorkerListItem } from '@/data/workers.mock'
 import type { OpportunityListItem } from '@/data/opportunities.mock'
 import type { ProductListItem } from '@/data/products.mock'
 import type { ProjectListItem } from '@/data/projects.mock'
@@ -111,6 +112,17 @@ export function fetchExpensesServerPage(
   extraQuery: Record<string, string> = {},
 ): Promise<ServerListFetchResult<ExpenseListItem>> {
   return fetchModulePage(`${API_V1}/expenses`, params, {
+    archived: archived ? 'true' : 'false',
+    ...extraQuery,
+  })
+}
+
+export function fetchWorkersServerPage(
+  params: ServerListFetchParams,
+  archived = false,
+  extraQuery: Record<string, string> = {},
+): Promise<ServerListFetchResult<WorkerListItem>> {
+  return fetchModulePage(`${API_V1}/workers`, params, {
     archived: archived ? 'true' : 'false',
     ...extraQuery,
   })

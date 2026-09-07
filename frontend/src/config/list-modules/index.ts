@@ -7,6 +7,7 @@ import { contactsListConfig } from './contacts'
 import { invoicingListConfig } from './invoicing'
 import { boletasListConfig } from './boletas'
 import { gastosListConfig } from './gastos'
+import { trabajadoresListConfig } from './trabajadores'
 import { opportunitiesListConfig } from './opportunities'
 import { quotesListConfig } from './quotes'
 import { productsListConfig } from './products'
@@ -27,6 +28,7 @@ export type ListModuleSlug =
   | 'facturacion'
   | 'boletas'
   | 'gastos'
+  | 'trabajadores'
   | 'productos'
   | 'reportes'
   | 'usuarios'
@@ -49,6 +51,7 @@ export const listModuleSlugs: ListModuleSlug[] = [
   'facturacion',
   'boletas',
   'gastos',
+  'trabajadores',
   'productos',
   'reportes',
   'usuarios',
@@ -79,6 +82,8 @@ export function getListModuleConfig(
       return asBaseConfig(boletasListConfig)
     case 'gastos':
       return asBaseConfig(gastosListConfig)
+    case 'trabajadores':
+      return asBaseConfig(trabajadoresListConfig)
     case 'productos':
       return asBaseConfig(productsListConfig)
     case 'reportes':

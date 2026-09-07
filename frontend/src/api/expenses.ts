@@ -55,6 +55,8 @@ function normalizeExpenseApiDetail(data: ExpenseApiPayload): ExpenseDetail {
     receiptUrls: Array.isArray(listRest.receiptUrls)
       ? listRest.receiptUrls.filter((url): url is string => typeof url === 'string')
       : [],
+    documentType: asTrimmedString(listRest.documentType),
+    documentFolio: asTrimmedString(listRest.documentFolio),
     isPartnerLoan: Boolean(listRest.isPartnerLoan),
     partnerUserId: asTrimmedString(listRest.partnerUserId) || undefined,
     partnerName: asTrimmedString(listRest.partnerName) || undefined,
@@ -80,6 +82,8 @@ export type ExpenseApiBody = {
   supplierName?: string
   notes?: string
   receiptUrls?: string[]
+  documentType?: string
+  documentFolio?: string
   isPartnerLoan?: boolean
   partnerUserId?: string | null
   partnerName?: string
@@ -102,6 +106,8 @@ export function expenseFormToApiBody(values: CreateExpenseFormValues): ExpenseAp
     supplierName: values.supplierName.trim() || undefined,
     notes: values.notes.trim() || undefined,
     receiptUrls: normalizeExpenseReceiptUrls(values.receiptUrlsText),
+    documentType: values.documentType.trim() || '',
+    documentFolio: values.documentFolio.trim() || '',
     isPartnerLoan: values.isPartnerLoan,
     partnerUserId: values.isPartnerLoan
       ? values.partnerUserId.trim() || null
@@ -130,6 +136,8 @@ export function expenseDetailToApiBody(detail: ExpenseDetail): ExpenseApiBody {
     supplierName: detail.supplierName,
     notes: detail.internalNotes || undefined,
     receiptUrls: detail.receiptUrls ?? [],
+    documentType: detail.documentType ?? '',
+    documentFolio: detail.documentFolio ?? '',
     isPartnerLoan: Boolean(detail.isPartnerLoan),
     partnerUserId: detail.isPartnerLoan
       ? detail.partnerUserId ?? null

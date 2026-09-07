@@ -27,6 +27,8 @@ export type CreateExpenseFormValues = {
   ownerName: string
   notes: string
   receiptUrlsText: string
+  documentType: string
+  documentFolio: string
   isPartnerLoan: boolean
   partnerUserId: string
   partnerName: string
@@ -49,6 +51,8 @@ export function createDefaultExpenseFormValues(
     ownerName: getDefaultOwnerName(),
     notes: '',
     receiptUrlsText: '',
+    documentType: '',
+    documentFolio: '',
     isPartnerLoan: false,
     partnerUserId: '',
     partnerName: '',
@@ -126,6 +130,8 @@ export function formValuesToExpenseListItem(
     owner: values.ownerName.trim(),
     notes: values.notes.trim() || undefined,
     receiptUrls: normalizeExpenseReceiptUrls(values.receiptUrlsText),
+    documentType: values.documentType.trim() || '',
+    documentFolio: values.documentFolio.trim() || '',
     isPartnerLoan: values.isPartnerLoan,
     partnerUserId: values.isPartnerLoan
       ? values.partnerUserId.trim() || undefined

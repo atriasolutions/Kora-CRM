@@ -27,6 +27,8 @@ import { BoletasPage } from '@/pages/BoletasPage'
 import { BoletaDetailPage } from '@/pages/BoletaDetailPage'
 import { GastosPage } from '@/pages/GastosPage'
 import { GastoDetailPage } from '@/pages/GastoDetailPage'
+import { TrabajadoresPage } from '@/pages/TrabajadoresPage'
+import { TrabajadorDetailPage } from '@/pages/TrabajadorDetailPage'
 import { ProjectDetailPage } from '@/pages/ProjectDetailPage'
 import { ProjectsPage } from '@/pages/ProjectsPage'
 import { SolicitudesPage } from '@/pages/SolicitudesPage'
@@ -137,6 +139,8 @@ export default function App() {
                   <Route path="boletas/:boletaId" element={<BoletaDetailPage />} />
                   <Route path="gastos" element={<GastosPage />} />
                   <Route path="gastos/:gastoId" element={<GastoDetailPage />} />
+                  <Route path="trabajadores" element={<TrabajadoresPage />} />
+                  <Route path="trabajadores/:trabajadorId" element={<TrabajadorDetailPage />} />
                   <Route path="usuarios" element={<UsersPage />} />
                   <Route path="usuarios/:userId" element={<UserDetailPage />} />
                   <Route path="perfiles" element={<ProfilesPage />} />
@@ -159,6 +163,7 @@ export default function App() {
                         slug !== 'facturacion' &&
                         slug !== 'boletas' &&
                         slug !== 'gastos' &&
+                        slug !== 'trabajadores' &&
                         slug !== 'usuarios' &&
                         slug !== 'reportes' &&
                         slug !== 'configuracion',
